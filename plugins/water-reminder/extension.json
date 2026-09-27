@@ -3,12 +3,13 @@
   "format": "source",
   "id": "lexora.water-reminder",
   "name": "喝水提醒小助手",
+  "author": "Lexora",
   "icon": "icon.svg",
   "description": "按你设定的间隔发送系统通知，记得休息一下、喝杯水。",
-  "version": "1.0.0",
-  "apiVersion": 1,
+  "version": "1.1.0",
+  "apiVersion": 3,
   "engines": {
-    "lexora": ">=0.7.3"
+    "lexora": ">=0.9.1 <1.0.0"
   },
   "entry": "extension.ts",
   "categories": [
@@ -33,7 +34,6 @@
         "id": "lexora.water-reminder.settings",
         "title": "喝水提醒",
         "entry": "view.ts",
-        "location": "page",
         "resource": "none"
       }
     ],
@@ -50,7 +50,8 @@
       },
       {
         "id": "lexora.water-reminder.notify",
-        "title": "喝水提醒：发送测试通知"
+        "title": "喝水提醒：发送测试通知",
+        "hidden": true
       }
     ]
   }

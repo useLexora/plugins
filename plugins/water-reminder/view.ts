@@ -14,6 +14,7 @@ export async function render(api: ViewContext, container: HTMLElement) {
   stylesheet.rel = 'stylesheet'
   stylesheet.href = new URL('./style.css', import.meta.url).href
   document.head.append(stylesheet)
+  api.signal.addEventListener('abort', () => stylesheet.remove(), { once: true })
   container.innerHTML = `<article class="reminder">
     <img class="reminder__mark" src="${new URL('./icon.svg', import.meta.url).href}" alt="" aria-hidden="true">
     <h1>喝水提醒小助手</h1>
@@ -34,6 +35,8 @@ export async function render(api: ViewContext, container: HTMLElement) {
   const feedback = container.querySelector<HTMLParagraphElement>('.feedback')!
   const buttons = [...container.querySelectorAll<HTMLButtonElement>('button')]
   let current = settings(await api.commands.execute(`${command}.get`))
+  if (api.signal.aborted)
+    return
   let busy = false
   function updateNext() {
     next.textContent = current.enabled && current.nextRunAt ? new Date(current.nextRunAt).toLocaleTimeString(api.environment.language, { hour: '2-digit', minute: '2-digit' }) : '已暂停'
@@ -75,16 +78,31 @@ export async function render(api: ViewContext, container: HTMLElement) {
     const shown = await api.commands.execute(`${command}.notify`)
     feedback.textContent = shown ? '测试通知已发送。' : '系统通知未开启，请在 Lexora 和系统设置中检查通知权限。'
   }), { signal: api.signal })
-  const timer = setInterval(() => {
-    if (busy || document.visibilityState === 'hidden')
+  let timer: ReturnType<typeof setInterval> | undefined
+  function refresh() {
+    if (busy || !api.visible || api.signal.aborted)
       return
     void api.commands.execute(`${command}.get`).then((value) => {
-      if (busy || api.signal.aborted)
+      if (busy || !api.visible || api.signal.aborted)
         return
       current = settings(value)
       updateNext()
     }).catch(() => {})
-  }, 15000)
-  api.signal.addEventListener('abort', () => { clearInterval(timer); stylesheet.remove() }, { once: true })
+  }
+  function setVisible(visible: boolean) {
+    clearInterval(timer)
+    if (!visible || api.signal.aborted)
+      return
+    refresh()
+    timer = setInterval(refresh, 15000)
+  }
+  const visibility = api.onVisibilityChange(setVisible)
+  const environment = api.onEnvironmentChange(updateNext)
+  api.signal.addEventListener('abort', () => {
+    clearInterval(timer)
+    visibility.dispose()
+    environment.dispose()
+  }, { once: true })
   restoreForm()
+  setVisible(api.visible)
 }

@@ -1,8 +1,8 @@
 # Lexora Plugins
 
-Lexora 插件源码、市场目录与分发入口。首个插件：[喝水提醒小助手](plugins/water-reminder/README.md)。
+Lexora 插件源码、市场目录与分发入口。
 
-插件源码按名称放在 `plugins/<name>/`，清单中的 `id` 使用稳定的 `发布者.插件名`，例如 `lexora.water-reminder`。使用 `categories` 和 `tags` 分类，不增加分类目录。
+插件源码按名称放在 `plugins/<name>/`。清单中的 `id` 是稳定身份，升级时保持不变；`author` 独立保存作者署名。使用 `categories` 和 `tags` 分类，不增加分类目录。
 
 ## 开发与安装
 
