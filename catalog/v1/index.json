@@ -7,6 +7,7 @@
         "format": "compiled",
         "id": "lexora.water-reminder",
         "name": "喝水提醒小助手",
+        "author": "Lexora",
         "description": "按你设定的间隔发送系统通知，记得休息一下、喝杯水。",
         "icon": "icon.svg",
         "categories": [
@@ -17,19 +18,23 @@
           "提醒",
           "健康"
         ],
-        "version": "1.0.0",
-        "apiVersion": 1,
+        "version": "1.1.0",
+        "apiVersion": 3,
         "engines": {
-          "lexora": ">=0.7.3"
+          "lexora": ">=0.9.1 <1.0.0"
         },
         "entry": "extension.js",
         "dataVersion": 1,
         "dependencies": {},
         "permissions": {
           "windowEffects": false,
+          "controls": [],
           "notifications": true,
           "schedules": true,
           "selectedResource": "none",
+          "selectedContent": false,
+          "localResources": false,
+          "resourceExport": false,
           "network": []
         },
         "contributes": {
@@ -47,9 +52,10 @@
             {
               "id": "lexora.water-reminder.notify",
               "title": "喝水提醒：发送测试通知",
-              "hidden": false
+              "hidden": true
             }
           ],
+          "menus": [],
           "views": [
             {
               "id": "lexora.water-reminder.settings",
@@ -57,21 +63,22 @@
               "entry": "view.js",
               "stateVersion": 1,
               "resource": "none",
-              "location": "page"
+              "location": "context"
             }
           ],
+          "placements": [],
           "navigation": {
             "title": "喝水提醒",
             "view": "lexora.water-reminder.settings"
           }
         }
       },
-      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0MCA0MCIgZmlsbD0ibm9uZSI+CiAgPHBhdGggZD0iTTIwIDNDMTcgOSA4IDE4IDggMjVhMTIgMTIgMCAwIDAgMjQgMEMzMiAxOCAyMyA5IDIwIDNaIiBzdHJva2U9IiM1ODc0OWEiIHN0cm9rZS13aWR0aD0iMiIvPgogIDxwYXRoIGQ9Ik0xNCAyNWE2IDYgMCAwIDAgNiA2IiBzdHJva2U9IiM1ODc0OWEiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+Cjwvc3ZnPgo=",
+      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSI+CiAgPHN0eWxlPgogICAgOnJvb3QgeyBjb2xvcjogIzQ1NGQ0ODsgfQogICAgQG1lZGlhIChwcmVmZXJzLWNvbG9yLXNjaGVtZTogZGFyaykgeyA6cm9vdCB7IGNvbG9yOiAjZDVkY2Q2OyB9IH0KICA8L3N0eWxlPgogIDxwYXRoIGQ9Ik0xMiAyLjVDOS41IDYgNSAxMC43IDUgMTQuNWE3IDcgMCAwIDAgMTQgMEMxOSAxMC43IDE0LjUgNiAxMiAyLjVaIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIxLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxwYXRoIGQ9Ik04LjUgMTQuNUEzLjUgMy41IDAgMCAwIDEyIDE4IiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIxLjgiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgo8L3N2Zz4K",
       "repository": "https://github.com/useLexora/plugins",
       "artifact": {
-        "url": "https://github.com/useLexora/plugins/releases/download/water-reminder-v1.0.0/water-reminder-1.0.0.lexora-extension",
-        "sha256": "23f5bb9ff9997abaae89ecde5a5db34a3d34ea7fc6c2bc65b1d5953bc0e0cbf9",
-        "size": 6121
+        "url": "https://github.com/useLexora/plugins/releases/download/water-reminder-v1.1.0/water-reminder-1.1.0.lexora-extension",
+        "sha256": "2f40d3b33c764e35a933843e13fbb6297f66cb9b6a043d0887d4a3068b860179",
+        "size": 6505
       }
     }
   ]
