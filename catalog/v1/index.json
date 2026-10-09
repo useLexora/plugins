@@ -88,11 +88,11 @@
         "id": "lexora.auto-title",
         "name": "标题自动生成",
         "author": "Lexora",
-        "description": "首条有效输入提交后后台生成任务标题，支持主动重新生成并保护手动命名。",
+        "description": "首条有效输入提交后后台生成任务标题，保护手动命名，可选随任务目标更新。",
         "icon": "icon.svg",
         "categories": [],
         "tags": [],
-        "version": "1.2.0",
+        "version": "1.2.1",
         "apiVersion": 3,
         "engines": {
           "lexora": ">=0.9.4 <1.0.0"
@@ -147,8 +147,7 @@
                 "title": "重新生成标题",
                 "triggers": [
                   "task:input:committed",
-                  "task:turn:completed",
-                  "user"
+                  "task:turn:completed"
                 ]
               }
             ]
@@ -217,9 +216,9 @@
       "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0IiBmaWxsPSJub25lIj4KICA8cmVjdCB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHJ4PSIxNCIgZmlsbD0iIzUwNkQ5NiIvPgogIDxwYXRoIGQ9Ik0xNSAyMmgyNU0yNy41IDIydjI1TTIxIDQ3aDEzTTE1IDIydjVNNDAgMjJ2NSIgc3Ryb2tlPSIjRkZGIiBzdHJva2Utd2lkdGg9IjMuNSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgPHBhdGggZD0ibTQ3IDExIDIuMiA2LjhMNTYgMjBsLTYuOCAyLjJMNDcgMjlsLTIuMi02LjhMMzggMjBsNi44LTIuMkw0NyAxMVoiIGZpbGw9IiNEQ0VBRkYiLz4KPC9zdmc+Cg==",
       "repository": "https://github.com/useLexora/plugins",
       "artifact": {
-        "url": "https://github.com/useLexora/plugins/releases/download/auto-title-v1.2.0/auto-title-1.2.0.lexora-extension",
-        "sha256": "41abec863bce22ea55c5476d7f4978559e2e023f53580267c414103374e6d8a6",
-        "size": 4724
+        "url": "https://github.com/useLexora/plugins/releases/download/auto-title-v1.2.1/auto-title-1.2.1.lexora-extension",
+        "sha256": "bb6deacf376e6be307d55e4f4bb4426c84ef1797730cfa6fa66de9d1791660ce",
+        "size": 4642
       }
     }
   ]
