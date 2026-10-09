@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "format": "source",
+  "id": "lexora.auto-title",
+  "name": "标题自动生成",
+  "author": "Lexora",
+  "description": "首条有效输入提交后后台生成任务标题，支持主动重新生成并保护手动命名。",
+  "version": "1.2.0",
+  "apiVersion": 3,
+  "engines": {
+    "lexora": ">=0.9.4 <1.0.0"
+  },
+  "entry": "extension.ts",
+  "icon": "icon.svg",
+  "permissions": {
+    "agent": true,
+    "models": true,
+    "tasks": "title",
+    "taskMessages": true
+  },
+  "contributes": {
+    "settings": {
+      "groups": [
+        {
+          "id": "lexora.auto-title.naming",
+          "module": "settings.runtime",
+          "title": "标题自动生成"
+        }
+      ],
+      "items": [
+        {
+          "id": "lexora.auto-title.enabled",
+          "key": "enabled",
+          "group": "lexora.auto-title.naming",
+          "type": "boolean",
+          "title": "启用",
+          "description": "提交输入后在后台生成一次标题，会额外调用模型；内容不足或失败后可在下次输入时重试。",
+          "default": true,
+          "order": 0
+        },
+        {
+          "id": "lexora.auto-title.model",
+          "key": "model",
+          "group": "lexora.auto-title.naming",
+          "type": "model",
+          "title": "生成标题的模型",
+          "description": "留空使用触发任务当前选择的模型。",
+          "default": null,
+          "order": 1,
+          "enabledWhen": {
+            "condition": "lexora.auto-title.available",
+            "params": {
+              "purpose": "configure"
+            }
+          }
+        },
+        {
+          "id": "lexora.auto-title.update-on-goal-change",
+          "key": "updateOnGoalChange",
+          "group": "lexora.auto-title.naming",
+          "type": "boolean",
+          "title": "允许随任务目标更新",
+          "description": "每轮回答后额外调用模型评估，仅在任务目标明显变化时更新自动标题。手动标题始终保留。",
+          "default": false,
+          "order": 2,
+          "enabledWhen": {
+            "condition": "lexora.auto-title.available",
+            "params": {
+              "purpose": "configure"
+            }
+          }
+        }
+      ]
+    },
+    "agent": {
+      "enabledWhen": "enabled",
+      "actions": [
+        {
+          "id": "lexora.auto-title.generate",
+          "title": "重新生成标题",
+          "triggers": [
+            "task:input:committed",
+            "task:turn:completed",
+            "user"
+          ],
+          "enabledWhen": {
+            "condition": "lexora.auto-title.runnable"
+          }
+        }
+      ]
+    },
+    "conditions": [
+      {
+        "id": "lexora.auto-title.available",
+        "inputs": [
+          "configuration",
+          "form"
+        ]
+      },
+      {
+        "id": "lexora.auto-title.runnable",
+        "inputs": [
+          "configuration",
+          "runtime.models",
+          "runtime.task"
+        ]
+      }
+    ]
+  }
+}
