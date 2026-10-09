@@ -4,8 +4,8 @@
   "id": "lexora.auto-title",
   "name": "标题自动生成",
   "author": "Lexora",
-  "description": "首条有效输入提交后后台生成任务标题，支持主动重新生成并保护手动命名。",
-  "version": "1.2.0",
+  "description": "首条有效输入提交后后台生成任务标题，保护手动命名，可选随任务目标更新。",
+  "version": "1.2.1",
   "apiVersion": 3,
   "engines": {
     "lexora": ">=0.9.4 <1.0.0"
@@ -80,8 +80,7 @@
           "title": "重新生成标题",
           "triggers": [
             "task:input:committed",
-            "task:turn:completed",
-            "user"
+            "task:turn:completed"
           ],
           "enabledWhen": {
             "condition": "lexora.auto-title.runnable"
