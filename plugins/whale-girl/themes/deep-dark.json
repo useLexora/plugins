@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "colors": {
+    "canvas": "#13172f",
+    "surface": "#191f3d",
+    "reading": "#13172f",
+    "reading-fg": "#dde6ff",
+    "app-sidebar": "#29335d",
+    "app-sidebar-fg": "#e2eaff",
+    "workspace-sidebar": "#1c2344",
+    "workspace-sidebar-fg": "#dbe6ff",
+    "composer": "#222d54",
+    "composer-fg": "#e6edff",
+    "raised": "#252f56",
+    "subtle": "#303b66",
+    "strong": "#f1f4ff",
+    "fg": "#dbe5ff",
+    "muted": "#a1afd5",
+    "disabled": "#6f7da8",
+    "on-accent": "#172653",
+    "accent": "#9ab8ff",
+    "accent-hover": "#b3ccff",
+    "accent-pressed": "#7d9bdf",
+    "accent-text": "#acc6ff",
+    "focus": "#98bfff",
+    "hover": "#7899ef25",
+    "hover-fg": "#f0f4ff",
+    "selected": "#7e9de844",
+    "selected-hover": "#7e9de85c",
+    "selected-fg": "#e7efff",
+    "pressed": "#7e9de874",
+    "pressed-fg": "#ffffff",
+    "nav-hover": "#5670ad50",
+    "nav-selected": "#4a63a0",
+    "nav-selected-hover": "#586faf",
+    "nav-pressed": "#657fbd",
+    "nav-foreground": "#ffffff",
+    "border": "#8a9ad444",
+    "border-strong": "#a5b6e178",
+    "user-message": "#2d3b68",
+    "link": "#abc7ff",
+    "quote": "#a3abd3",
+    "quote-border": "#7d91c6",
+    "inline-code": "#333660",
+    "inline-code-fg": "#d0bcff",
+    "code": "#1d2447",
+    "code-fg": "#dce6ff",
+    "table-header": "#2e3961",
+    "table-border": "#576b9e",
+    "editor": "#171c39",
+    "editor-fg": "#dde6ff",
+    "editor-line": "#42548448",
+    "editor-gutter": "#7b8bb7",
+    "editor-cursor": "#abc6ff",
+    "syntax-comment": "#8494bf",
+    "syntax-keyword": "#c5aff1",
+    "syntax-string": "#a5ddd4",
+    "syntax-number": "#e8c38e",
+    "syntax-function": "#a3c6ff",
+    "syntax-type": "#95d8f0",
+    "syntax-variable": "#dce6ff",
+    "syntax-operator": "#b6b8f3",
+    "terminal-background": "#1b2041",
+    "terminal-foreground": "#dce6ff",
+    "terminal-muted": "#99a9d3",
+    "terminal-scrollbar": "#64759f",
+    "terminal-mauve": "#c5aff1",
+    "terminal-blue": "#a3c6ff",
+    "terminal-green": "#a5ddd4",
+    "terminal-yellow": "#e8ce99",
+    "terminal-peach": "#e7b797",
+    "terminal-maroon": "#e5a9c4",
+    "terminal-sky": "#95d8f0",
+    "terminal-rosewater": "#e0b9d1",
+    "gold": "#ddbc80",
+    "gold-surface": "#ab884c30",
+    "avatar": "#a5bcf0",
+    "avatar-foreground": "#1c2f5e",
+    "data-violet": "#c5aff1",
+    "data-cyan": "#95d8f0",
+    "data-blue": "#a3c6ff",
+    "success": "#a1dbca",
+    "success-solid": "#8ccab8",
+    "success-surface": "#203e40",
+    "success-surface-hover": "#2a514f",
+    "success-border": "#78b4a567",
+    "warning": "#ebc790",
+    "warning-solid": "#dbb67d",
+    "warning-surface": "#443b32",
+    "warning-surface-hover": "#534735",
+    "warning-border": "#c5a17072",
+    "danger": "#f0b0c6",
+    "danger-solid": "#d591ae",
+    "danger-surface": "#472b49",
+    "danger-surface-hover": "#563454",
+    "danger-border": "#c882a168"
+  },
+  "materials": [
+    {
+      "anchor": "app.sidebar",
+      "gradient": {
+        "angle": 180,
+        "stops": [
+          {
+            "color": "#415a8790",
+            "at": 0
+          },
+          {
+            "color": "#42447480",
+            "at": 48
+          },
+          {
+            "color": "#193d6290",
+            "at": 100
+          }
+        ]
+      }
+    },
+    {
+      "anchor": "workbench.sidebar",
+      "gradient": {
+        "angle": 180,
+        "stops": [
+          {
+            "color": "#273857b0",
+            "at": 0
+          },
+          {
+            "color": "#32315960",
+            "at": 100
+          }
+        ]
+      }
+    },
+    {
+      "anchor": "workbench.pane",
+      "image": "assets/companion-dark.png",
+      "imageOpacity": 0.38,
+      "scale": 0.6,
+      "position": [
+        100,
+        95
+      ],
+      "size": "contain",
+      "gradient": {
+        "angle": 90,
+        "stops": [
+          {
+            "color": "#13172fff",
+            "at": 0
+          },
+          {
+            "color": "#13172fee",
+            "at": 32
+          },
+          {
+            "color": "#13172f90",
+            "at": 64
+          },
+          {
+            "color": "#13172f00",
+            "at": 100
+          }
+        ]
+      }
+    },
+    {
+      "anchor": "composer.input",
+      "gradient": {
+        "angle": 120,
+        "stops": [
+          {
+            "color": "#b0c5ff00",
+            "at": 0
+          },
+          {
+            "color": "#aac2f50e",
+            "at": 100
+          }
+        ]
+      }
+    }
+  ],
+  "welcome": {
+    "text": {
+      "zh-CN": "夜深了，灵感依然有回声。",
+      "en-US": "Even at night, ideas find their echo."
+    },
+    "image": null
+  },
+  "shadows": {
+    "soft": [
+      {
+        "x": 0,
+        "y": 3,
+        "blur": 12,
+        "color": "#090d2840"
+      }
+    ],
+    "raised": [
+      {
+        "x": 0,
+        "y": 5,
+        "blur": 22,
+        "color": "#080b2866"
+      }
+    ],
+    "overlay": [
+      {
+        "x": 0,
+        "y": 12,
+        "blur": 36,
+        "color": "#06092099"
+      }
+    ],
+    "window": [
+      {
+        "x": 0,
+        "y": 18,
+        "blur": 48,
+        "color": "#05091c99"
+      }
+    ]
+  }
+}

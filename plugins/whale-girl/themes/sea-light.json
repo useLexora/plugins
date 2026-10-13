@@ -1,0 +1,225 @@
+{
+  "schemaVersion": 1,
+  "colors": {
+    "canvas": "#eef2ff",
+    "surface": "#f5f6ff",
+    "reading": "#f5f6ff",
+    "reading-fg": "#293968",
+    "app-sidebar": "#cbd8fa",
+    "app-sidebar-fg": "#213773",
+    "workspace-sidebar": "#e0e7fc",
+    "workspace-sidebar-fg": "#293968",
+    "composer": "#ffffff",
+    "composer-fg": "#24355f",
+    "raised": "#f6f7ff",
+    "subtle": "#dbe3fc",
+    "strong": "#192c58",
+    "fg": "#293968",
+    "muted": "#596b99",
+    "disabled": "#8d9cc1",
+    "on-accent": "#ffffff",
+    "accent": "#4562ca",
+    "accent-hover": "#5777e4",
+    "accent-pressed": "#3349a5",
+    "accent-text": "#304eaa",
+    "focus": "#6583e1",
+    "hover": "#617ee326",
+    "hover-fg": "#203675",
+    "selected": "#6383e638",
+    "selected-hover": "#6383e650",
+    "selected-fg": "#203c8d",
+    "pressed": "#6383e666",
+    "pressed-fg": "#173274",
+    "nav-hover": "#9fb8ee70",
+    "nav-selected": "#4865c3",
+    "nav-selected-hover": "#3d57b1",
+    "nav-pressed": "#304796",
+    "nav-foreground": "#ffffff",
+    "border": "#6e85c63d",
+    "border-strong": "#6e85c680",
+    "user-message": "#dbe5ff",
+    "link": "#355bbb",
+    "quote": "#626a99",
+    "quote-border": "#a2acdf",
+    "inline-code": "#e0e6fc",
+    "inline-code-fg": "#5441a6",
+    "code": "#e6eafe",
+    "code-fg": "#2b386d",
+    "table-header": "#d8e2fc",
+    "table-border": "#a7b8e4",
+    "editor": "#f0f2ff",
+    "editor-fg": "#283861",
+    "editor-line": "#ccd8fa60",
+    "editor-gutter": "#7f8cb4",
+    "editor-cursor": "#4668d2",
+    "syntax-comment": "#7a82a7",
+    "syntax-keyword": "#8253b2",
+    "syntax-string": "#237f81",
+    "syntax-number": "#a7763a",
+    "syntax-function": "#3c60b9",
+    "syntax-type": "#227a9c",
+    "syntax-variable": "#314670",
+    "syntax-operator": "#6563ae",
+    "terminal-background": "#e3e9ff",
+    "terminal-foreground": "#26366a",
+    "terminal-muted": "#6677a4",
+    "terminal-scrollbar": "#9caed9",
+    "terminal-mauve": "#8253b2",
+    "terminal-blue": "#3c60b9",
+    "terminal-green": "#237f81",
+    "terminal-yellow": "#957332",
+    "terminal-peach": "#b57450",
+    "terminal-maroon": "#ad5274",
+    "terminal-sky": "#2282a0",
+    "terminal-rosewater": "#996185",
+    "gold": "#a27b3d",
+    "gold-surface": "#eddcba70",
+    "avatar": "#4667bf",
+    "avatar-foreground": "#ffffff",
+    "data-violet": "#8152b1",
+    "data-cyan": "#218da4",
+    "data-blue": "#456bca",
+    "success": "#24776c",
+    "success-solid": "#338b7d",
+    "success-surface": "#e1f2ed",
+    "success-surface-hover": "#d2eae3",
+    "success-border": "#80b7a965",
+    "warning": "#966a26",
+    "warning-solid": "#bb8a3d",
+    "warning-surface": "#fff2d9",
+    "warning-surface-hover": "#f7e5c1",
+    "warning-border": "#b78b4875",
+    "danger": "#b44969",
+    "danger-solid": "#c35d79",
+    "danger-surface": "#fde7ee",
+    "danger-surface-hover": "#f6d5e1",
+    "danger-border": "#c4799165"
+  },
+  "materials": [
+    {
+      "anchor": "app.sidebar",
+      "gradient": {
+        "angle": 180,
+        "stops": [
+          {
+            "color": "#bdd6fc90",
+            "at": 0
+          },
+          {
+            "color": "#c5c5ee80",
+            "at": 48
+          },
+          {
+            "color": "#a8c7e890",
+            "at": 100
+          }
+        ]
+      }
+    },
+    {
+      "anchor": "workbench.sidebar",
+      "gradient": {
+        "angle": 180,
+        "stops": [
+          {
+            "color": "#cfdcfd90",
+            "at": 0
+          },
+          {
+            "color": "#dad2f650",
+            "at": 100
+          }
+        ]
+      }
+    },
+    {
+      "anchor": "workbench.pane",
+      "image": "assets/companion-light.png",
+      "imageOpacity": 0.62,
+      "scale": 0.66,
+      "position": [
+        100,
+        0
+      ],
+      "size": "contain",
+      "gradient": {
+        "angle": 90,
+        "stops": [
+          {
+            "color": "#f5f6ffff",
+            "at": 0
+          },
+          {
+            "color": "#f5f6ffee",
+            "at": 32
+          },
+          {
+            "color": "#f5f6ff90",
+            "at": 64
+          },
+          {
+            "color": "#f5f6ff00",
+            "at": 100
+          }
+        ]
+      }
+    },
+    {
+      "anchor": "composer.input",
+      "gradient": {
+        "angle": 120,
+        "stops": [
+          {
+            "color": "#dfe8ff00",
+            "at": 0
+          },
+          {
+            "color": "#c8ddf53b",
+            "at": 100
+          }
+        ]
+      }
+    }
+  ],
+  "welcome": {
+    "text": {
+      "zh-CN": "一起，把灵感带向更远的海。",
+      "en-US": "Let’s take your ideas out to sea."
+    },
+    "image": null
+  },
+  "shadows": {
+    "soft": [
+      {
+        "x": 0,
+        "y": 3,
+        "blur": 12,
+        "color": "#30468716"
+      }
+    ],
+    "raised": [
+      {
+        "x": 0,
+        "y": 5,
+        "blur": 22,
+        "color": "#30468722"
+      }
+    ],
+    "overlay": [
+      {
+        "x": 0,
+        "y": 12,
+        "blur": 36,
+        "color": "#293e7238"
+      }
+    ],
+    "window": [
+      {
+        "x": 0,
+        "y": 18,
+        "blur": 48,
+        "color": "#30468730"
+      }
+    ]
+  }
+}
