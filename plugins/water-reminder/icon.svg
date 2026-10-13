@@ -1,8 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
-  <style>
-    :root { color: #454d48; }
-    @media (prefers-color-scheme: dark) { :root { color: #d5dcd6; } }
-  </style>
-  <path d="M12 2.5C9.5 6 5 10.7 5 14.5a7 7 0 0 0 14 0C19 10.7 14.5 6 12 2.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M8.5 14.5A3.5 3.5 0 0 0 12 18" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="#E5F1EF"/>
+  <path d="M43 26h4a8 8 0 0 1 0 16h-5" stroke="#367B79" stroke-width="3"/>
+  <path d="M15 23h28l-2 24a6 6 0 0 1-6 5H23a6 6 0 0 1-6-5l-2-24Z" fill="#FFFDF8" stroke="#367B79" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M17 34c8-5 17 5 24 0l-1 12a5 5 0 0 1-5 4H23a5 5 0 0 1-5-4l-1-12Z" fill="#8CCAC8"/>
+  <path d="M22 40v5" stroke="#EFFAF7" stroke-width="3" stroke-linecap="round"/>
+  <path d="M30 10c-2 3-5 6-5 8a5 5 0 0 0 10 0c0-2-3-5-5-8Z" fill="#529B9A"/>
+  <path d="M23 56h13" stroke="#BCD8D3" stroke-width="2" stroke-linecap="round"/>
 </svg>

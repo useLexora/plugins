@@ -4,14 +4,22 @@
   "id": "lexora.auto-title",
   "name": "标题自动生成",
   "author": "Lexora",
-  "description": "首条有效输入提交后后台生成任务标题，保护手动命名，可选随任务目标更新。",
-  "version": "1.2.1",
+  "description": "根据首条有效输入自动生成任务标题，保留手动命名，也可随任务目标变化更新。",
+  "version": "1.2.2",
   "apiVersion": 3,
   "engines": {
     "lexora": ">=0.9.4 <1.0.0"
   },
   "entry": "extension.ts",
   "icon": "icon.svg",
+  "categories": [
+    "效率"
+  ],
+  "tags": [
+    "任务标题",
+    "自动命名",
+    "AI"
+  ],
   "permissions": {
     "agent": true,
     "models": true,

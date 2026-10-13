@@ -6,7 +6,7 @@
   "author": "Lexora",
   "icon": "icon.svg",
   "description": "按你设定的间隔发送系统通知，记得休息一下、喝杯水。",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "apiVersion": 3,
   "engines": {
     "lexora": ">=0.9.1 <1.0.0"

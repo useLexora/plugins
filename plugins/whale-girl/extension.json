@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "lexora.whale-girl",
+  "name": "鲸鱼娘",
+  "author": "Lexora",
+  "description": "海盐与深海两款主题，搭配蓝靛配色与鲸鱼娘角色插画。",
+  "version": "1.0.0",
+  "icon": "icon.svg",
+  "apiVersion": 3,
+  "engines": {
+    "lexora": ">0.10.1"
+  },
+  "categories": [
+    "主题"
+  ],
+  "tags": [
+    "主题",
+    "鲸鱼娘",
+    "DeepSeek"
+  ],
+  "contributes": {
+    "themes": [
+      {
+        "id": "lexora.whale-girl.sea-light",
+        "label": "鲸鱼娘 · 海盐",
+        "appearance": "light",
+        "path": "themes/sea-light.json"
+      },
+      {
+        "id": "lexora.whale-girl.deep-dark",
+        "label": "鲸鱼娘 · 深海",
+        "appearance": "dark",
+        "path": "themes/deep-dark.json"
+      }
+    ]
+  }
+}
