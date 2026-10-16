@@ -96,7 +96,6 @@
     {
       "manifest": {
         "schemaVersion": 1,
-        "format": "compiled",
         "id": "lexora.auto-title",
         "name": "标题自动生成",
         "author": "Lexora",
@@ -110,11 +109,12 @@
           "自动命名",
           "AI"
         ],
-        "version": "1.2.2",
+        "version": "1.3.0",
         "apiVersion": 3,
         "engines": {
-          "lexora": ">=0.9.4 <1.0.0"
+          "lexora": ">=0.12.0 <1.0.0"
         },
+        "format": "compiled",
         "entry": "extension.js",
         "dataVersion": 1,
         "dependencies": {},
@@ -135,6 +135,7 @@
           "network": []
         },
         "contributes": {
+          "iconThemes": [],
           "themes": [],
           "conditions": [
             {
@@ -142,14 +143,6 @@
               "inputs": [
                 "configuration",
                 "form"
-              ]
-            },
-            {
-              "id": "lexora.auto-title.runnable",
-              "inputs": [
-                "configuration",
-                "runtime.models",
-                "runtime.task"
               ]
             }
           ],
@@ -159,16 +152,14 @@
             "tools": [],
             "actions": [
               {
-                "enabledWhen": {
-                  "condition": "lexora.auto-title.runnable",
-                  "params": {}
-                },
                 "id": "lexora.auto-title.generate",
                 "title": "重新生成标题",
                 "triggers": [
-                  "task:input:committed",
+                  "task:created",
+                  "task:reply:started",
                   "task:turn:completed"
-                ]
+                ],
+                "execution": "background"
               }
             ]
           },
@@ -188,7 +179,7 @@
                 "key": "enabled",
                 "group": "lexora.auto-title.naming",
                 "title": "启用",
-                "description": "提交输入后在后台生成一次标题，会额外调用模型；内容不足或失败后可在下次输入时重试。",
+                "description": "仅对启用后创建的新任务，在主回复开始后后台命名；内容不足或失败时可在下次输入时重试。",
                 "order": 0,
                 "type": "boolean",
                 "default": true
@@ -236,9 +227,9 @@
       "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDY0IDY0IiBmaWxsPSJub25lIj4KICA8cmVjdCB4PSIyIiB5PSIyIiB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHJ4PSIxNiIgZmlsbD0iI0U5RUVGOCIvPgogIDxyZWN0IHg9IjE0IiB5PSIxMyIgd2lkdGg9IjM0IiBoZWlnaHQ9IjQyIiByeD0iNiIgZmlsbD0iI0NBRDVFOSIvPgogIDxyZWN0IHg9IjEyIiB5PSIxMCIgd2lkdGg9IjM0IiBoZWlnaHQ9IjQyIiByeD0iNiIgZmlsbD0iI0ZGRkRGOCIgc3Ryb2tlPSIjNDU2MThCIiBzdHJva2Utd2lkdGg9IjIiLz4KICA8cmVjdCB4PSIxOSIgeT0iMTkiIHdpZHRoPSIyMCIgaGVpZ2h0PSI1IiByeD0iMi41IiBmaWxsPSIjNDU2MThCIi8+CiAgPHBhdGggZD0iTTIwIDMyaDE0TTIwIDM5aDkiIHN0cm9rZT0iI0E2QjZDRiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cGF0aCBkPSJtMzMgNDYgMi04IDE0LTE0YTMuNSAzLjUgMCAwIDEgNSA1TDQwIDQzbC03IDNaIiBmaWxsPSIjRUFCODZCIiBzdHJva2U9IiM3OTU4MzgiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIvPgogIDxwYXRoIGQ9Im00NiAyNyA1IDVNMzUgMzhsNSA1IiBzdHJva2U9IiM3OTU4MzgiIHN0cm9rZS13aWR0aD0iMiIvPgogIDxwYXRoIGQ9Im0zMyA0NiAyLTggNSA1LTcgM1oiIGZpbGw9IiNGRkZERjgiLz4KPC9zdmc+Cg==",
       "repository": "https://github.com/useLexora/plugins",
       "artifact": {
-        "url": "https://github.com/useLexora/plugins/releases/download/auto-title-v1.2.2/auto-title-1.2.2.lexora-extension",
-        "sha256": "3b5f5e2d7b8525bcbd2d767e11a7913c5a77df2af35bccf07e201edd70c55807",
-        "size": 4768
+        "url": "https://github.com/useLexora/plugins/releases/download/auto-title-v1.3.0/auto-title-1.3.0.lexora-extension",
+        "sha256": "ef60484c70384d08ba62829fdbac25c4f7c75c6ba8d7e83730b94f68ad91f418",
+        "size": 4951
       }
     },
     {
