@@ -1,0 +1,310 @@
+{
+  "schemaVersion": 1,
+  "format": "source",
+  "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell",
+  "name": "多 Shell · 命令执行",
+  "author": "Lexora",
+  "description": "检测本机已有命令解释器，在原生设置中启用候选、指定路径和配置优先级；命令仍由 Lexora 核心受控执行。",
+  "version": "1.0.0",
+  "apiVersion": 4,
+  "engines": {
+    "lexora": ">=0.15.0"
+  },
+  "icon": "icon.svg",
+  "categories": [
+    "效率"
+  ],
+  "tags": [
+    "Shell",
+    "命令执行",
+    "本机"
+  ],
+  "permissions": {
+    "shells": true
+  },
+  "contributes": {
+    "shells": {
+      "candidates": [
+        {
+          "id": "bash",
+          "enabled": "bashEnabled",
+          "executable": "bashExecutable",
+          "priority": "bashPriority"
+        },
+        {
+          "id": "git-bash",
+          "enabled": "gitBashEnabled",
+          "executable": "gitBashExecutable",
+          "priority": "gitBashPriority"
+        },
+        {
+          "id": "zsh",
+          "enabled": "zshEnabled",
+          "executable": "zshExecutable",
+          "priority": "zshPriority"
+        },
+        {
+          "id": "sh",
+          "enabled": "shEnabled",
+          "executable": "shExecutable",
+          "priority": "shPriority"
+        },
+        {
+          "id": "powershell7",
+          "enabled": "powershell7Enabled",
+          "executable": "powershell7Executable",
+          "priority": "powershell7Priority"
+        },
+        {
+          "id": "powershell51",
+          "enabled": "powershell51Enabled",
+          "executable": "powershell51Executable",
+          "priority": "powershell51Priority"
+        },
+        {
+          "id": "cmd",
+          "enabled": "cmdEnabled",
+          "executable": "cmdExecutable",
+          "priority": "cmdPriority"
+        }
+      ],
+      "settingsGroup": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution"
+    },
+    "settings": {
+      "modules": [],
+      "groups": [
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "module": "settings.runtime",
+          "title": "命令解释器"
+        }
+      ],
+      "items": [
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.bash.enabled",
+          "key": "bashEnabled",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "启用 Bash",
+          "type": "boolean",
+          "default": false,
+          "description": "开启后允许模型选择此候选；未找到或不适用于当前系统的解释器不会执行。",
+          "order": 0
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.bash.executable",
+          "key": "bashExecutable",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "可执行文件路径",
+          "type": "string",
+          "default": "",
+          "description": "默认自动检测；通过“选择文件”指定你信任的本机解释器，或“恢复自动”。检测会调用该程序的固定版本探针。",
+          "order": 1
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.bash.priority",
+          "key": "bashPriority",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "优先级",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "description": "0 保持平台默认；正数越小越优先，同数按候选顺序。设置从下一轮任务生效。",
+          "order": 2
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.git-bash.enabled",
+          "key": "gitBashEnabled",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "启用 Git Bash",
+          "type": "boolean",
+          "default": false,
+          "description": "开启后允许模型选择此候选；未找到或不适用于当前系统的解释器不会执行。",
+          "order": 0
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.git-bash.executable",
+          "key": "gitBashExecutable",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "可执行文件路径",
+          "type": "string",
+          "default": "",
+          "description": "默认自动检测；通过“选择文件”指定你信任的本机解释器，或“恢复自动”。检测会调用该程序的固定版本探针。",
+          "order": 1
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.git-bash.priority",
+          "key": "gitBashPriority",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "优先级",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "description": "0 保持平台默认；正数越小越优先，同数按候选顺序。设置从下一轮任务生效。",
+          "order": 2
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.zsh.enabled",
+          "key": "zshEnabled",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "启用 Zsh",
+          "type": "boolean",
+          "default": false,
+          "description": "开启后允许模型选择此候选；未找到或不适用于当前系统的解释器不会执行。",
+          "order": 0
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.zsh.executable",
+          "key": "zshExecutable",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "可执行文件路径",
+          "type": "string",
+          "default": "",
+          "description": "默认自动检测；通过“选择文件”指定你信任的本机解释器，或“恢复自动”。检测会调用该程序的固定版本探针。",
+          "order": 1
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.zsh.priority",
+          "key": "zshPriority",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "优先级",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "description": "0 保持平台默认；正数越小越优先，同数按候选顺序。设置从下一轮任务生效。",
+          "order": 2
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.sh.enabled",
+          "key": "shEnabled",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "启用 POSIX sh",
+          "type": "boolean",
+          "default": false,
+          "description": "开启后允许模型选择此候选；未找到或不适用于当前系统的解释器不会执行。",
+          "order": 0
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.sh.executable",
+          "key": "shExecutable",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "可执行文件路径",
+          "type": "string",
+          "default": "",
+          "description": "默认自动检测；通过“选择文件”指定你信任的本机解释器，或“恢复自动”。检测会调用该程序的固定版本探针。",
+          "order": 1
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.sh.priority",
+          "key": "shPriority",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "优先级",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "description": "0 保持平台默认；正数越小越优先，同数按候选顺序。设置从下一轮任务生效。",
+          "order": 2
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.powershell7.enabled",
+          "key": "powershell7Enabled",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "启用 PowerShell 7+",
+          "type": "boolean",
+          "default": false,
+          "description": "开启后允许模型选择此候选；未找到或不适用于当前系统的解释器不会执行。",
+          "order": 0
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.powershell7.executable",
+          "key": "powershell7Executable",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "可执行文件路径",
+          "type": "string",
+          "default": "",
+          "description": "默认自动检测；通过“选择文件”指定你信任的本机解释器，或“恢复自动”。检测会调用该程序的固定版本探针。",
+          "order": 1
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.powershell7.priority",
+          "key": "powershell7Priority",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "优先级",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "description": "0 保持平台默认；正数越小越优先，同数按候选顺序。设置从下一轮任务生效。",
+          "order": 2
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.powershell51.enabled",
+          "key": "powershell51Enabled",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "启用 Windows PowerShell 5.1",
+          "type": "boolean",
+          "default": false,
+          "description": "开启后允许模型选择此候选；未找到或不适用于当前系统的解释器不会执行。",
+          "order": 0
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.powershell51.executable",
+          "key": "powershell51Executable",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "可执行文件路径",
+          "type": "string",
+          "default": "",
+          "description": "默认自动检测；通过“选择文件”指定你信任的本机解释器，或“恢复自动”。检测会调用该程序的固定版本探针。",
+          "order": 1
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.powershell51.priority",
+          "key": "powershell51Priority",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "优先级",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "description": "0 保持平台默认；正数越小越优先，同数按候选顺序。设置从下一轮任务生效。",
+          "order": 2
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.cmd.enabled",
+          "key": "cmdEnabled",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "启用 命令提示符 cmd",
+          "type": "boolean",
+          "default": false,
+          "description": "开启后允许模型选择此候选；未找到或不适用于当前系统的解释器不会执行。",
+          "order": 0
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.cmd.executable",
+          "key": "cmdExecutable",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "可执行文件路径",
+          "type": "string",
+          "default": "",
+          "description": "默认自动检测；通过“选择文件”指定你信任的本机解释器，或“恢复自动”。检测会调用该程序的固定版本探针。",
+          "order": 1
+        },
+        {
+          "id": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.cmd.priority",
+          "key": "cmdPriority",
+          "group": "p9b8f69c8f1c74ce5afcd83dba94e44c8.multi-shell.execution",
+          "title": "优先级",
+          "type": "number",
+          "min": 0,
+          "max": 100,
+          "default": 0,
+          "description": "0 保持平台默认；正数越小越优先，同数按候选顺序。设置从下一轮任务生效。",
+          "order": 2
+        }
+      ]
+    }
+  }
+}
