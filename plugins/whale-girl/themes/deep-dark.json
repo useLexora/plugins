@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "colors": {
-    "canvas": "#13172f",
+    "canvas": "#13172f00",
     "surface": "#191f3d",
-    "reading": "#13172f",
+    "reading": "#13172f00",
     "reading-fg": "#dde6ff",
     "app-sidebar": "#29335d",
     "app-sidebar-fg": "#e2eaff",
@@ -97,6 +97,10 @@
   },
   "materials": [
     {
+      "anchor": "window",
+      "color": "#13172f"
+    },
+    {
       "anchor": "app.sidebar",
       "gradient": {
         "angle": 180,
@@ -133,7 +137,7 @@
       }
     },
     {
-      "anchor": "workbench.pane",
+      "anchor": "workbench.workspace",
       "image": "assets/companion-dark.png",
       "imageOpacity": 0.38,
       "scale": 0.6,
