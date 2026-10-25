@@ -748,6 +748,7 @@
         "schemaVersion": 1,
         "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx",
         "name": "Lexora Office",
+        "author": "Lexora",
         "description": "文档、表格、演示文稿与 PDF 的独立工作台，集中管理文件、收藏、历史版本与回收站。",
         "icon": "icon.svg",
         "categories": [
@@ -760,7 +761,7 @@
           "演示文稿",
           "PDF"
         ],
-        "version": "1.0.0",
+        "version": "1.0.1",
         "apiVersion": 4,
         "engines": {
           "lexora": ">=0.16.0"
@@ -1159,9 +1160,9 @@
       "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJsdWUiIHgxPSIxMCIgeTE9IjYiIHgyPSIzMiIgeTI9IjMyIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiM2QjhBRkYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNDI2M0U4Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJncmVlbiIgeDE9IjM4IiB5MT0iNiIgeDI9IjU0IiB5Mj0iMzgiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzRERDVCRiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMxQ0E5OEQiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9Im9yYW5nZSIgeDE9IjQ4IiB5MT0iMzIiIHgyPSIzMiIgeTI9IjU4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiNGRkM4NkEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRjM5QTM4Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJjb3JhbCIgeDE9IjI0IiB5MT0iMjYiIHgyPSIxNCIgeTI9IjU4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiNGRjhFOTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRUU1QTc1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cGF0aCBkPSJNNiAzMlYyMEExNCAxNCAwIDAgMSAyMCA2SDMyTDM4IDIySDI2QTQgNCAwIDAgMCAyMiAyNloiIGZpbGw9InVybCgjYmx1ZSkiLz4KICA8cGF0aCBkPSJNMzIgNkg0NEExNCAxNCAwIDAgMSA1OCAyMFYzMkw0MiAzOFYyNkE0IDQgMCAwIDAgMzggMjJaIiBmaWxsPSJ1cmwoI2dyZWVuKSIvPgogIDxwYXRoIGQ9Ik01OCAzMlY0NEExNCAxNCAwIDAgMSA0NCA1OEgzMkwyNiA0MkgzOEE0IDQgMCAwIDAgNDIgMzhaIiBmaWxsPSJ1cmwoI29yYW5nZSkiLz4KICA8cGF0aCBkPSJNMzIgNThIMjBBMTQgMTQgMCAwIDEgNiA0NFYzMkwyMiAyNlYzOEE0IDQgMCAwIDAgMjYgNDJaIiBmaWxsPSJ1cmwoI2NvcmFsKSIvPgo8L3N2Zz4K",
       "repository": "https://github.com/useLexora/plugins",
       "artifact": {
-        "url": "https://github.com/useLexora/plugins/releases/download/office-v1.0.0/office-1.0.0.lexora-extension",
-        "sha256": "7e86a79540ab6157a22d89bd53ca2dd0c834fb0d4b9133cae2ba676bfce55c7c",
-        "size": 32408541
+        "url": "https://github.com/useLexora/plugins/releases/download/office-v1.0.1/office-1.0.1.lexora-extension",
+        "sha256": "3ccf8886cb135f8d8d7818faa03f343511aaaff178330842d0c3fd28fec0ead6",
+        "size": 32406116
       }
     }
   ]
