@@ -1,0 +1,61 @@
+{
+  "synthetic": true,
+  "description": "所有名称、数量、单价及日期均为插件验收合成数据，不代表真实业务。",
+  "calculation": {
+    "engine": "LibreOffice",
+    "formula_count": 12,
+    "formula_errors": 0,
+    "expected_values": {
+      "销售明细!E4": 258,
+      "销售明细!E5": 247.5,
+      "销售明细!E6": 225,
+      "销售明细!E7": 112,
+      "销售明细!E8": 299,
+      "销售明细!E9": 119.4,
+      "销售明细!C10": 21,
+      "销售明细!E10": 1260.9,
+      "汇总!B4": 1260.9,
+      "汇总!B5": 126.09,
+      "汇总!B6": 1134.81,
+      "汇总!B7": 21
+    },
+    "cache_transfer": "Only formula v elements copied into original OOXML; styles, charts, drawings and formulas preserved."
+  },
+  "files": {
+    "business.xlsx": {
+      "bytes": 12185,
+      "sha256": "841928789f509ba15b31f1bdc8be86e8c1fb41a13d663398a18efa47f763da13"
+    },
+    "empty.xlsx": {
+      "bytes": 4798,
+      "sha256": "e7d3e640839a4c61247d443787f727cee97330c646cea0f279ddfec0961420cf"
+    },
+    "invalid.xlsx": {
+      "bytes": 69,
+      "sha256": "b32d9925374c81327a71c53d989d528f7d78726dc2e27ad335e99b8294bc0727"
+    },
+    "protected.xlsx": {
+      "bytes": 5244,
+      "sha256": "427b9c9db6b8a73ef466aff1e8e8412739894c095264c7b9021fff7470c3e213"
+    },
+    "sparse.xlsx": {
+      "bytes": 5052,
+      "sha256": "767d3b078181c720513b233f29d43fdb9956aff9a0a81b7ddcf3176954be074b"
+    }
+  },
+  "recommended_edits": {
+    "business.xlsx": {
+      "销售明细!B4": "晨光钢笔（已修改）",
+      "销售明细!C4": 3
+    }
+  },
+  "expected_after_edits": {
+    "销售明细!E4": 387,
+    "销售明细!C10": 22,
+    "销售明细!E10": 1389.9,
+    "汇总!B4": 1389.9,
+    "汇总!B5": 138.99,
+    "汇总!B6": 1250.91,
+    "汇总!B7": 22
+  }
+}

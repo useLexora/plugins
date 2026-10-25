@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="blue" x1="10" y1="6" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6B8AFF"/>
+      <stop offset="1" stop-color="#4263E8"/>
+    </linearGradient>
+    <linearGradient id="green" x1="38" y1="6" x2="54" y2="38" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4DD5BF"/>
+      <stop offset="1" stop-color="#1CA98D"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="48" y1="32" x2="32" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFC86A"/>
+      <stop offset="1" stop-color="#F39A38"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="24" y1="26" x2="14" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8E93"/>
+      <stop offset="1" stop-color="#EE5A75"/>
+    </linearGradient>
+  </defs>
+  <path d="M6 32V20A14 14 0 0 1 20 6H32L38 22H26A4 4 0 0 0 22 26Z" fill="url(#blue)"/>
+  <path d="M32 6H44A14 14 0 0 1 58 20V32L42 38V26A4 4 0 0 0 38 22Z" fill="url(#green)"/>
+  <path d="M58 32V44A14 14 0 0 1 44 58H32L26 42H38A4 4 0 0 0 42 38Z" fill="url(#orange)"/>
+  <path d="M32 58H20A14 14 0 0 1 6 44V32L22 26V38A4 4 0 0 0 26 42Z" fill="url(#coral)"/>
+</svg>

@@ -1,0 +1,2 @@
+upstream/*.patch -text -whitespace
+**/LICENSE* -whitespace

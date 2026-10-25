@@ -1,0 +1,33 @@
+.office-docx-editor {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+.office-docx-editor > .app-shell {
+  height: 100%;
+}
+.office-docx-editor .file-tab-wrap,
+.office-docx-editor .ribbon-group:has(.ai-entry),
+.office-docx-editor .ai-dock,
+.office-docx-editor .ribbon-group:has([data-tip*="Zotero"]) {
+  display: none;
+}
+.office-docx-editor .ribbon-tabs {
+  -webkit-app-region: no-drag;
+  padding-top: 0;
+}
+.office-docx-editor .ribbon-tab {
+  min-height: 30px;
+}
+.office-docx-editor .app-main {
+  min-height: 0;
+}
+
+.office-docx-editor [data-tip^="新建标签"],
+.office-docx-editor .rb-split-wrap:has([data-tip^="切换到其他标签"]){display:none!important}
+
+.office-docx-editor .autosave-toggle{display:none!important}
+
+.office-docx-editor .ribbon-tabs > .qa-btn:first-of-type { display: none; }
+
+.office-docx-editor .office-paste-error { color: var(--o-danger); font-size: 12px; line-height: 1.6; }

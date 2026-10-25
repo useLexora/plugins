@@ -1,0 +1,247 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": [
+      "ES2023",
+      "DOM",
+      "WebWorker",
+      "DOM.Iterable"
+    ],
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": [
+      "node"
+    ],
+    "esModuleInterop": true,
+    "jsx": "react-jsx",
+    "paths": {
+      "@genoffice/xlsx-gateway/*": [
+        "./vendor/genoffice/packages/xlsx-gateway/src/*.ts"
+      ],
+      "@genoffice/zip-gate": [
+        "./vendor/genoffice/packages/zip-gate/src/index.ts"
+      ],
+      "@genoffice/agent-core": [
+        "./vendor/genoffice/packages/agent-core/src/index.ts"
+      ],
+      "@genoffice/agent-core/redact-range": [
+        "./vendor/genoffice/packages/agent-core/src/redact-range.ts"
+      ],
+      "@genoffice/agent-core/redact-core": [
+        "./vendor/genoffice/packages/agent-core/src/redact-core.ts"
+      ],
+      "@genoffice/ai-provider": [
+        "./vendor/genoffice/packages/ai-provider/src/index.ts"
+      ],
+      "@genoffice/ai-provider/browser": [
+        "./vendor/genoffice/packages/ai-provider/src/browser.ts"
+      ],
+      "@genoffice/ai-provider/codex-app-server": [
+        "./vendor/genoffice/packages/ai-provider/src/codex-app-server.ts"
+      ],
+      "@genoffice/ai-provider/custom-models": [
+        "./vendor/genoffice/packages/ai-provider/src/custom-models.ts"
+      ],
+      "@genoffice/ai-provider/trace": [
+        "./vendor/genoffice/packages/ai-provider/src/trace.ts"
+      ],
+      "@genoffice/docx-engine": [
+        "./vendor/genoffice/packages/docx-engine/src/index.ts"
+      ],
+      "@genoffice/docx-engine/math": [
+        "./vendor/genoffice/packages/docx-engine/src/math.ts"
+      ],
+      "@genoffice/docx-engine/metafile": [
+        "./vendor/genoffice/packages/docx-engine/src/metafile.ts"
+      ],
+      "@genoffice/docx-engine/zip-splice": [
+        "./vendor/genoffice/packages/docx-engine/src/zip-splice.ts"
+      ],
+      "@genoffice/docx-engine/lazy-media": [
+        "./vendor/genoffice/packages/docx-engine/src/lazy-media.ts"
+      ],
+      "@genoffice/electron-utils": [
+        "./vendor/genoffice/packages/electron-utils/src/index.ts"
+      ],
+      "@genoffice/electron-utils/atomic-write": [
+        "./vendor/genoffice/packages/electron-utils/src/atomic-write.ts"
+      ],
+      "@genoffice/electron-utils/disk-watch": [
+        "./vendor/genoffice/packages/electron-utils/src/disk-watch.ts"
+      ],
+      "@genoffice/electron-utils/drop-open": [
+        "./vendor/genoffice/packages/electron-utils/src/drop-open.ts"
+      ],
+      "@genoffice/electron-utils/font-catalog": [
+        "./vendor/genoffice/packages/electron-utils/src/font-catalog.ts"
+      ],
+      "@genoffice/electron-utils/font-store": [
+        "./vendor/genoffice/packages/electron-utils/src/font-store.ts"
+      ],
+      "@genoffice/electron-utils/generated-images": [
+        "./vendor/genoffice/packages/electron-utils/src/generated-images.ts"
+      ],
+      "@genoffice/electron-utils/headless-export": [
+        "./vendor/genoffice/packages/electron-utils/src/headless-export.ts"
+      ],
+      "@genoffice/electron-utils/main-proxy": [
+        "./vendor/genoffice/packages/electron-utils/src/main-proxy.ts"
+      ],
+      "@genoffice/electron-utils/print-job": [
+        "./vendor/genoffice/packages/electron-utils/src/print-job.ts"
+      ],
+      "@genoffice/electron-utils/print-window": [
+        "./vendor/genoffice/packages/electron-utils/src/print-window.ts"
+      ],
+      "@genoffice/electron-utils/remote-image": [
+        "./vendor/genoffice/packages/electron-utils/src/remote-image.ts"
+      ],
+      "@genoffice/electron-utils/renderer-protocol": [
+        "./vendor/genoffice/packages/electron-utils/src/renderer-protocol.ts"
+      ],
+      "@genoffice/electron-utils/renderer-scheme": [
+        "./vendor/genoffice/packages/electron-utils/src/renderer-scheme.ts"
+      ],
+      "@genoffice/electron-utils/safe-external-url": [
+        "./vendor/genoffice/packages/electron-utils/src/safe-external-url.ts"
+      ],
+      "@genoffice/electron-utils/safe-remote-url": [
+        "./vendor/genoffice/packages/electron-utils/src/safe-remote-url.ts"
+      ],
+      "@genoffice/font-metrics": [
+        "./vendor/genoffice/packages/font-metrics/src/index.ts"
+      ],
+      "@genoffice/font-metrics/resolve": [
+        "./vendor/genoffice/packages/font-metrics/src/resolve.ts"
+      ],
+      "@genoffice/font-metrics/word-faces.json": [
+        "./vendor/genoffice/packages/font-metrics/word-faces.json"
+      ],
+      "@genoffice/i18n": [
+        "./vendor/genoffice/packages/i18n/src/index.ts"
+      ],
+      "@genoffice/pdf2docx": [
+        "./vendor/genoffice/packages/pdf2docx/src/index.ts"
+      ],
+      "@genoffice/pipelines": [
+        "./vendor/genoffice/packages/pipelines/src/index.ts"
+      ],
+      "@genoffice/pipelines/slides": [
+        "./vendor/genoffice/packages/pipelines/src/slides/index.ts"
+      ],
+      "@genoffice/pipelines/slides/layout-audit": [
+        "./vendor/genoffice/packages/pipelines/src/slides/layout-audit.ts"
+      ],
+      "@genoffice/pptx-engine": [
+        "./vendor/genoffice/packages/pptx-engine/src/index.ts"
+      ],
+      "@genoffice/pptx-engine/custgeom": [
+        "./vendor/genoffice/packages/pptx-engine/src/custgeom.ts"
+      ],
+      "@genoffice/pptx-engine/table-grid": [
+        "./vendor/genoffice/packages/pptx-engine/src/table-grid.ts"
+      ],
+      "@genoffice/pptx-engine/identity": [
+        "./vendor/genoffice/packages/pptx-engine/src/identity.ts"
+      ],
+      "@genoffice/pptx-engine/chart-workbook": [
+        "./vendor/genoffice/packages/pptx-engine/src/chart-workbook.ts"
+      ],
+      "@genoffice/pptx-engine/model3d": [
+        "./vendor/genoffice/packages/pptx-engine/src/model3d.ts"
+      ],
+      "@genoffice/pptx-engine/named-action": [
+        "./vendor/genoffice/packages/pptx-engine/src/named-action.ts"
+      ],
+      "@genoffice/pptx-engine/background-promote": [
+        "./vendor/genoffice/packages/pptx-engine/src/background-promote.ts"
+      ],
+      "@genoffice/pptx-ops": [
+        "./vendor/genoffice/packages/pptx-ops/src/index.ts"
+      ],
+      "@genoffice/pptx-ops/op-docs": [
+        "./vendor/genoffice/packages/pptx-ops/src/op-docs.ts"
+      ],
+      "@genoffice/pptx-ops/font-size": [
+        "./vendor/genoffice/packages/pptx-ops/src/font-size.ts"
+      ],
+      "@genoffice/pptx-render": [
+        "./vendor/genoffice/packages/pptx-render/src/index.ts"
+      ],
+      "@genoffice/pptx-render/preset-geometry": [
+        "./vendor/genoffice/packages/pptx-render/src/preset-geometry.ts"
+      ],
+      "@genoffice/pptx-render/auto-num": [
+        "./vendor/genoffice/packages/pptx-render/src/auto-num.ts"
+      ],
+      "@genoffice/project-store": [
+        "./vendor/genoffice/packages/project-store/src/index.ts"
+      ],
+      "@genoffice/ui": [
+        "./vendor/genoffice/packages/ui/src/index.ts"
+      ],
+      "@genoffice/ui/ai-panel-prefs": [
+        "./vendor/genoffice/packages/ui/src/ai-panel-prefs.ts"
+      ],
+      "@genoffice/ui/tokens.css": [
+        "./vendor/genoffice/packages/ui/src/tokens.css"
+      ],
+      "@genoffice/ui/screentip.css": [
+        "./vendor/genoffice/packages/ui/src/screentip.css"
+      ],
+      "@genoffice/ui/color-picker.css": [
+        "./vendor/genoffice/packages/ui/src/color-picker.css"
+      ],
+      "@genoffice/ui/dropdown.css": [
+        "./vendor/genoffice/packages/ui/src/dropdown.css"
+      ],
+      "@genoffice/ui/find-panel.css": [
+        "./vendor/genoffice/packages/ui/src/find-panel.css"
+      ],
+      "@genoffice/ui/ribbon-collapse.css": [
+        "./vendor/genoffice/packages/ui/src/ribbon-collapse.css"
+      ],
+      "@genoffice/ui/markdown.css": [
+        "./vendor/genoffice/packages/ui/src/markdown.css"
+      ],
+      "@genoffice/ui/ai-panel-prefs.css": [
+        "./vendor/genoffice/packages/ui/src/ai-panel-prefs.css"
+      ],
+      "@genoffice/ui/ai-scope-quote.css": [
+        "./vendor/genoffice/packages/ui/src/ai-scope-quote.css"
+      ],
+      "@genoffice/ui/ai-queue-strip.css": [
+        "./vendor/genoffice/packages/ui/src/ai-queue-strip.css"
+      ],
+      "@genoffice/ui/ai-usage.css": [
+        "./vendor/genoffice/packages/ui/src/ai-usage.css"
+      ],
+      "@genoffice/ui/image-dialogs.css": [
+        "./vendor/genoffice/packages/ui/src/image-dialogs.css"
+      ],
+      "@genoffice/ui/image-viewer.css": [
+        "./vendor/genoffice/packages/ui/src/image-viewer.css"
+      ],
+      "@genoffice/ui/fonts/*": [
+        "./vendor/genoffice/packages/ui/src/fonts/*"
+      ],
+      "@genoffice/ui/ai-model-picker.css": [
+        "./vendor/genoffice/packages/ui/src/ai-model-picker.css"
+      ],
+      "@genoffice/ui/ai-skills.css": [
+        "./vendor/genoffice/packages/ui/src/ai-skills.css"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "vendor/genoffice/apps/docs/src/renderer/env.d.ts",
+    "vendor/genoffice/apps/docs/src/renderer/bidi-js.d.ts",
+    "vendor/genoffice/apps/sheets/src/renderer/env.d.ts"
+  ]
+}

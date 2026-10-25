@@ -1,0 +1,1687 @@
+--- a/apps/docs/src/renderer/App.tsx
++++ b/apps/docs/src/renderer/App.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { scriptFontHtml } from './editor/script-fonts'
+ import { carryDocSeen } from './ai/tools'
+ import { DOC_CSS_COMMITTED_EVENT, WRAP_WIDTHS_COMMITTED_EVENT } from './editor/cjk-punct-shrink'
+@@ -781,7 +783,7 @@
+   return !('needsPassword' in result)
+ }
+ 
+-export function App() {
++export function App({ onFileContext, onDirty, onLoadError, onSaveRequest }: { onSaveRequest?: () => Promise<void>; onFileContext?: (read: () => FileActionContext) => void; onDirty?: (dirty: boolean) => void; onLoadError?: (error: Error) => void }) {
+   // subscribe to language switches for re-render; strings all go through module-level t, so memoized callbacks never capture stale closures
+   const { lang } = useI18n()
+   const [doc, setDoc] = useState<DocState | null>(null)
+@@ -2131,7 +2133,10 @@
+     const outcome = await loadFileImpl(fileCtxRef.current, result)
+     // a failed open with no document yet (boot, or the open that superseded the
+     // boot open) must land on blank instead of the "Opening…" screen
+-    if (outcome === 'failed' && !fileCtxRef.current.doc) await newFileImpl(fileCtxRef.current)
++    if (outcome === 'failed' && !fileCtxRef.current.doc) {
++      if (onLoadError) onLoadError(new Error('Word 文档无法打开。'))
++      else await newFileImpl(fileCtxRef.current)
++    }
+     return outcome
+   }, [])
+   const resetFile = useCallback(() => newFileImpl(fileCtxRef.current), [])
+@@ -2310,7 +2315,13 @@
+   }
+ 
+   const save = useCallback(
+-    (saveAs: boolean, auto = false) => saveImpl(fileCtxRef.current, saveAs, auto),
++    async (saveAs: boolean, auto = false) => {
++      if (onSaveRequest) {
++        try { await onSaveRequest(); return true }
++        catch (error) { setStatus(error instanceof Error ? error.message : String(error)); return false }
++      }
++      return saveImpl(fileCtxRef.current, saveAs, auto)
++    },
+     [],
+   )
+ 
+@@ -2325,7 +2336,7 @@
+     if (!result) return
+     if (!result.ok) {
+       setStatus(result.error)
+-      return
++      throw new Error(result.error)
+     }
+     setMergeSource(result.source)
+     setStatus(
+@@ -5448,6 +5459,10 @@
+   const anyDirtyRef = useRef(false)
+   const hasUnsavedChanges = isDocDirty(fileCtxRef.current)
+   anyDirtyRef.current = hasUnsavedChanges
++  useEffect(() => {
++    onFileContext?.(() => fileCtxRef.current)
++    onDirty?.(hasUnsavedChanges)
++  })
+ 
+   // close guard: the main process queries dirty state before closing a tab/window; choosing "Save" runs a full save and reports back
+   useEffect(() => {
+@@ -6935,7 +6950,7 @@
+     onHeader: (next: HeaderFooter) => commitHfAt(0, 'header', headerAreaView, next),
+     onPageNumFormat: openPgNumModal,
+     onInsertField: insertField,
+-    onPickMergeDataSource: () => void pickMergeDataSource(),
++    onPickMergeDataSource: pickMergeDataSource,
+     onMergeMailings: mergeMailings,
+     onFooter: (next: HeaderFooter) => commitHfAt(lastSectionIdx, 'footer', footerAreaView, next),
+     onHfAction: (action: HfAction) => onHfAction(action),
+--- a/apps/docs/src/renderer/components/ContextMenu.tsx
++++ b/apps/docs/src/renderer/components/ContextMenu.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { useEffect, useMemo, useRef, useState } from 'react'
+ import type { Editor } from '@tiptap/core'
+ import type { Command } from '@tiptap/pm/state'
+@@ -28,6 +30,7 @@
+   shapeWrapOf,
+ } from '../editor/floating-z-order'
+ import { pasteFromClipboard } from '../editor/paste-actions'
++import { showToast } from './toast-bus'
+ import { setTableAutoFit } from '../editor/table-properties'
+ import { distributeSelectedColumns } from '../editor/table-sizing'
+ import {
+@@ -227,7 +230,18 @@
+     onLink()
+   }
+   const copyLink = () => {
+-    if (linkHref) void navigator.clipboard.writeText(linkHref)
++    if (!linkHref || editor.isDestroyed) return
++    const desktop = window.desktop
++    const copy = async () => {
++      try {
++        if (!desktop.clipboard) throw new Error('Clipboard unavailable')
++        await desktop.clipboard.write({ text: linkHref })
++        if (!editor.isDestroyed && window.desktop === desktop) showToast('链接已复制。')
++      } catch {
++        if (!editor.isDestroyed && window.desktop === desktop) showToast('未能复制链接，请检查剪贴板写入授权后重试。', 'error')
++      }
++    }
++    void copy()
+   }
+   const field = fieldRangeAt(editor.state, clickPos)
+   const canComment = hasSelection || wordRangeAtCaret(editor) !== null
+--- a/apps/docs/src/renderer/components/MailMergePanel.tsx
++++ b/apps/docs/src/renderer/components/MailMergePanel.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { useMemo, useState } from 'react'
+ import type { Editor } from '@tiptap/core'
+ import { mergeFieldInstruction } from '@genoffice/docx-engine'
+@@ -23,7 +25,7 @@
+   /** the data source the user picked, null when there is none yet */
+   source: MergeDataSource | null
+   /** open the file dialog and read the recipient list */
+-  onPickSource: () => void
++  onPickSource: () => void | Promise<void>
+   /** insert a merge field at the caret */
+   onInsertField: (instr: string) => void
+   /** build the documents and write them */
+@@ -59,6 +61,13 @@
+     if (!record) return ''
+     return documentText(substituteMergeFields(editor.getJSON() as PmNode, record))
+   }, [editor, record])
++
++  const pickSource = async () => {
++    setError('')
++    setDone('')
++    try { await onPickSource() }
++    catch (error) { setError(error instanceof Error ? error.message : String(error)) }
++  }
+ 
+   const insertField = (name: string) => {
+     onInsertField(mergeFieldInstruction(name))
+@@ -109,7 +118,7 @@
+             <span className="mailmerge-source-name">
+               {source ? source.name : t('ribbonMailingsNoSource')}
+             </span>
+-            <button onClick={onPickSource}>{t('ribbonMailingsSelectSource')}</button>
++            <button onClick={() => void pickSource()}>{t('ribbonMailingsSelectSource')}</button>
+           </div>
+         </div>
+ 
+--- a/apps/docs/src/renderer/components/PasteSpecialDialog.tsx
++++ b/apps/docs/src/renderer/components/PasteSpecialDialog.tsx
+@@ -1,8 +1,12 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /** Paste ▸ Paste Special…: the clipboard flavors actually present, pasted as the chosen one. */
+-import { useEffect, useState } from 'react'
++import { useEffect, useMemo, useState } from 'react'
+ import type { Editor } from '@tiptap/core'
+ import {
+   pastePayload,
++  capturePasteTarget,
++  PASTE_TARGET_CHANGED,
+   readClipboardPayload,
+   type ClipboardPayload,
+   type PasteChoice,
+@@ -33,23 +37,36 @@
+   const keys = useModalKeys(onClose)
+   const [payload, setPayload] = useState<ClipboardPayload | null>(null)
+   const [flavor, setFlavor] = useState<Flavor | null>(null)
++  const [error, setError] = useState('')
++  const target = useMemo(() => capturePasteTarget(editor), [editor])
+ 
+   useEffect(() => {
+     let alive = true
+     void readClipboardPayload().then((read) => {
+       if (!alive) return
++      if (!target.current()) { setError(PASTE_TARGET_CHANGED); return }
+       setPayload(read)
+       setFlavor(availableFlavors(read)[0] ?? null)
++    }).catch((failure: unknown) => {
++      if (alive) setError(failure instanceof Error ? failure.message : '无法读取剪贴板，请检查读取授权后重试。')
+     })
+     return () => {
+       alive = false
+     }
+-  }, [])
++  }, [target])
+ 
+   const flavors = payload ? availableFlavors(payload) : []
+   const ok = () => {
+-    if (payload && flavor) pastePayload(editor, payload, CHOICES[flavor])
+-    onClose()
++    if (!target.current()) { setError(PASTE_TARGET_CHANGED); return }
++    try {
++      if (payload && flavor && !pastePayload(editor, payload, CHOICES[flavor])) {
++        setError('剪贴板中没有可粘贴的文本。图片请使用插入图片或 Ctrl+V。')
++        return
++      }
++      onClose()
++    } catch (failure) {
++      setError(failure instanceof Error ? failure.message : '粘贴失败，请重试。')
++    }
+   }
+ 
+   return (
+@@ -66,6 +83,7 @@
+       >
+         <h2>{t('ribbonPasteSpecialTitle')}</h2>
+         <p className="modal-desc">{t('ribbonPasteSpecialAs')}</p>
++        {error && <p className="office-paste-error" role="alert">{error}</p>}
+         {payload && flavors.length === 0 && (
+           <p className="fld-hint">{t('ribbonPasteSpecialEmpty')}</p>
+         )}
+@@ -75,7 +93,7 @@
+               type="radio"
+               name="paste-special-flavor"
+               checked={flavor === f}
+-              onChange={() => setFlavor(f)}
++              onChange={() => { setFlavor(f); setError('') }}
+               onDoubleClick={ok}
+             />
+             <span className="ctl" aria-hidden="true" />
+@@ -86,7 +104,7 @@
+           <button type="button" onClick={onClose}>
+             {t('ribbonCancel')}
+           </button>
+-          <button type="button" className="primary" onClick={ok} disabled={!flavor}>
++          <button type="button" className="primary" onClick={ok} disabled={!flavor || !!error}>
+             {t('ribbonOk')}
+           </button>
+         </div>
+--- a/apps/docs/src/renderer/components/Ribbon.tsx
++++ b/apps/docs/src/renderer/components/Ribbon.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+ import { createPortal } from 'react-dom'
+ import type { Lang } from '@genoffice/i18n'
+@@ -387,7 +389,7 @@
+   /** Mailings: the data source the user picked, null when there is none yet */
+   mergeSource: MergeDataSource | null
+   /** Mailings: open the file dialog and read the recipient list */
+-  onPickMergeDataSource: () => void
++  onPickMergeDataSource: () => void | Promise<void>
+   /** Mailings: build the merged documents and write them */
+   onMergeMailings: (request: MailMergeRequest) => Promise<MailMergeResponse>
+   /** current document path (View → New Window opens it in another window) */
+--- a/apps/docs/src/renderer/components/ribbon-mailings-tab.tsx
++++ b/apps/docs/src/renderer/components/ribbon-mailings-tab.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { useState } from 'react'
+ import type { Editor } from '@tiptap/core'
+ import { mergeFieldInstruction } from '@genoffice/docx-engine'
+@@ -25,7 +27,7 @@
+   /** the data source the user picked, null when there is none yet */
+   source: MergeDataSource | null
+   /** open the file dialog and read the recipient list */
+-  onPickSource: () => void
++  onPickSource: () => void | Promise<void>
+   /** insert a merge field at the caret */
+   onInsertField: (instr: string) => void
+   /** build the documents and write them */
+--- a/apps/docs/src/renderer/doc-bytes.ts
++++ b/apps/docs/src/renderer/doc-bytes.ts
+@@ -1,5 +1,10 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
++let byteReader: ((url: string) => Promise<Uint8Array>) | null = null
++export function setDocBytesReader(reader: typeof byteReader): void { byteReader = reader }
+ /** Fetch the bytes behind a one-shot handoff URL from the main process (see main/byte-handoff.ts). */
+ export async function fetchDocBytes(url: string): Promise<Uint8Array> {
++  if (byteReader && url.startsWith('office-bytes:')) return byteReader(url)
+   const res = await fetch(url)
+   if (!res.ok) throw new Error(`document bytes unavailable (${res.status})`)
+   return new Uint8Array(await res.arrayBuffer())
+--- a/apps/docs/src/renderer/editor/paste-actions.ts
++++ b/apps/docs/src/renderer/editor/paste-actions.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /**
+  * Clipboard pastes started from the UI (ribbon Paste, its split menu, Paste
+  * Special, the context menu). Every entry runs the editor's full paste
+@@ -14,6 +16,7 @@
+   type PasteMode,
+ } from './paste-options'
+ import { isForeignPasteHtml } from './paste-web-html'
++import { showToast } from '../components/toast-bus'
+ 
+ export type ClipboardPayload = { html: string; text: string; image: Blob | null }
+ 
+@@ -21,26 +24,27 @@
+ export type PasteChoice = PasteMode | 'picture'
+ 
+ export async function readClipboardPayload(): Promise<ClipboardPayload> {
+-  const payload: ClipboardPayload = { html: '', text: '', image: null }
+   try {
+-    for (const item of await navigator.clipboard.read()) {
+-      if (!payload.text && item.types.includes('text/plain')) {
+-        payload.text = await (await item.getType('text/plain')).text()
+-      }
+-      if (!payload.html && item.types.includes('text/html')) {
+-        payload.html = await (await item.getType('text/html')).text()
+-      }
+-      const imageType = item.types.find((type) => type.startsWith('image/'))
+-      if (!payload.image && imageType) payload.image = await item.getType(imageType)
+-    }
++    if (!window.desktop.clipboard) throw new Error('Clipboard unavailable')
++    const payload = await window.desktop.clipboard.read()
++    return { html: payload.html ?? '', text: payload.text ?? '', image: null }
+   } catch {
+-    try {
+-      payload.text = await navigator.clipboard.readText()
+-    } catch {
+-      /* clipboard unavailable or denied */
+-    }
++    throw new Error('无法读取剪贴板，请检查剪贴板读取授权后重试，或使用 Ctrl+V。')
+   }
+-  return payload
++}
++
++export const PASTE_TARGET_CHANGED = '文档或选区已变化，已取消粘贴。请在目标位置重新粘贴。'
++
++export function capturePasteTarget(editor: Editor) {
++  const desktop = window.desktop
++  const view = editor.view
++  const doc = editor.state.doc
++  const selection = editor.state.selection
++  const sameSession = () => !editor.isDestroyed && window.desktop === desktop && editor.view === view
++  return {
++    sameSession,
++    current: () => sameSession() && editor.isEditable && editor.state.doc === doc && editor.state.selection.eq(selection),
++  }
+ }
+ 
+ function clipboardEvent(html: string | null, text: string): ClipboardEvent {
+@@ -83,6 +87,13 @@
+   mode?: PasteChoice,
+ ): boolean {
+   const { html, text, image } = payload
++  if (html && !image && mode !== 'text') {
++    const body = new window.DOMParser().parseFromString(html, 'text/html').body
++    const images = [...body.querySelectorAll('img')]
++    if (images.length && !(body.textContent ?? '').trim() && images.every(node => /^https?:\/\//i.test(node.getAttribute('src') ?? ''))) {
++      throw new Error('菜单粘贴暂不支持网页图片，请使用插入图片或 Ctrl+V。')
++    }
++  }
+   if (mode === 'picture') {
+     if (!image) return false
+     insertBlobImage(editor, image)
+@@ -133,5 +144,18 @@
+ }
+ 
+ export async function pasteFromClipboard(editor: Editor, mode?: PasteMode): Promise<boolean> {
+-  return pastePayload(editor, await readClipboardPayload(), mode)
++  if (editor.isDestroyed) return false
++  const target = capturePasteTarget(editor)
++  try {
++    const payload = await readClipboardPayload()
++    if (!target.current()) throw new Error(PASTE_TARGET_CHANGED)
++    if (!pastePayload(editor, payload, mode)) {
++      showToast('剪贴板中没有可粘贴的文本。图片请使用插入图片或 Ctrl+V。', 'error')
++      return false
++    }
++    return true
++  } catch (error) {
++    if (target.sameSession()) showToast(error instanceof Error ? error.message : '粘贴失败，请重试。', 'error')
++    return false
++  }
+ }
+--- a/apps/docs/src/renderer/i18n/ribbon/zh.ts
++++ b/apps/docs/src/renderer/i18n/ribbon/zh.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /** ribbon strings, zh: defines the key set every other locale shard must match. */
+ export const zh = {
+   ribbonAiCreditNote: '将调用 AI 并消耗额度',
+@@ -947,7 +949,7 @@
+   ribbonMailingsNextTip: '下一条记录',
+   ribbonMailingsRecord: '第 {n} 条，共 {total} 条',
+   ribbonMailingsOutput: '合并输出',
+-  ribbonMailingsOutputPerRecord: '每条记录一个文档',
++  ribbonMailingsOutputPerRecord: '每条记录一个文档（ZIP 压缩包）',
+   ribbonMailingsOutputSingle: '所有记录合并为一个文档',
+   ribbonMailingsNamePattern: '文件名格式',
+   ribbonMailingsNamePatternPh: '留空则使用第一个字段',
+--- a/apps/docs/src/renderer/parse-off-thread.ts
++++ b/apps/docs/src/renderer/parse-off-thread.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { parseDocx } from '@genoffice/docx-engine'
+ 
+ type Parsed = Awaited<ReturnType<typeof parseDocx>>
+@@ -21,6 +23,12 @@
+  */
+ 
+ let worker: Worker | null = null
++let providedWorker: Worker | null = null
++export function setParseWorker(value: Worker | null): void {
++  worker?.terminate()
++  worker = null
++  providedWorker = value
++}
+ let nextId = 0
+ const pending = new Map<number, (r: ParseWorkerResponse) => void>()
+ 
+@@ -28,7 +36,8 @@
+   if (worker) return worker
+   if (typeof Worker === 'undefined') return null
+   try {
+-    worker = new Worker(new URL('./parse-worker.ts', import.meta.url), { type: 'module' })
++    worker = providedWorker
++    if (!worker) return null
+   } catch {
+     return null
+   }
+--- a/apps/docs/src/shared/ipc.ts
++++ b/apps/docs/src/shared/ipc.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ export interface OpenFileResult {
+   path: string
+   name: string
+@@ -393,6 +395,10 @@
+ }
+ 
+ export interface DesktopApi {
++  clipboard?: {
++    read(): Promise<{ text?: string; html?: string }>
++    write(data: { text?: string; html?: string }): Promise<void>
++  }
+   /** current UI language (persisted by the shell in app-settings.json) */
+   getLanguage(): Promise<'zh' | 'en' | 'ja' | 'ko' | 'fr' | 'de' | 'es' | 'th' | 'id' | 'ru' | 'ar'>
+   /** OS regional-settings locale (BCP 47); Word derives the new-document paper size from it */
+--- a/apps/pdf/src/main/image-edit.ts
++++ b/apps/pdf/src/main/image-edit.ts
+@@ -1,4 +1,6 @@
+-import { nativeImage } from 'electron'
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
++import { nativeImage, decodeImage } from '../../../../../../src/pdf-browser-runtime'
+ import {
+   FPDF_PAGEOBJ_TEXT,
+   chainPdfium,
+@@ -76,23 +78,6 @@
+   objects.find((o) => o.type === FPDF_PAGEOBJ_TEXT)?.index
+ 
+ /** Decode a PNG/JPEG into straight-alpha BGRA (pdfium splits alpha into an SMask itself) */
+-function decodeImage(b64: string): { width: number; height: number; bgra: Buffer } {
+-  const img = nativeImage.createFromBuffer(Buffer.from(b64, 'base64'))
+-  if (img.isEmpty()) throw new Error('could not decode the image data')
+-  const { width, height } = img.getSize()
+-  // toBitmap() hands back premultiplied BGRA; un-premultiply so translucent pixels
+-  // keep their color once pdfium separates them into image + SMask
+-  const bgra = Buffer.from(img.toBitmap())
+-  for (let i = 0; i < bgra.length; i += 4) {
+-    const a = bgra[i + 3]!
+-    if (a > 0 && a < 255) {
+-      bgra[i] = Math.min(255, Math.round((bgra[i]! * 255) / a))
+-      bgra[i + 1] = Math.min(255, Math.round((bgra[i + 1]! * 255) / a))
+-      bgra[i + 2] = Math.min(255, Math.round((bgra[i + 2]! * 255) / a))
+-    }
+-  }
+-  return { width, height, bgra }
+-}
+ 
+ /** Content matrix for a footprint rect, counter-rotated against the page's display
+     rotation so the image shows upright (same table as save-pdf's addImageStamp) */
+@@ -112,9 +97,9 @@
+   }
+ }
+ 
+-function insertImage(m: Pdfium, doc: number, page: number, edit: ImageEditInput): void {
++async function insertImage(m: Pdfium, doc: number, page: number, edit: ImageEditInput): Promise<void> {
+   if (edit.kind !== 'insertImage') return
+-  const { width, height, bgra } = decodeImage(edit.image)
++  const { width, height, bgra } = await decodeImage(edit.image)
+   const bufPtr = m._malloc(bgra.length)
+   m.HEAPU8.set(bgra, bufPtr)
+   const bmp = m._FPDFBitmap_CreateEx(width, height, FPDF_BITMAP_BGRA, bufPtr, width * 4)
+@@ -214,12 +199,12 @@
+ 
+ /** Swap the image object's pixels for a new bitmap (matrix untouched: the footprint,
+     z-order and any original rotation stay), then apply the shared geometry pass */
+-function replaceImage(m: Pdfium, page: number, edit: ImageEditInput): void {
++async function replaceImage(m: Pdfium, page: number, edit: ImageEditInput): Promise<void> {
+   if (edit.kind !== 'replaceImage') return
+   const target = matchImage(collectObjects(m, page), edit.oldRect)
+   if (!target) throw new Error('the image could not be located on the page')
+   if (edit.layer) moveToLayer(m, page, target.obj, edit.layer)
+-  const { width, height, bgra } = decodeImage(edit.image)
++  const { width, height, bgra } = await decodeImage(edit.image)
+   const bufPtr = m._malloc(bgra.length)
+   m.HEAPU8.set(bgra, bufPtr)
+   const bmp = m._FPDFBitmap_CreateEx(width, height, FPDF_BITMAP_BGRA, bufPtr, width * 4)
+@@ -278,9 +263,9 @@
+           // Objects are re-collected inside each op: every mutation shifts indices
+           for (const { edit, editIndex } of pageEdits) {
+             try {
+-              if (edit.kind === 'insertImage') insertImage(m, doc, page, edit)
++              if (edit.kind === 'insertImage') await insertImage(m, doc, page, edit)
+               else if (edit.kind === 'transformImage') transformImage(m, page, edit)
+-              else if (edit.kind === 'replaceImage') replaceImage(m, page, edit)
++              else if (edit.kind === 'replaceImage') await replaceImage(m, page, edit)
+               else deleteImage(m, page, edit)
+               applied++
+             } catch (err) {
+--- a/apps/pdf/src/main/wasm-path.ts
++++ b/apps/pdf/src/main/wasm-path.ts
+@@ -1,38 +1,3 @@
+-import { existsSync } from 'node:fs'
+-import { createRequire } from 'node:module'
+-import { dirname, join } from 'node:path'
+-
+-/**
+- * Runtime wasm assets live in node_modules during dev/tests but the packaged app
+- * ships no node_modules (everything is bundled) — electron-builder copies them
+- * into Resources/wasm instead (see apps/shell/electron-builder.cjs extraResources).
+- */
+-const packagedPath = (fileName: string) => join(process.resourcesPath, 'wasm', fileName)
+-
+-const req = () => createRequire(import.meta.url)
+-
+-export function pdfiumWasmPath(): string {
+-  try {
+-    return req().resolve('@embedpdf/pdfium/pdfium.wasm')
+-  } catch {
+-    return packagedPath('pdfium.wasm')
+-  }
+-}
+-
+-export function hbSubsetWasmPath(): string {
+-  const r = req()
+-  try {
+-    // harfbuzzjs ≤0.10 ships hb-subset.wasm at the package root with no exports map
+-    return r.resolve('harfbuzzjs/hb-subset.wasm')
+-  } catch {
+-    /* fall through */
+-  }
+-  try {
+-    // harfbuzzjs ≥1.x seals subpaths; the wasm sits next to the exported entry point
+-    const p = join(dirname(r.resolve('harfbuzzjs')), 'harfbuzz-subset.wasm')
+-    if (existsSync(p)) return p
+-  } catch {
+-    /* fall through */
+-  }
+-  return packagedPath('hb-subset.wasm')
+-}
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
++export { pdfiumWasmPath, hbSubsetWasmPath } from '../../../../../../src/pdf-browser-runtime'
+--- a/apps/pdf/src/renderer/App.tsx
++++ b/apps/pdf/src/renderer/App.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+ import { handlePdfControl, type ControlRequest } from './control'
+ import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+@@ -8,6 +10,9 @@
+ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.min.mjs?url'
+ import { AiPanel, GensparkMark } from './ai/AiPanel'
+ import { AiAskPopover, type AskAnchorRect } from './AiAskPopover'
++import { executePdfTool } from './ai/tools'
++import { flushSync } from 'react-dom'
++import type { PdfOfficeBridge } from './office-bridge'
+ import {
+   createSavedAnnotCountsLoader,
+   loadSavedAnnots,
+@@ -99,7 +104,6 @@
+ import {
+   buildFormCatalog,
+   documentFormFeatures,
+-  hasXfaMarker,
+   visibleFormWidgets,
+   type FormCatalog,
+   type FormField,
+@@ -369,7 +373,7 @@
+ ] as const
+ type RibbonTab = (typeof RIBBON_TABS)[number]['id'] | 'fillForm' | 'formDesign'
+ 
+-export default function App() {
++export default function App({ onStatus, onSaveRequest, onOfficeBridge, onReference }: { onStatus?: (status: string) => void; onSaveRequest?: () => Promise<boolean>; onOfficeBridge?: (bridge: PdfOfficeBridge | null) => void; onReference?: () => Promise<void> }) {
+   const { lang, t } = useI18n()
+   const collapse = useRibbonCollapse('genoffice-pdf-ribbon-collapsed', {
+     collapse: t('ribbonCollapse'),
+@@ -379,10 +383,13 @@
+     expandFull: t('ribbonExpand'),
+   })
+   const [doc, setDoc] = useState<PDFDocumentProxy | null>(null)
++  const documentVersion = useRef({ doc, revision: 0 })
++  if (documentVersion.current.doc !== doc) documentVersion.current = { doc, revision: documentVersion.current.revision + 1 }
+   const [filePath, setFilePath] = useState('')
+   const [status, setStatus] = useState<'loading' | 'error' | 'empty' | 'password' | 'ready'>(
+     'loading',
+   )
++  useEffect(() => { onStatus?.(status) }, [status, onStatus])
+   const [sizes, setSizes] = useState<PageSize[]>([])
+   // Blank pages added this session live past the document's pages as virtual original
+   // indices (see BlankPageInput); allSizes is the page table every index lookup uses
+@@ -1147,23 +1154,10 @@
+       previous: PDFDocumentProxy | null,
+       saved?: SavedSnapshot,
+       waitForPageNos: number[] = [],
++      restore?: { bytes: Uint8Array; fills: StaticFormFillRecord[]; commit: () => void },
+     ) => {
+-      const data = await window.pdfApi.readFile(path)
++      const data = restore ? restore.bytes : await window.pdfApi.readFile(path)
+       const bytes = new Uint8Array(data)
+-      setFormHasXfa(hasXfaMarker(bytes))
+-      if (!saved) {
+-        setFormCatalog(null)
+-        setSavedStaticFormFills([])
+-        setActiveFormWidgetId(null)
+-        formControlRefs.current.clear()
+-        commitFormFields([])
+-        commitBlankPages([])
+-        setFormWidgetEdits(new Map())
+-        setFormDesignTool(null)
+-        setFormDesignPreview(false)
+-        setSelectedFormFieldId(null)
+-        setFreshFormFieldId(null)
+-      }
+       const task = getDocument({
+         data: bytes,
+         password: passwordRef.current,
+@@ -1182,9 +1176,10 @@
+       const rots: number[] = []
+       const origins: [number, number][] = []
+       const userUnits: number[] = []
++      let documentInfo: { EncryptFilterName?: string | null; IsXFAPresent?: boolean; Title?: string; Author?: string; Subject?: string; Keywords?: string } = {}
+       try {
+         const metadata = await loaded.getMetadata()
+-        const documentInfo = metadata.info as {
++        documentInfo = metadata.info as {
+           EncryptFilterName?: string | null
+           IsXFAPresent?: boolean
+           Title?: string
+@@ -1192,15 +1187,6 @@
+           Subject?: string
+           Keywords?: string
+         }
+-        setDocInfo({
+-          title: documentInfo.Title ?? '',
+-          author: documentInfo.Author ?? '',
+-          subject: documentInfo.Subject ?? '',
+-          keywords: documentInfo.Keywords ?? '',
+-        })
+-        const formFeatures = documentFormFeatures(documentInfo, bytes)
+-        setFormHasXfa(formFeatures.hasXfa)
+-        setDocumentEncrypted(formFeatures.encrypted)
+         for (let i = 1; i <= loaded.numPages; i++) {
+           const page = await loaded.getPage(i)
+           // Unrotated size; display size is derived by geom from the total rotation
+@@ -1218,21 +1204,40 @@
+         void loaded.loadingTask.destroy()
+         throw err
+       }
+-      try {
+-        setFormCatalog(await buildFormCatalog(loaded))
+-      } catch {
+-        setFormCatalog({
+-          widgets: [],
+-          fields: new Map(),
+-          byPage: new Map(),
+-          otherFieldNames: new Set(),
+-        })
++      let catalog: FormCatalog
++      try { catalog = await buildFormCatalog(loaded) } catch {
++        catalog = { widgets: [], fields: new Map(), byPage: new Map(), otherFieldNames: new Set() }
+       }
+-      try {
+-        setSavedStaticFormFills(await window.pdfApi.listStaticFormFills(path))
+-      } catch {
++      let staticFills: StaticFormFillRecord[] = []
++      try { staticFills = restore ? restore.fills : await window.pdfApi.listStaticFormFills(path) } catch { /* optional metadata */ }
++      try { restore?.commit() } catch (error) {
++        void loaded.loadingTask.destroy()
++        throw error
++      }
++      if (!saved) {
++        setFormCatalog(null)
+         setSavedStaticFormFills([])
++        setActiveFormWidgetId(null)
++        formControlRefs.current.clear()
++        commitFormFields([])
++        commitBlankPages([])
++        setFormWidgetEdits(new Map())
++        setFormDesignTool(null)
++        setFormDesignPreview(false)
++        setSelectedFormFieldId(null)
++        setFreshFormFieldId(null)
+       }
++      setDocInfo({
++        title: documentInfo.Title ?? '',
++        author: documentInfo.Author ?? '',
++        subject: documentInfo.Subject ?? '',
++        keywords: documentInfo.Keywords ?? '',
++      })
++      const formFeatures = documentFormFeatures(documentInfo, bytes)
++      setFormHasXfa(formFeatures.hasXfa)
++      setDocumentEncrypted(formFeatures.encrypted)
++      setFormCatalog(catalog)
++      setSavedStaticFormFills(staticFills)
+       setSizes(all)
+       setPageOrigins(origins)
+       setPageUserUnits(userUnits)
+@@ -1972,7 +1977,7 @@
+   // Mirror dirty state to the main process (close-tab/close-window guard)
+   useEffect(() => {
+     window.pdfApi.setDirty(dirty)
+-  }, [dirty])
++  }, [dirty, doc, markups, redactions, annotDeletes, noteEdits, drawings, textEdits, textInserts, imageEdits, stampCfg, formEdits, formFields, blankPages, formWidgetEdits, rotations, deleted, order, metadata])
+ 
+   // Existing images are listed while edit-image mode is on; `doc` in the deps refreshes
+   // the list after a post-save reload (object rects may have changed on disk)
+@@ -2600,6 +2605,10 @@
+       anchor now (the bar's mousedown preventDefault kept the selection alive up
+       to this click; the popover input will collapse it) */
+   const openAskPopover = () => {
++    if (onReference) {
++      void onReference().catch((error) => showNotice(error instanceof Error ? error.message : String(error)))
++      return
++    }
+     const sel = window.getSelection()
+     const box =
+       sel && !sel.isCollapsed && sel.rangeCount > 0
+@@ -4283,7 +4292,8 @@
+ 
+   // flushAll also writes the field whose card is open: callers that treat success as
+   // "everything is in the file" (close-tab Save, flushThen) must not leave it behind
+-  const save = (autosave = false, flushAll = false): Promise<boolean> => {
++  const save = (autosave = false, flushAll = false, internal = false): Promise<boolean> => {
++    if (!internal && onSaveRequest) return onSaveRequest().catch((error) => { opFailed(error instanceof Error ? error.message : String(error)); return false })
+     if (redactionRequestInFlightRef.current) return Promise.resolve(false)
+     // A save is already writing: queue behind it instead of reporting failure — the
+     // close prompt's "Save" and ⌘S regularly collide with the blur-triggered autosave
+@@ -6177,15 +6187,7 @@
+   // currentPage only tracks scroll, so it can outlive a page deletion
+   const printCurrentPage = Math.max(1, Math.min(currentPage, pageCount))
+   const openPrintDlg = () => {
+-    setPrintMode('all')
+-    setPrintInput(String(printCurrentPage))
+-    setPrintInvalid(false)
+-    setPrintParity('all')
+-    setPrintDlg(true)
+-    window.pdfApi
+-      .listPrinters()
+-      .then(setPrinters)
+-      .catch(() => undefined)
++    showNotice('请从文件菜单导出 PDF，再使用系统 PDF 阅读器打印。')
+   }
+ 
+   /** Print: save first (markups/forms/page ops all into the file), then reload from the file to render, avoiding a destroyed old doc */
+@@ -6318,6 +6320,31 @@
+     return `The document has ${bits.join(' and ')}; use read_annotations to read them.`
+   }
+ 
++  const queueTextEdit = async (raw: TextEditInput, assertCurrent?: () => void): Promise<string | null> => {
++    const resolved = resolveTextEdit(textEditsRef.current, raw)
++    if ('reason' in resolved) return resolved.reason
++    const { input, replaces, moveBy } = resolved
++    let cover: [number, number, number, number] | undefined
++    if (filePath) {
++      try {
++        const [v] = await window.pdfApi.validateTextEdits({ path: filePath, edits: [input] })
++        if (v?.reason) return v.reason
++        cover = v?.bounds
++      } catch (error) {
++        if (assertCurrent) throw error
++      }
++    }
++    assertCurrent?.()
++    const te: LocalTextEdit = { id: newId(), input, cover, moveBy }
++    const gone = new Set(replaces.map((e) => e.id))
++    const prev = textEditsRef.current
++    let plan: PlanResult | undefined
++    const apply = () => { plan = applyEditOpsRef.current(textEditListOps(prev, patchPendingEdits(prev, te, gone))) }
++    if (assertCurrent) flushSync(apply)
++    else apply()
++    return plan?.failures[0]?.error ?? null
++  }
++
+   const aiApi: PdfAppDeps = {
+     doc: () => doc,
+     fileName: () => fileName,
+@@ -6350,7 +6377,7 @@
+         ],
+       }
+     },
+-    deleteMarkups: async (origIdx, keys) => {
++    deleteMarkups: async (origIdx, keys, assertCurrent) => {
+       const pendingIds = new Set(keys.filter((k) => k[0] === 'P').map((k) => k.slice(1)))
+       const savedNums = new Set(keys.filter((k) => k[0] === 'S').map((k) => Number(k.slice(1))))
+       let savedList = savedMarkups.get(origIdx)
+@@ -6360,12 +6387,15 @@
+         (a) => savedNums.has(a.objNum) && !pendingDeleted.has(a.objNum),
+       )
+       if (pendingIds.size === 0 && saved.length === 0) return
+-      applyEditOpsRef.current([
++      assertCurrent?.()
++      const apply = () => applyEditOpsRef.current([
+         ...markupsRef.current
+           .filter((m) => m.pageIndex === origIdx && pendingIds.has(m.id))
+           .map((m): Op => ({ op: 'removeMarkup', id: m.id })),
+         ...saved.map((annot): Op => ({ op: 'deleteSavedAnnot', annot })),
+       ])
++      if (assertCurrent) flushSync(apply)
++      else apply()
+     },
+     deleteNoteThread: (_origIdx, root) => deleteNoteItem(root),
+     addNote: (origIdx, at, contents, color) => {
+@@ -6426,26 +6456,7 @@
+         },
+       ])
+     },
+-    editText: async (raw) => {
+-      const resolved = resolveTextEdit(textEditsRef.current, raw)
+-      if ('reason' in resolved) return resolved.reason
+-      const { input, replaces, moveBy } = resolved
+-      let cover: [number, number, number, number] | undefined
+-      if (filePath) {
+-        try {
+-          const [v] = await window.pdfApi.validateTextEdits({ path: filePath, edits: [input] })
+-          if (v?.reason) return v.reason
+-          cover = v?.bounds
+-        } catch {
+-          /* best-effort: the save path skips-and-reports unmatched edits anyway */
+-        }
+-      }
+-      const te: LocalTextEdit = { id: newId(), input, cover, moveBy }
+-      const gone = new Set(replaces.map((e) => e.id))
+-      const prev = textEditsRef.current
+-      const plan = applyEditOpsRef.current(textEditListOps(prev, patchPendingEdits(prev, te, gone)))
+-      return plan.failures[0]?.error ?? null
+-    },
++    editText: (raw) => queueTextEdit(raw),
+     moveTextBlock: async (origIdx, block, d) => {
+       const plan = planBlockMove(origIdx, block, d, textEditsRef.current)
+       if (plan === 'overflow') {
+@@ -6576,6 +6587,78 @@
+     mergePages: mergePagesToFile,
+   }
+ 
++  useLayoutEffect(() => {
++    onOfficeBridge?.({
++      selection: () => aiSelection && selPopup ? {
++        ...aiSelection,
++        quads: [...selPopup.quads].map(([pageIndex, quads]) => ({ page: pageIndex + 1, quads })),
++      } : null,
++      state: () => ({
++        documentRevision: documentVersion.current.revision,
++        redactions,
++        drafts: { textDraft, pendingTextInsert, noteDraft, noteEditDraft },
++        pending: Object.fromEntries(Object.entries(snapshot()).map(([key, value]) => [key, value instanceof Map || value instanceof Set ? [...value] : value])),
++      }),
++      snapshot: () => {
++        if (!filePath || saveInFlightRef.current || redactions.length || textDraft || pendingTextInsert || noteDraft || noteEditDraft) throw new Error('请先完成当前 PDF 编辑并保存后再使用工具。')
++        return ordinaryDirty ? { path: filePath, ...editsPayload(textEdits, undefined, formFields) } : null
++      },
++      restore: async (bytes, fills, commit) => {
++        if (!filePath || saveInFlightRef.current) throw new Error('PDF 正在保存，请稍后重试。')
++        await loadDoc(filePath, doc, undefined, [], { bytes, fills, commit })
++        flushSync(() => {})
++      },
++      pendingText: () => [...textEditsRef.current.map(edit => ({ page: edit.input.pageIndex + 1, before: edit.input.oldText, after: edit.input.newText })), ...textInsertsRef.current.map(edit => ({ page: edit.input.pageIndex + 1, after: edit.input.text }))],
++      deps: aiApi,
++      execute: async (name, input, assertCurrent, signal) => {
++        const guard = () => { signal?.throwIfAborted(); assertCurrent() }
++        guard()
++        const markups: Op[] = []
++        const guarded = <A extends unknown[], R>(fn: (...args: A) => R) => (...args: A): R => {
++          guard()
++          let value!: R
++          flushSync(() => { value = fn(...args) })
++          return value
++        }
++        const result = await executePdfTool({
++          ...aiApi,
++          confirmFileOp: async () => false,
++          editText: raw => queueTextEdit(raw, guard),
++          applyOps: guarded(aiApi.applyOps),
++          insertText: guarded(aiApi.insertText),
++          updateTextInsert: guarded(aiApi.updateTextInsert),
++          moveTextInsert: guarded(aiApi.moveTextInsert),
++          deleteTextInsert: guarded(aiApi.deleteTextInsert),
++          addNote: guarded(aiApi.addNote),
++          replyToThread: guarded(aiApi.replyToThread),
++          editNote: guarded(aiApi.editNote),
++          deleteNoteThread: guarded(aiApi.deleteNoteThread),
++          deleteMarkups: (page, keys) => aiApi.deleteMarkups(page, keys, guard),
++          addFormMark: guarded(aiApi.addFormMark),
++          insertBlankPage: guarded(aiApi.insertBlankPage),
++          setStamps: guarded(aiApi.setStamps),
++          addMarkup: (type, pageIndex, rects, color) => markups.push({
++            op: 'addMarkup', markup: { pageIndex, type, color: color ?? (type === 'highlight' ? highlightColor : MARKUP_COLORS[type]), quads: rects.map(r => [r[0], r[3], r[2], r[3], r[0], r[1], r[2], r[1]]) },
++          }),
++        }, { id: crypto.randomUUID(), name, input }, signal)
++        if (markups.length && !result.isError) {
++          guard()
++          const plan = guarded(aiApi.applyOps)(markups)
++          if (plan.failures.length) return { output: plan.failures[0]!.error, summary: result.summary, isError: true }
++        }
++        flushSync(() => {})
++        return result
++      },
++      undo: () => {
++        if (!undoStack.length) return false
++        flushSync(undo)
++        return true
++      },
++      canUndo: () => undoStack.length > 0,
++    })
++  })
++  useEffect(() => () => onOfficeBridge?.(null), [onOfficeBridge])
++
+   /**
+    * After an AI run that mutated a shell-created blank still carrying its untitled
+    * name, silently save once: the save's auto-rename then derives the file name from
+@@ -6684,6 +6767,13 @@
+   })
+ 
+   // Main process asked for a save (close prompt, menu Save, export) → save and report the result
++  const [closeSaveResult, setCloseSaveResult] = useState<{ ok: boolean } | null>(null)
++  useEffect(() => {
++    if (!closeSaveResult) return
++    window.pdfApi.sendCloseSaveResult(closeSaveResult.ok)
++    setCloseSaveResult(null)
++  }, [closeSaveResult])
++
+   useEffect(() => {
+     return window.pdfApi.onCloseSaveRequest(({ flushAll }) => {
+       if (redactions.length > 0) {
+@@ -6691,7 +6781,7 @@
+         window.pdfApi.sendCloseSaveResult(false)
+         return
+       }
+-      void save(false, flushAll).then((ok) => window.pdfApi.sendCloseSaveResult(ok))
++      void save(false, flushAll, true).then((ok) => setCloseSaveResult({ ok }))
+     })
+   })
+ 
+@@ -6967,9 +7057,8 @@
+   const menuInsertAfter = menuInGap ? (thumbMenu.afterOrigIdx ?? -1) : menuOrig
+ 
+   /** Ribbon AI buttons: expand the dock and auto-run the prompt in the assistant */
+-  const runAiPreset = (text: string): void => {
+-    setAiCollapsed(false)
+-    setAiPreset({ text, nonce: Date.now() })
++  const runAiPreset = (_text: string): void => {
++    showNotice('请在 Lexora 对话中引用此文档并提出要求。')
+   }
+ 
+   /** Converter dropdown → the shell's local conversion flows (save dialog, password prompt) */
+@@ -6979,8 +7068,8 @@
+     setConvertBusy(true)
+     try {
+       await window.pdfApi.convertOffice(format)
+-    } catch {
+-      // No shell conversion flow in standalone mode; shell-side errors show their own dialogs
++    } catch (error) {
++      showNotice(error instanceof Error ? error.message : String(error))
+     } finally {
+       setConvertBusy(false)
+     }
+@@ -7192,7 +7281,7 @@
+       showNotice(t('certSaveFirst'))
+       return
+     }
+-    setCertSignDlg(true)
++    showNotice('当前宿主未提供数字证书签名与验证；手写签名可在签名工具中使用。')
+   }
+ 
+   /** The signed copy becomes this tab's document; reload it like a Save As target */
+@@ -7441,7 +7530,7 @@
+               <div className="ribbon-sep" />
+               <div className="ribbon-group">
+                 <div className="ribbon-group-items">
+-                  <div className="rb-drop-wrap" ref={convertWrapRef}>
++                  <div className="rb-drop-wrap" ref={convertWrapRef} hidden style={{ display: 'none' }}>
+                     <button
+                       className={`rb-big${convertOpen ? ' active' : ''}`}
+                       data-tip={t('convertPdfTip')}
+@@ -7476,17 +7565,18 @@
+               <div className="ribbon-group">
+                 <div className="ribbon-group-items">
+                   {searchBtn}
+-                  <button
+-                    className="rb-big"
+-                    data-tip={`${t('print')} (${platformShortcuts('⌘P')})`}
+-                    disabled={printing}
+-                    onClick={openPrintDlg}
+-                  >
+-                    <span className="rb-big-icon">
+-                      <IconPrint />
+-                    </span>
+-                    <span>{printing ? t('printPreparing') : t('print')}</span>
+-                  </button>
++                  <span className="office-unavailable-control" tabIndex={0} aria-label="打印：请先从文件菜单导出 PDF，再使用系统 PDF 阅读器打印。" data-tip="请先从文件菜单导出 PDF，再使用系统 PDF 阅读器打印。">
++                    <button
++                      className="rb-big"
++                      disabled
++                      onClick={openPrintDlg}
++                    >
++                      <span className="rb-big-icon">
++                        <IconPrint />
++                      </span>
++                      <span>{printing ? t('printPreparing') : t('print')}</span>
++                    </button>
++                  </span>
+                   <button
+                     className="rb-big"
+                     data-tip={t('exportImagesAll')}
+@@ -7571,13 +7661,11 @@
+                   ))}
+                   <button
+                     className={`rb-big${drawTool === 'redact' ? ' active' : ''}`}
+-                    disabled={readOnly}
+-                    data-tip={t('redactHint')}
++                    disabled
++                    data-tip="当前宿主暂不支持永久涂黑"
++                    title="当前宿主暂不支持永久涂黑"
+                     onClick={() => {
+-                      setEditTextMode(false)
+-                      setTextDraft(null)
+-                      setEditImageMode(false)
+-                      setDrawTool((tool) => (tool === 'redact' ? null : 'redact'))
++                      showNotice('当前宿主暂不支持永久涂黑。')
+                     }}
+                   >
+                     <span className="rb-big-icon">
+@@ -7617,17 +7705,18 @@
+                     </span>
+                     <span>{t('sign')}</span>
+                   </button>
+-                  <button
+-                    className="rb-big"
+-                    disabled={readOnly || status !== 'ready'}
+-                    data-tip={t('certSignHint')}
+-                    onClick={openCertSignDialog}
+-                  >
+-                    <span className="rb-big-icon">
+-                      <IconCertSign />
+-                    </span>
+-                    <span>{t('certSign')}</span>
+-                  </button>
++                  <span className="office-unavailable-control" tabIndex={0} aria-label="数字证书签名：当前不可用，可使用手写签名。" data-tip="当前不支持数字证书签名，可使用手写签名。">
++                    <button
++                      className="rb-big"
++                      disabled
++                      onClick={openCertSignDialog}
++                    >
++                      <span className="rb-big-icon">
++                        <IconCertSign />
++                      </span>
++                      <span>{t('certSign')}</span>
++                    </button>
++                  </span>
+                   {digitalSignatures.length > 0 && (
+                     <button
+                       className="rb-big"
+@@ -9827,8 +9916,8 @@
+                 <button
+                   type="button"
+                   className="pdf-sel-ask"
+-                  data-tip={t('aiAskTitle')}
+-                  aria-label={t('aiAskBtn')}
++                  data-tip={onReference ? '引用到任务' : t('aiAskTitle')}
++                  aria-label={onReference ? '引用到任务' : t('aiAskBtn')}
+                   onClick={openAskPopover}
+                 >
+                   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden>
+@@ -9837,7 +9926,7 @@
+                       fill="currentColor"
+                     />
+                   </svg>
+-                  {t('aiAskBtn')}
++                  {onReference ? '引用到任务' : t('aiAskBtn')}
+                 </button>
+               </div>
+             )}
+--- a/apps/pdf/src/renderer/ai/tools.ts
++++ b/apps/pdf/src/renderer/ai/tools.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import type { PDFDocumentProxy } from 'pdfjs-dist'
+ import type { AgentToolCall, AgentToolDef, ToolExecution } from '@genoffice/agent-core'
+ import type { OutlineNode } from '../OutlinePanel'
+@@ -100,7 +102,7 @@
+   /** Rewrite one comment's text (root or reply): pending notes in place, saved notes as a pending content edit */
+   editNote(origIdx: number, item: NoteThreadItem, contents: string): void
+   /** Remove markups by the keys annotationsOn reports (saved → pending deletion, session → dropped) */
+-  deleteMarkups(origIdx: number, keys: string[]): Promise<void>
++  deleteMarkups(origIdx: number, keys: string[], assertCurrent?: () => void): Promise<void>
+   /** Delete a note thread root and every reply under it */
+   deleteNoteThread(origIdx: number, root: NoteThreadItem): void
+   /** Queue a pending text edit (dry-run validated against the file when possible); null = accepted, string = rejection reason */
+@@ -1506,7 +1508,7 @@
+ 
+ /** nth (1-based, non-overlapping) case-insensitive occurrence of query on a page →
+     verbatim text, union rect (PDF space), and line height (≈ font size) */
+-function locateOccurrence(
++export function locateOccurrence(
+   entry: PageEntry,
+   query: string,
+   occurrence: number,
+@@ -1540,7 +1542,7 @@
+   return { oldText: entry.text.slice(pos, end), rect: [x1, y1, x2, y2], fontSize }
+ }
+ 
+-const countOccurrences = (entry: PageEntry, query: string): number => {
++export const countOccurrences = (entry: PageEntry, query: string): number => {
+   const q = foldCase(query)
+   let n = 0
+   for (let from = 0; ; n++) {
+--- /dev/null
++++ b/apps/pdf/src/renderer/office-bridge.ts
+@@ -0,0 +1,23 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++import type { PdfAppDeps } from './ai/tools'
++import type { ToolExecution } from '@genoffice/agent-core'
++import type { SavePdfRequest, StaticFormFillRecord } from '../shared/ipc'
++
++export interface PdfOfficeSelection {
++  text: string
++  page: number
++  lastPage: number
++  quads: { page: number; quads: number[][] }[]
++}
++
++export interface PdfOfficeBridge {
++  selection: () => PdfOfficeSelection | null
++  state: () => unknown
++  pendingText: () => { page: number; before?: string; after: string }[]
++  snapshot: () => SavePdfRequest | null
++  restore: (bytes: Uint8Array, fills: StaticFormFillRecord[], commit: () => void) => Promise<void>
++  deps: PdfAppDeps
++  execute: (name: string, input: Record<string, unknown>, assertCurrent: () => void, signal?: AbortSignal) => Promise<ToolExecution>
++  undo: (assertCurrent?: () => void) => boolean | Promise<boolean>
++  canUndo: () => boolean
++}
+--- a/apps/pdf/src/renderer/view-config.ts
++++ b/apps/pdf/src/renderer/view-config.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ // cmaps/standard fonts/wasm are statically copied by the build into pdfjs/ of the renderer output (same path on the dev server)
+ export const ASSET_BASE = new URL('pdfjs/', document.baseURI).href
+ 
+@@ -31,6 +33,7 @@
+ export type FitMode = 'width' | 'page' | null
+ 
+ export const DOC_OPTS = {
++  isEvalSupported: false,
+   cMapUrl: `${ASSET_BASE}cmaps/`,
+   cMapPacked: true,
+   standardFontDataUrl: `${ASSET_BASE}standard_fonts/`,
+--- a/apps/sheets/src/renderer/app-constants.ts
++++ b/apps/sheets/src/renderer/app-constants.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /**
+  * App-scope constants shared by the App component: chart ribbon command
+  * vocabularies, Univer mutation/command names the edit journal listens to,
+@@ -5,7 +7,9 @@
+  */
+ import type { CellFormatPatch } from '@genoffice/xlsx-gateway/domain/workbook-dsl'
+ import type { WorkbookSnapshot } from '@genoffice/xlsx-gateway/domain/workbook.types'
+-import type { ChartEditData } from './WorkbookVisuals'
++import type { WorkbookChartEdit } from '@genoffice/xlsx-gateway/shared/edit-schemas'
++
++type ChartEditData = Omit<WorkbookChartEdit, 'chartPath'>
+ 
+ export const CHART_TYPE_COMMANDS = ['column', 'bar', 'line', 'area', 'pie', 'doughnut'] as const
+ /// Demo/session charts bake edits into the visual itself — no pending map.
+--- a/apps/sheets/src/renderer/edit-journal.ts
++++ b/apps/sheets/src/renderer/edit-journal.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { CellValueType } from '@univerjs/core'
+ 
+ import type {
+@@ -24,7 +26,7 @@
+ import { ADDABLE_SHAPE_TYPES } from '@genoffice/xlsx-gateway/shared/shape-types'
+ import { INDENT_STEP_PX } from './selection-format'
+ import type { SharedFormulaResolver } from './shared-formula-journal'
+-import type { SheetProtectionInfo } from './sheet-protection'
++import type { SheetProtectionInfo } from '../shared/sheet-protection-types'
+ 
+ /// Tracks the user's cell edits on a streamed external workbook. Streaming
+ /// evicts and re-installs viewport cells, so the journal is both the save
+--- a/apps/sheets/src/renderer/shared-formula-journal.ts
++++ b/apps/sheets/src/renderer/shared-formula-journal.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /**
+  * Shared-formula (si) materialization for the edit journal.
+  *
+@@ -11,9 +13,11 @@
+  * time instead: find the group's master cell, shift its formula by the
+  * follower's offset — the same rule Univer applies when evaluating.
+  */
+-import { LexerTreeBuilder } from '@univerjs/engine-formula'
++import { LexerTreeBuilder } from '@univerjs/preset-sheets-core'
+ 
+-import type { UniverRuntime } from './univer-state'
++import type { createUniver } from './create-univer'
++
++type UniverRuntime = ReturnType<typeof createUniver>
+ 
+ export type SharedFormulaResolver = (row: number, column: number, si: string) => string | null
+ 
+--- a/apps/sheets/src/renderer/sheet-protection.ts
++++ b/apps/sheets/src/renderer/sheet-protection.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /**
+  * Excel-style worksheet protection in the editor. The file's
+  * `<sheetProtection>` (or the session's desired state) gates Univer commands
+@@ -21,12 +23,8 @@
+ export const CELL_LOCKED_KEY = 'xlsxLocked'
+ export const CELL_HIDDEN_KEY = 'xlsxHidden'
+ 
+-export interface SheetProtectionInfo {
+-  readonly protected: boolean
+-  readonly hasPassword: boolean
+-  readonly allow: SheetProtectionAllow
+-  readonly password: SheetPasswordHash | null
+-}
++export type { SheetProtectionInfo } from '../shared/sheet-protection-types'
++import type { SheetProtectionInfo } from '../shared/sheet-protection-types'
+ 
+ export const UNPROTECTED_SHEET: SheetProtectionInfo = {
+   protected: false,
+--- /dev/null
++++ b/apps/sheets/src/shared/sheet-protection-types.ts
+@@ -0,0 +1,11 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Extracted for the Lexora plugin (2026) from apps/sheets/src/renderer/sheet-protection.ts; see vendor/genoffice/PATCHES.md.
++import type { SheetProtectionAllow } from '@genoffice/xlsx-gateway/gateway/xlsx-protection'
++import type { SheetPasswordHash } from '@genoffice/xlsx-gateway/gateway/xlsx-protection-hash'
++
++export interface SheetProtectionInfo {
++  readonly protected: boolean
++  readonly hasPassword: boolean
++  readonly allow: SheetProtectionAllow
++  readonly password: SheetPasswordHash | null
++}
+--- a/apps/slides/src/main/slides-main.ts
++++ b/apps/slides/src/main/slides-main.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /**
+  * GenOffice Slides main process — pptx parsing/render-tree building/edit application/saving all live
+  * here (Node side). The renderer only gets plain-data RenderSlide; edit intents are sent back
+@@ -1436,12 +1438,12 @@
+     const plan = runTxn(session.opened, { ...req, dryRun: true })
+     const invalid = plan.failures?.length ?? 0
+     if ((req.isolation ?? 'atomic') === 'atomic' ? invalid > 0 : invalid >= req.ops.length)
+-      return null
++      throw new Error(plan.failures?.map(failure => failure.error).join('\n') || '演示文稿编辑校验失败。')
+     pushHistory(session)
+     const r = journaledTxn(session, source, req)
+     if (!r.applied) {
+       session.undoStack.pop()
+-      return null
++      throw new Error(r.failures?.map(failure => failure.error).join('\n') || '演示文稿编辑失败。')
+     }
+     return r
+   }
+--- a/apps/slides/src/renderer/App.tsx
++++ b/apps/slides/src/renderer/App.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+ import type {
+   GroupRenderNode,
+@@ -355,7 +357,7 @@
+   return { width, height: (slide.heightPx * width) / slide.widthPx }
+ }
+ 
+-export function App() {
++export function App({ onContext, onLoadError }: { onContext?: (read: () => ActionCtx) => void; onLoadError?: (error: Error) => void }) {
+   const { lang } = useI18n()
+   const [slides, setSlides] = useState<RenderSlide[]>([])
+   // Layouts may reference Office-private fonts (resolved in main); register them as FontFaces
+@@ -963,17 +965,17 @@
+   // Shared session (a second window on the same file): apply the other window's
+   // edits without touching local selection or an open editor — the ids are stable,
+   // so the selection stays valid; a same-element conflict resolves last-write-wins.
+-  useEffect(
+-    () =>
+-      window.slidesApi.onDeckChanged?.(({ slides: all }) => {
+-        setSlides(all)
+-        setCurrent((c) => Math.min(c, Math.max(0, all.length - 1)))
+-        // The broadcast also fires for undo back to a clean state — ask the
+-        // session instead of assuming the change dirtied it
+-        void window.slidesApi.isDirty?.().then((d) => setDirty(!!d))
+-      }),
+-    [],
+-  )
++  useEffect(() => {
++    let alive = true
++    const off = window.slidesApi.onDeckChanged?.(({ slides: all }) => {
++      setSlides(all)
++      setCurrent((c) => Math.min(c, Math.max(0, all.length - 1)))
++      void window.slidesApi.isDirty?.()
++        .then((d) => { if (alive) setDirty(!!d) })
++        .catch((error: unknown) => { if (alive) showToast(error instanceof Error ? error.message : String(error), 'error') })
++    })
++    return () => { alive = false; off?.() }
++  }, [])
+ 
+   // Auto-save (off by default): when on and a file path exists, silently write back every 30s + on blur.
+   // Saving rebuilds element ids; skipped during text editing/mouse-down (dragging) to avoid interrupting the current operation.
+@@ -1261,9 +1263,10 @@
+         else void bootBlank()
+       })
+       // Open failures (corrupt file etc.) also land on a blank deck, or it stays at "Opening…" forever
+-      .catch(() => {
++      .catch((error: unknown) => {
+         if (bootHandledRef.current) return
+         bootHandledRef.current = true
++        if (onLoadError) { onLoadError(error instanceof Error ? error : new Error(String(error))); return }
+         void bootBlank()
+       })
+     return off
+@@ -1272,14 +1275,16 @@
+   // Path changed outside this renderer (shell Home list rename, or an MCP save that
+   // wrote the session to disk) → sync the title-bar path and ask the session
+   // whether it is still dirty rather than assuming
+-  useEffect(
+-    () =>
+-      window.slidesApi.onRenamed((p) => {
+-        setPath(p)
+-        void window.slidesApi.isDirty().then(setDirty)
+-      }),
+-    [],
+-  )
++  useEffect(() => {
++    let alive = true
++    const off = window.slidesApi.onRenamed((p) => {
++      setPath(p)
++      void window.slidesApi.isDirty()
++        .then((value) => { if (alive) setDirty(value) })
++        .catch((error: unknown) => { if (alive) showToast(error instanceof Error ? error.message : String(error), 'error') })
++    })
++    return () => { alive = false; off() }
++  }, [])
+ 
+   useEffect(() => {
+     const loadSettings = () => void window.slidesApi.getAiSettings().then(setAiSettings)
+@@ -1711,7 +1716,7 @@
+     [],
+   )
+   const insertModel3dFile = useCallback(() => model3dActions.insertModel3dFile(ctxRef.current), [])
+-  const toggleScreenRecord = useCallback(() => insertActions.toggleScreenRecord(ctxRef.current), [])
++  const toggleScreenRecord = useCallback(() => showToast('当前不支持屏幕录制。', 'error'), [])
+ 
+   // Reflect the current page's transition effect on page/document changes
+   useEffect(() => {
+@@ -1913,7 +1918,7 @@
+   )
+   const saveRehearseTimings = useCallback(() => showActions.saveRehearseTimings(ctxRef.current), [])
+   const startRecordShow = useCallback(
+-    (fromStart: boolean) => showActions.startRecordShow(ctxRef.current, fromStart),
++    (_fromStart: boolean) => showToast('当前不支持麦克风录制。', 'error'),
+     [],
+   )
+   const onRecordDone = useCallback(
+@@ -1926,7 +1931,7 @@
+     [],
+   )
+   const startPresenterView = useCallback(
+-    (fromStart: boolean) => showActions.startPresenterView(ctxRef.current, fromStart),
++    (_fromStart: boolean) => showToast('当前不支持独立演示窗口，请使用页面内放映。', 'error'),
+     [],
+   )
+   const exitPresenterView = useCallback(
+@@ -3195,6 +3200,8 @@
+     newComment: () => openComments(true),
+     openChangeShape: (targetId, x, y) => setShapeGalleryAt({ targetId, x, y }),
+   }
++
++  useEffect(() => { onContext?.(() => ctxRef.current) })
+ 
+   // Context menu items (context-menu-items.ts); the deps list covers all state the builder reads
+   const ctxItems = useMemo(
+@@ -4502,7 +4509,7 @@
+               {hasDoc && (
+                 <button
+                   className="status-play-btn"
+-                  data-tip={t('ribbonFromCurrentTip')}
++                  data-tip="在当前页面放映；按 Esc 返回编辑。"
+                   aria-label={t('ribbonFromCurrentTip')}
+                   onClick={() => startSlideShow(false)}
+                 >
+@@ -4525,6 +4532,7 @@
+ 
+       {slideShow && slides.length > 0 && (
+         <SlideShowView
++          embedded
+           slides={slides}
+           images={images}
+           startAt={slideShow.startAt}
+--- a/apps/slides/src/renderer/components/Ribbon.tsx
++++ b/apps/slides/src/renderer/components/Ribbon.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /**
+  * Ribbon: tab bar + grouped buttons. Same mechanism as the apps/docs Ribbon
+  * (local state switches tabs, .ribbon-body dispatches); content is trimmed to slide capabilities,
+@@ -2439,7 +2441,7 @@
+                 className="rb-big"
+                 disabled={!hasDoc}
+                 onClick={() => onSlideShow(true)}
+-                data-tip={t('ribbonFromBeginningTip')}
++                data-tip="从第一页在当前页面放映；按 Esc 返回编辑。"
+               >
+                 <span className="rb-big-icon">
+                   <IconPlayFromStart size={BIG} />
+@@ -2450,24 +2452,25 @@
+                 className="rb-big"
+                 disabled={!hasDoc}
+                 onClick={() => onSlideShow(false)}
+-                data-tip={t('ribbonFromCurrentTip')}
++                data-tip="从当前页在页面内放映；按 Esc 返回编辑。"
+               >
+                 <span className="rb-big-icon">
+                   <IconPlayCurrent size={BIG} />
+                 </span>
+                 <span>{t('ribbonFromCurrent')}</span>
+               </button>
+-              <button
+-                className="rb-big"
+-                disabled={!hasDoc}
+-                onClick={() => onPresenterView(true)}
+-                data-tip={t('ribbonPresenterViewTip')}
+-              >
+-                <span className="rb-big-icon">
+-                  <IconPresenterView size={BIG} />
+-                </span>
+-                <span>{t('ribbonPresenterView')}</span>
+-              </button>
++              <span className="office-unavailable-control" tabIndex={0} aria-label="演示者视图：当前不支持独立演示窗口，请使用页面内放映。" data-tip="当前不支持独立演示窗口，请使用页面内放映。">
++                <button
++                  className="rb-big"
++                  disabled
++                  onClick={() => onPresenterView(true)}
++                >
++                  <span className="rb-big-icon">
++                    <IconPresenterView size={BIG} />
++                  </span>
++                  <span>{t('ribbonPresenterView')}</span>
++                </button>
++              </span>
+               <button
+                 className="rb-big"
+                 disabled={!hasDoc}
+@@ -2506,18 +2509,19 @@
+                 <span>{t('ribbonRehearse')}</span>
+               </button>
+               <div className="rb-drop-wrap">
+-                <button
+-                  className={`rb-big${recordOpen ? ' active' : ''}`}
+-                  disabled={!hasDoc}
+-                  onMouseDown={(e) => closeSiblingPanels(e, closePanels, 'record')}
+-                  onClick={() => setRecordOpen((v) => !v)}
+-                  data-tip={t('ribbonRecordTip')}
+-                >
+-                  <span className="rb-big-icon">
+-                    <IconRecord size={BIG} />
+-                  </span>
+-                  <span>{t('ribbonRecord')}</span>
+-                </button>
++                <span className="office-unavailable-control" tabIndex={0} aria-label="录制旁白：当前不支持麦克风录制。" data-tip="当前不支持麦克风录制。">
++                  <button
++                    className={`rb-big${recordOpen ? ' active' : ''}`}
++                    disabled
++                    onMouseDown={(e) => closeSiblingPanels(e, closePanels, 'record')}
++                    onClick={() => setRecordOpen((v) => !v)}
++                  >
++                    <span className="rb-big-icon">
++                      <IconRecord size={BIG} />
++                    </span>
++                    <span>{t('ribbonRecord')}</span>
++                  </button>
++                </span>
+                 {recordOpen && (
+                   <div className="rb-drop rb-menu" onMouseDown={(e) => e.stopPropagation()}>
+                     <button
+--- a/apps/slides/src/renderer/components/RibbonHomeTab.tsx
++++ b/apps/slides/src/renderer/components/RibbonHomeTab.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /** Home tab of the slides ribbon. Extracted from Ribbon.tsx. */
+ import { useState } from 'react'
+ import { platformShortcuts } from '@genoffice/i18n'
+@@ -354,7 +356,7 @@
+             className="rb-big rb-split"
+             disabled={!hasDoc}
+             onClick={() => onSlideShow(slideShowFromStart)}
+-            data-tip={t(slideShowFromStart ? 'ribbonFromBeginningTip' : 'ribbonFromCurrentTip')}
++            data-tip="在当前页面放映；按 Esc 返回编辑。"
+           >
+             <span className="rb-big-icon">
+               <span className="rb-split-main">
+@@ -388,7 +390,7 @@
+                   setSlideShowFromStart(true)
+                   onSlideShow(true)
+                 }}
+-                data-tip={t('ribbonFromBeginningTip')}
++                data-tip="从第一页在当前页面放映；按 Esc 返回编辑。"
+               >
+                 <span className="rb-menu-glyph">
+                   <IconPlayFromStart size={20} />
+--- a/apps/slides/src/renderer/components/RibbonInsertTab.tsx
++++ b/apps/slides/src/renderer/components/RibbonInsertTab.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /** Insert tab of the slides ribbon. Extracted from Ribbon.tsx. */
+ import type { InsertKind } from '../../shared/ipc'
+ import { platformShortcuts } from '@genoffice/i18n'
+@@ -523,17 +525,18 @@
+           </span>
+           <span>{t('ribbonAudio')}</span>
+         </button>
+-        <button
+-          className={`rb-big ${recording ? 'active rb-recording' : ''}`}
+-          disabled={!hasDoc}
+-          onClick={onToggleScreenRecord}
+-          data-tip={recording ? t('ribbonStopRecTip') : t('ribbonScreenRecTip')}
+-        >
+-          <span className="rb-big-icon">
+-            <IconScreenRec size={BIG} />
+-          </span>
+-          <span>{recording ? t('ribbonStopRec') : t('ribbonScreenRec')}</span>
+-        </button>
++        <span className="office-unavailable-control" tabIndex={0} aria-label="录制屏幕：当前不支持屏幕录制。" data-tip="当前不支持屏幕录制。">
++          <button
++            className={`rb-big ${recording ? 'active rb-recording' : ''}`}
++            disabled
++            onClick={onToggleScreenRecord}
++          >
++            <span className="rb-big-icon">
++              <IconScreenRec size={BIG} />
++            </span>
++            <span>{recording ? t('ribbonStopRec') : t('ribbonScreenRec')}</span>
++          </button>
++        </span>
+       </Group>
+     </>
+   )
+--- a/apps/slides/src/renderer/components/SlideShowView.tsx
++++ b/apps/slides/src/renderer/components/SlideShowView.tsx
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /**
+  * Slide show — the full-screen playback view.
+  *
+@@ -64,6 +66,7 @@
+ const GRID_THUMB_W = 200
+ 
+ export function SlideShowView({
++  embedded = false,
+   slides,
+   images,
+   startAt,
+@@ -74,6 +77,7 @@
+   recordMode,
+   onRecordDone,
+ }: {
++  embedded?: boolean
+   slides: RenderSlide[]
+   images: Map<string, HTMLImageElement>
+   /** Start page (original index) */
+@@ -231,6 +235,10 @@
+   // shell's WebContentsView the promise can stay pending/reject even though fullscreen engaged, which
+   // left the show mounted after Esc (fullscreen gone, show still covering the window).
+   useEffect(() => {
++    if (embedded) {
++      setCovered(true)
++      return liftShowCurtain
++    }
+     // already-fullscreen mounts (presenter view handing off to the normal show
+     // keeps fullscreen) never get a fullscreenchange, so seed from current state
+     let entered = !!document.fullscreenElement
+@@ -292,7 +300,7 @@
+       void window.slidesApi.setShowFullScreen?.(false)
+       liftShowCurtain()
+     }
+-  }, [])
++  }, [embedded])
+ 
+   // The click-time curtain (dropped in show-actions before this component mounted)
+   // is only needed until the show reveals — its own black root covers from there on
+--- a/apps/slides/src/shared/ipc.ts
++++ b/apps/slides/src/shared/ipc.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import type { AiPanelPrefs } from '@genoffice/ui'
+ /**
+  * slides main-process <-> renderer IPC contract (Phase 3: open/save/edit, AI not included yet).
+@@ -1887,7 +1889,6 @@
+ declare global {
+   interface Window {
+     slidesApi: SlidesApi
+-    desktop: DesktopFilesApi
+   }
+ }
+ 
+--- a/packages/docx-engine/src/index.ts
++++ b/packages/docx-engine/src/index.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ // one definition, in the package both carriers and both apps can reach
+ export { REDACT_EL, REDACT_NS, REDACT_PREFIX } from '@genoffice/agent-core/redact-range'
+ export * from './types'
+@@ -261,3 +263,5 @@
+   type CompareResult,
+   type CompareSummary,
+ } from './compare'
++
++export type { EffectivePPr, EffectiveRPr } from './resolve-props'
+--- a/packages/pptx-engine/src/index.ts
++++ b/packages/pptx-engine/src/index.ts
+@@ -1,3 +1,5 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /**
+  * pptx-engine top-level API.
+  *
+@@ -6,6 +8,7 @@
+  */
+ import { stripRedactExt, syncRedactExt } from './redaction-xml'
+ import JSZip from 'jszip'
++import { randomUUID } from 'node:crypto'
+ import { PackageArchive, relsPathFor, resolveTarget, type Relationship } from './zip'
+ import { parseClrMap, parseTheme, type Theme } from './theme'
+ import {
+@@ -4243,7 +4246,7 @@
+     xml = xml.replace(
+       /(<a16:creationId[^>]*\bid=")\{?[0-9A-Fa-f-]{36}\}?(")/g,
+       (_a, pre: string, post: string) =>
+-        `${pre}{${globalThis.crypto.randomUUID().toUpperCase()}}${post}`,
++        `${pre}{${randomUUID().toUpperCase()}}${post}`,
+     )
+     // Offset only the outermost xfrm's off (group child coordinate systems stay put)
+     xml = xml.replace(/<a:off\b[^>]*\/>/, (tag) =>
+--- a/packages/pptx-engine/src/xml-utils.ts
++++ b/packages/pptx-engine/src/xml-utils.ts
+@@ -1,4 +1,7 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
++// Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ /** XML escaping utilities (same as docx-engine's, used for patch generation). */
++import { randomUUID } from 'node:crypto'
+ 
+ /**
+  * A fast-xml-parser element node: attributes are '@_'-prefixed, text is '#text',
+@@ -92,7 +95,7 @@
+ export function creationIdExtXml(): string {
+   return (
+     '<a:ext uri="{FF2B5EF4-FFF2-40B4-BE49-F238E27FC236}">' +
+-    `<a16:creationId xmlns:a16="http://schemas.microsoft.com/office/drawing/2014/main" id="{${globalThis.crypto.randomUUID().toUpperCase()}}"/>` +
++    `<a16:creationId xmlns:a16="http://schemas.microsoft.com/office/drawing/2014/main" id="{${randomUUID().toUpperCase()}}"/>` +
+     '</a:ext>'
+   )
+ }

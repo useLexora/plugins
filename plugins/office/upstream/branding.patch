@@ -1,0 +1,300 @@
+--- a/apps/docs/src/renderer/App.tsx
++++ b/apps/docs/src/renderer/App.tsx
+@@ -1891,7 +1891,7 @@
+ 
+   // window title follows the document, so the OS window list and Switch Window show file names
+   useEffect(() => {
+-    document.title = doc ? doc.fileName : 'GenOffice Docs'
++    document.title = doc ? doc.fileName : 'Lexora Office'
+   }, [doc])
+ 
+   useEffect(() => window.desktop.onTeardown?.(() => setTornDown(true)), [])
+@@ -2708,7 +2708,7 @@
+       window.desktop.onZoteroRequest(async (request) => {
+         try {
+           const activeEditor = editorRef.current
+-          if (!activeEditor) throw new Error('No active GenOffice document')
++          if (!activeEditor) throw new Error('No active Office document')
+           const controller =
+             zoteroControllerRef.current ??
+             new ZoteroDocumentController(activeEditor, {
+--- a/apps/docs/src/renderer/components/ribbon-tabs.tsx
++++ b/apps/docs/src/renderer/components/ribbon-tabs.tsx
+@@ -1,3 +1,4 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
+ import { useRef, useState } from 'react'
+ import type { Editor, JSONContent } from '@tiptap/core'
+ import type { Node as PmNode } from '@tiptap/pm/model'
+@@ -1580,7 +1581,7 @@
+                     }}
+                   >
+                     {w.focused ? '✓ ' : ''}
+-                    {w.title || 'GenOffice Docs'}
++                    {w.title || 'Lexora Office'}
+                   </button>
+                 ))}
+               </div>
+--- a/apps/docs/src/renderer/i18n/strings-zotero.ts
++++ b/apps/docs/src/renderer/i18n/strings-zotero.ts
+@@ -1,3 +1,4 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
+ import { defineStrings } from '@genoffice/i18n'
+ 
+ /** Strings for the Zotero integration in the References tab. */
+@@ -16,7 +17,7 @@
+     zoteroConnectionError: '无法连接 Zotero。请先启动 Zotero，并保持桌面程序运行。',
+     zoteroOperationError: 'Zotero 操作失败。',
+     zoteroNoteFieldsUnsupported:
+-      '此文档的脚注或尾注中含有 Zotero 引文，GenOffice 目前还不能更新它们。为保持参考文献表完整，已停用此文档的 Zotero 命令。',
++      '此文档的脚注或尾注中含有 Zotero 引文，Lexora Office 目前还不能更新它们。为保持参考文献表完整，已停用此文档的 Zotero 命令。',
+     zoteroGroup: 'Zotero',
+   },
+   en: {
+@@ -33,7 +34,7 @@
+     zoteroConnectionError: 'Unable to connect to Zotero. Start Zotero and keep it running.',
+     zoteroOperationError: 'The Zotero operation failed.',
+     zoteroNoteFieldsUnsupported:
+-      'This document has Zotero citations in footnotes or endnotes, which GenOffice cannot update yet. Zotero commands are turned off here so the bibliography stays intact.',
++      'This document has Zotero citations in footnotes or endnotes, which Lexora Office cannot update yet. Zotero commands are turned off here so the bibliography stays intact.',
+     zoteroGroup: 'Zotero',
+   },
+   ja: {
+@@ -50,7 +51,7 @@
+     zoteroConnectionError: 'Zotero に接続できません。Zotero を起動したままにしてください。',
+     zoteroOperationError: 'Zotero の操作に失敗しました。',
+     zoteroNoteFieldsUnsupported:
+-      'この文書の脚注または文末脚注に Zotero の引用が含まれていますが、GenOffice はまだ更新できません。参考文献一覧を保つため、この文書では Zotero コマンドを無効にしています。',
++      'この文書の脚注または文末脚注に Zotero の引用が含まれていますが、Lexora Office はまだ更新できません。参考文献一覧を保つため、この文書では Zotero コマンドを無効にしています。',
+     zoteroGroup: 'Zotero',
+   },
+   ko: {
+@@ -67,7 +68,7 @@
+     zoteroConnectionError: 'Zotero에 연결할 수 없습니다. Zotero를 실행한 상태로 유지하세요.',
+     zoteroOperationError: 'Zotero 작업에 실패했습니다.',
+     zoteroNoteFieldsUnsupported:
+-      '이 문서의 각주 또는 미주에 Zotero 인용이 있으며 GenOffice는 아직 이를 업데이트할 수 없습니다. 참고문헌을 그대로 유지하기 위해 이 문서에서는 Zotero 명령이 비활성화되었습니다.',
++      '이 문서의 각주 또는 미주에 Zotero 인용이 있으며 Lexora Office는 아직 이를 업데이트할 수 없습니다. 참고문헌을 그대로 유지하기 위해 이 문서에서는 Zotero 명령이 비활성화되었습니다.',
+     zoteroGroup: 'Zotero',
+   },
+   fr: {
+@@ -86,7 +87,7 @@
+       'Impossible de se connecter à Zotero. Démarrez Zotero et laissez-le ouvert.',
+     zoteroOperationError: "L'opération Zotero a échoué.",
+     zoteroNoteFieldsUnsupported:
+-      'Ce document contient des citations Zotero dans les notes de bas de page ou de fin, que GenOffice ne peut pas encore mettre à jour. Les commandes Zotero sont désactivées ici afin de préserver la bibliographie.',
++      'Ce document contient des citations Zotero dans les notes de bas de page ou de fin, que Lexora Office ne peut pas encore mettre à jour. Les commandes Zotero sont désactivées ici afin de préserver la bibliographie.',
+     zoteroGroup: 'Zotero',
+   },
+   de: {
+@@ -104,7 +105,7 @@
+       'Verbindung mit Zotero nicht möglich. Starten Sie Zotero und lassen Sie es geöffnet.',
+     zoteroOperationError: 'Der Zotero-Vorgang ist fehlgeschlagen.',
+     zoteroNoteFieldsUnsupported:
+-      'Dieses Dokument enthält Zotero-Zitate in Fuß- oder Endnoten, die GenOffice noch nicht aktualisieren kann. Die Zotero-Befehle sind hier deaktiviert, damit das Literaturverzeichnis intakt bleibt.',
++      'Dieses Dokument enthält Zotero-Zitate in Fuß- oder Endnoten, die Lexora Office noch nicht aktualisieren kann. Die Zotero-Befehle sind hier deaktiviert, damit das Literaturverzeichnis intakt bleibt.',
+     zoteroGroup: 'Zotero',
+   },
+   es: {
+@@ -121,7 +122,7 @@
+     zoteroConnectionError: 'No se puede conectar con Zotero. Inicie Zotero y manténgalo abierto.',
+     zoteroOperationError: 'La operación de Zotero ha fallado.',
+     zoteroNoteFieldsUnsupported:
+-      'Este documento tiene citas de Zotero en notas al pie o al final que GenOffice aún no puede actualizar. Los comandos de Zotero están desactivados aquí para mantener intacta la bibliografía.',
++      'Este documento tiene citas de Zotero en notas al pie o al final que Lexora Office aún no puede actualizar. Los comandos de Zotero están desactivados aquí para mantener intacta la bibliografía.',
+     zoteroGroup: 'Zotero',
+   },
+   th: {
+@@ -138,7 +139,7 @@
+     zoteroConnectionError: 'ไม่สามารถเชื่อมต่อกับ Zotero ได้ โปรดเปิด Zotero ทิ้งไว้',
+     zoteroOperationError: 'การดำเนินการ Zotero ล้มเหลว',
+     zoteroNoteFieldsUnsupported:
+-      'เอกสารนี้มีการอ้างอิง Zotero ในเชิงอรรถหรืออ้างอิงท้ายเรื่อง ซึ่ง GenOffice ยังอัปเดตไม่ได้ คำสั่ง Zotero จึงถูกปิดไว้เพื่อรักษาบรรณานุกรมให้ครบถ้วน',
++      'เอกสารนี้มีการอ้างอิง Zotero ในเชิงอรรถหรืออ้างอิงท้ายเรื่อง ซึ่ง Lexora Office ยังอัปเดตไม่ได้ คำสั่ง Zotero จึงถูกปิดไว้เพื่อรักษาบรรณานุกรมให้ครบถ้วน',
+     zoteroGroup: 'Zotero',
+   },
+   id: {
+@@ -157,7 +158,7 @@
+       'Tidak dapat terhubung ke Zotero. Jalankan Zotero dan biarkan tetap terbuka.',
+     zoteroOperationError: 'Operasi Zotero gagal.',
+     zoteroNoteFieldsUnsupported:
+-      'Dokumen ini memiliki sitasi Zotero di catatan kaki atau catatan akhir yang belum dapat diperbarui GenOffice. Perintah Zotero dinonaktifkan di sini agar daftar pustaka tetap utuh.',
++      'Dokumen ini memiliki sitasi Zotero di catatan kaki atau catatan akhir yang belum dapat diperbarui Lexora Office. Perintah Zotero dinonaktifkan di sini agar daftar pustaka tetap utuh.',
+     zoteroGroup: 'Zotero',
+   },
+   ru: {
+@@ -175,7 +176,7 @@
+       'Не удалось подключиться к Zotero. Запустите Zotero и оставьте его открытым.',
+     zoteroOperationError: 'Операция Zotero завершилась с ошибкой.',
+     zoteroNoteFieldsUnsupported:
+-      'В сносках или концевых сносках этого документа есть цитаты Zotero, которые GenOffice пока не может обновлять. Команды Zotero здесь отключены, чтобы библиография осталась целой.',
++      'В сносках или концевых сносках этого документа есть цитаты Zotero, которые Lexora Office пока не может обновлять. Команды Zotero здесь отключены, чтобы библиография осталась целой.',
+     zoteroGroup: 'Zotero',
+   },
+   ar: {
+@@ -192,7 +193,7 @@
+     zoteroConnectionError: 'تعذر الاتصال بـ Zotero. شغّل Zotero واتركه مفتوحًا.',
+     zoteroOperationError: 'فشلت عملية Zotero.',
+     zoteroNoteFieldsUnsupported:
+-      'يحتوي هذا المستند على استشهادات Zotero في الحواشي السفلية أو الختامية، ولا يستطيع GenOffice تحديثها بعد. تم تعطيل أوامر Zotero هنا للحفاظ على قائمة المراجع سليمة.',
++      'يحتوي هذا المستند على استشهادات Zotero في الحواشي السفلية أو الختامية، ولا يستطيع Lexora Office تحديثها بعد. تم تعطيل أوامر Zotero هنا للحفاظ على قائمة المراجع سليمة.',
+     zoteroGroup: 'Zotero',
+   },
+   pt: {
+@@ -210,7 +211,7 @@
+       'Não foi possível conectar ao Zotero. Inicie o Zotero e mantenha-o aberto.',
+     zoteroOperationError: 'A operação do Zotero falhou.',
+     zoteroNoteFieldsUnsupported:
+-      'Este documento tem citações do Zotero em notas de rodapé ou de fim que o GenOffice ainda não consegue atualizar. Os comandos do Zotero estão desativados aqui para manter a bibliografia intacta.',
++      'Este documento tem citações do Zotero em notas de rodapé ou de fim que o Lexora Office ainda não consegue atualizar. Os comandos do Zotero estão desativados aqui para manter a bibliografia intacta.',
+     zoteroGroup: 'Zotero',
+   },
+   it: {
+@@ -228,7 +229,7 @@
+     zoteroConnectionError: 'Impossibile connettersi a Zotero. Avvia Zotero e lascialo aperto.',
+     zoteroOperationError: "L'operazione Zotero non è riuscita.",
+     zoteroNoteFieldsUnsupported:
+-      'Questo documento contiene citazioni Zotero nelle note a piè di pagina o di chiusura, che GenOffice non può ancora aggiornare. I comandi Zotero sono disattivati qui per mantenere intatta la bibliografia.',
++      'Questo documento contiene citazioni Zotero nelle note a piè di pagina o di chiusura, che Lexora Office non può ancora aggiornare. I comandi Zotero sono disattivati qui per mantenere intatta la bibliografia.',
+     zoteroGroup: 'Zotero',
+   },
+   pl: {
+@@ -245,7 +246,7 @@
+     zoteroConnectionError: 'Nie można połączyć się z Zotero. Uruchom Zotero i pozostaw je otwarte.',
+     zoteroOperationError: 'Operacja Zotero nie powiodła się.',
+     zoteroNoteFieldsUnsupported:
+-      'Ten dokument zawiera cytowania Zotero w przypisach dolnych lub końcowych, których GenOffice nie potrafi jeszcze aktualizować. Polecenia Zotero są tu wyłączone, aby bibliografia pozostała nienaruszona.',
++      'Ten dokument zawiera cytowania Zotero w przypisach dolnych lub końcowych, których Lexora Office nie potrafi jeszcze aktualizować. Polecenia Zotero są tu wyłączone, aby bibliografia pozostała nienaruszona.',
+     zoteroGroup: 'Zotero',
+   },
+   cs: {
+@@ -262,7 +263,7 @@
+     zoteroConnectionError: 'K Zoteru se nelze připojit. Spusťte Zotero a nechte je otevřené.',
+     zoteroOperationError: 'Operace Zotero se nezdařila.',
+     zoteroNoteFieldsUnsupported:
+-      'Tento dokument obsahuje citace Zotero v poznámkách pod čarou nebo vysvětlivkách, které GenOffice zatím neumí aktualizovat. Příkazy Zotero jsou zde vypnuté, aby bibliografie zůstala nedotčená.',
++      'Tento dokument obsahuje citace Zotero v poznámkách pod čarou nebo vysvětlivkách, které Lexora Office zatím neumí aktualizovat. Příkazy Zotero jsou zde vypnuté, aby bibliografie zůstala nedotčená.',
+     zoteroGroup: 'Zotero',
+   },
+   nl: {
+@@ -281,7 +282,7 @@
+       'Kan geen verbinding maken met Zotero. Start Zotero en laat het geopend.',
+     zoteroOperationError: 'De Zotero-bewerking is mislukt.',
+     zoteroNoteFieldsUnsupported:
+-      'Dit document bevat Zotero-citaties in voet- of eindnoten die GenOffice nog niet kan bijwerken. Zotero-opdrachten zijn hier uitgeschakeld zodat de bibliografie intact blijft.',
++      'Dit document bevat Zotero-citaties in voet- of eindnoten die Lexora Office nog niet kan bijwerken. Zotero-opdrachten zijn hier uitgeschakeld zodat de bibliografie intact blijft.',
+     zoteroGroup: 'Zotero',
+   },
+   ms: {
+@@ -300,7 +301,7 @@
+       'Tidak dapat menyambung ke Zotero. Mulakan Zotero dan biarkannya terbuka.',
+     zoteroOperationError: 'Operasi Zotero gagal.',
+     zoteroNoteFieldsUnsupported:
+-      'Dokumen ini mempunyai petikan Zotero dalam nota kaki atau nota hujung yang belum boleh dikemas kini oleh GenOffice. Perintah Zotero dimatikan di sini supaya bibliografi kekal utuh.',
++      'Dokumen ini mempunyai petikan Zotero dalam nota kaki atau nota hujung yang belum boleh dikemas kini oleh Lexora Office. Perintah Zotero dimatikan di sini supaya bibliografi kekal utuh.',
+     zoteroGroup: 'Zotero',
+   },
+   he: {
+@@ -317,7 +318,7 @@
+     zoteroConnectionError: 'לא ניתן להתחבר ל-Zotero. יש להפעיל את Zotero ולהשאיר אותו פתוח.',
+     zoteroOperationError: 'פעולת Zotero נכשלה.',
+     zoteroNoteFieldsUnsupported:
+-      'מסמך זה מכיל ציטוטים של Zotero בהערות שוליים או הערות סיום, ש-GenOffice עדיין אינו יכול לעדכן. פקודות Zotero מושבתות כאן כדי לשמור על הביבליוגרפיה שלמה.',
++      'מסמך זה מכיל ציטוטים של Zotero בהערות שוליים או הערות סיום, ש-Lexora Office עדיין אינו יכול לעדכן. פקודות Zotero מושבתות כאן כדי לשמור על הביבליוגרפיה שלמה.',
+     zoteroGroup: 'Zotero',
+   },
+   hi: {
+@@ -334,7 +335,7 @@
+     zoteroConnectionError: 'Zotero से कनेक्ट नहीं हो सका। Zotero शुरू करें और उसे खुला रखें।',
+     zoteroOperationError: 'Zotero कार्रवाई विफल रही।',
+     zoteroNoteFieldsUnsupported:
+-      'इस दस्तावेज़ के फ़ुटनोट या एंडनोट में Zotero उद्धरण हैं, जिन्हें GenOffice अभी अपडेट नहीं कर सकता। ग्रंथसूची को सुरक्षित रखने के लिए यहाँ Zotero कमांड बंद हैं।',
++      'इस दस्तावेज़ के फ़ुटनोट या एंडनोट में Zotero उद्धरण हैं, जिन्हें Lexora Office अभी अपडेट नहीं कर सकता। ग्रंथसूची को सुरक्षित रखने के लिए यहाँ Zotero कमांड बंद हैं।',
+     zoteroGroup: 'Zotero',
+   },
+   'zh-TW': {
+@@ -351,7 +352,7 @@
+     zoteroConnectionError: '無法連線至 Zotero。請先啟動 Zotero，並保持桌面程式執行。',
+     zoteroOperationError: 'Zotero 操作失敗。',
+     zoteroNoteFieldsUnsupported:
+-      '此文件的註腳或章節附註中含有 Zotero 引文，GenOffice 目前還無法更新它們。為保持參考文獻完整，已停用此文件的 Zotero 命令。',
++      '此文件的註腳或章節附註中含有 Zotero 引文，Lexora Office 目前還無法更新它們。為保持參考文獻完整，已停用此文件的 Zotero 命令。',
+     zoteroGroup: 'Zotero',
+   },
+   vi: {
+@@ -369,7 +370,7 @@
+       'Không thể kết nối với Zotero. Hãy khởi động Zotero và giữ ứng dụng luôn chạy.',
+     zoteroOperationError: 'Thao tác Zotero thất bại.',
+     zoteroNoteFieldsUnsupported:
+-      'Tài liệu này có chứa trích dẫn Zotero trong chú thích cuối trang hoặc chú thích cuối tài liệu mà GenOffice hiện chưa thể cập nhật. Các lệnh Zotero đã bị tắt tại đây để giữ nguyên danh mục tài liệu tham khảo.',
++      'Tài liệu này có chứa trích dẫn Zotero trong chú thích cuối trang hoặc chú thích cuối tài liệu mà Lexora Office hiện chưa thể cập nhật. Các lệnh Zotero đã bị tắt tại đây để giữ nguyên danh mục tài liệu tham khảo.',
+     zoteroGroup: 'Zotero',
+   },
+ })
+--- a/apps/pdf/src/renderer/NoteMargin.tsx
++++ b/apps/pdf/src/renderer/NoteMargin.tsx
+@@ -1,3 +1,4 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
+ import { useMemo, useRef, useState } from 'react'
+ import type { ReactElement } from 'react'
+ import type { Lang } from '@genoffice/i18n'
+@@ -165,7 +166,7 @@
+             className={`pdf-note-comment${depth > 0 ? ' pdf-note-comment-reply' : ''}`}
+           >
+             <div className="pdf-note-comment-head">
+-              <span className="pdf-note-author">{item.author || 'GenOffice'}</span>
++              <span className="pdf-note-author">{item.author || 'Lexora Office'}</span>
+               <span className="pdf-note-time">
+                 {item.timeMs !== null ? timeFmt.format(item.timeMs) : ''}
+               </span>
+@@ -299,7 +300,7 @@
+       style={{ top, borderTopColor: cssRgb(color) }}
+     >
+       <div className="pdf-note-card-head">
+-        <span className="pdf-note-author">{author || 'GenOffice'}</span>
++        <span className="pdf-note-author">{author || 'Lexora Office'}</span>
+         <span className="pdf-note-time">{timeFmt.format(createdMs)}</span>
+       </div>
+       <div className="pdf-note-draft-box">
+--- a/apps/pdf/src/main/save-pdf.ts
++++ b/apps/pdf/src/main/save-pdf.ts
+@@ -1,3 +1,4 @@
++// Modified for Lexora Office; original license and copyright remain applicable.
+ import { readFile } from 'node:fs/promises'
+ import {
+   PDFArray,
+@@ -202,7 +203,7 @@
+     QuadPoints: m.quads.flat(),
+     C: m.color,
+     F: 4, // print
+-    T: 'GenOffice',
++    T: 'Lexora Office',
+     P: page.ref,
+     AP: { N: apRef },
+   })
+@@ -274,7 +275,7 @@
+     P: page.ref,
+     AP: { N: pdfDoc.context.register(ap) },
+   })
+-  annot.set(PDFName.of('T'), PDFHexString.fromText('GenOffice'))
++  annot.set(PDFName.of('T'), PDFHexString.fromText('Lexora Office'))
+   setVisualSignatureMetadata(annot, d.formFieldName)
+   appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
+ }
+@@ -426,7 +427,7 @@
+       AP: { N: pdfDoc.context.register(noteAppearance(pdfDoc, rect, d.color)) },
+     })
+     annot.set(PDFName.of('Contents'), PDFHexString.fromText(d.contents))
+-    annot.set(PDFName.of('T'), PDFHexString.fromText(d.author || 'GenOffice'))
++    annot.set(PDFName.of('T'), PDFHexString.fromText(d.author || 'Lexora Office'))
+     const when = pdfDateString(d.createdMs ?? Date.now())
+     annot.set(PDFName.of('CreationDate'), PDFString.of(when))
+     annot.set(PDFName.of('M'), PDFString.of(when))
+@@ -513,7 +514,7 @@
+   if (d.kind === 'line' || d.kind === 'arrow') {
+     annot.set(PDFName.of('L'), pdfDoc.context.obj([...d.from, ...d.to]))
+   }
+-  annot.set(PDFName.of('T'), PDFHexString.fromText('GenOffice'))
++  annot.set(PDFName.of('T'), PDFHexString.fromText('Lexora Office'))
+   if (d.kind === 'ink') setVisualSignatureMetadata(annot, d.formFieldName)
+   appendAnnot(pdfDoc, page, pdfDoc.context.register(annot))
+ }

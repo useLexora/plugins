@@ -1,0 +1,395 @@
+{
+  "schemaVersion": 1,
+  "format": "compiled",
+  "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx",
+  "name": "Lexora Office",
+  "description": "文档、表格、演示文稿与 PDF 的独立工作台，集中管理文件、收藏、历史版本与回收站。",
+  "version": "1.0.0",
+  "apiVersion": 4,
+  "engines": {
+    "lexora": ">=0.16.0"
+  },
+  "permissions": {
+    "selectedResource": "read",
+    "localResources": true,
+    "resourceExport": true,
+    "clipboardRead": true,
+    "clipboardWrite": true,
+    "references": true,
+    "agent": true
+  },
+  "contributes": {
+    "views": [
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.library",
+        "title": "Office",
+        "entry": "library-page.js",
+        "resource": "none",
+        "location": "context"
+      },
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.editor",
+        "title": "Office",
+        "entry": "view.js",
+        "resource": "optional-file",
+        "location": "context"
+      }
+    ],
+    "fileHandlers": [
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.xlsx",
+        "title": "Lexora Office",
+        "extensions": [
+          ".xlsx",
+          ".csv",
+          ".docx",
+          ".pptx",
+          ".pdf"
+        ],
+        "preview": {
+          "view": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.editor"
+        },
+        "open": {
+          "view": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.editor"
+        }
+      }
+    ],
+    "launchers": [
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.start",
+        "title": "Office",
+        "view": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.editor"
+      }
+    ],
+    "skills": [
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.skill.office",
+        "path": "skills/office/SKILL.md"
+      },
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.skill.docx",
+        "path": "skills/docx/SKILL.md"
+      },
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.skill.xlsx",
+        "path": "skills/xlsx/SKILL.md"
+      },
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.skill.pptx",
+        "path": "skills/pptx/SKILL.md"
+      },
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.skill.pdf",
+        "path": "skills/pdf/SKILL.md"
+      }
+    ],
+    "navigation": {
+      "title": "Office",
+      "view": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.library",
+      "showHeader": false
+    },
+    "commands": [
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.manage",
+        "title": "管理 Office 文档库",
+        "hidden": true
+      },
+      {
+        "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.editor-bridge",
+        "title": "Office 文档操作",
+        "hidden": true
+      }
+    ],
+    "agent": {
+      "instructions": "Office 使用当前主 Agent 执行，不调用插件内模型。先用 {{pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.capabilities}} 查询能力；阅读历史引用快照先用宿主 lexora_reference_list，再按 sourceMessageId/kind/referenceId 调用 lexora_reference_read，不依赖文档当前版本；检查或修改当前引用对象用 {{pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.references}} → {{pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.read}}，引用必须配对使用 references 返回的 sourceMessageId/referenceId；库文件用 documents → read(documentId)，新建用 create。读取结果的 targetId/revision 绑定具体文档、任务分支和当前执行，不跨轮次或子 Agent 复用，禁止以当前焦点或同名文件替代。只读请求不修改。edit 只能用公布的操作和参数；自己的编辑后继续 read(targetId)，原引用仍是快照。用户/其他页面修改会触发冲突，需检查后重新打开明确的文档 ID，不能重试旧操作。保存、检查内容/布局、导出才构成交付；export 的产物卡片才是任务输出，saved=true 仅代表文档库已保存。",
+      "tools": [
+        {
+          "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.capabilities",
+          "title": "查询 Office 能力",
+          "description": "查询套件入口；提供 targetId 时返回该格式真实读写操作、参数 schema、限制和渲染能力。",
+          "access": "read",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "targetId": {
+                "type": "string",
+                "description": "read/create 返回的当前执行文档目标 ID；不可跨轮次或子 Agent 复用"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.references",
+          "title": "列出 Office 引用",
+          "description": "列出当前任务已发送且可访问的 Office 引用。",
+          "access": "read",
+          "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.documents",
+          "title": "查询 Office 文档库",
+          "description": "按名称关键字、格式或回收站状态列出文档及 documentId/revision。名称不作为唯一目标。",
+          "access": "read",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "query": {
+                "type": "string",
+                "description": "名称关键字"
+              },
+              "kind": {
+                "type": "string",
+                "description": "文件格式",
+                "enum": [
+                  "docx",
+                  "xlsx",
+                  "pptx",
+                  "pdf"
+                ]
+              },
+              "trash": {
+                "type": "boolean",
+                "description": "true 查询回收站，默认 false"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.create",
+          "title": "新建 Office 文件",
+          "description": "创建空白文件并打开编辑器，返回 targetId/revision。接着查询格式能力并写入内容；失败先查询文档库，不重复新建。",
+          "access": "write",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "description": "文件格式",
+                "enum": [
+                  "docx",
+                  "xlsx",
+                  "pptx",
+                  "pdf"
+                ]
+              },
+              "name": {
+                "type": "string",
+                "description": "文件名，不含路径"
+              }
+            },
+            "required": [
+              "kind",
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.read",
+          "title": "读取 Office 文档目标",
+          "description": "读取当前文档并建立 CAS 编辑目标：sourceMessageId + referenceId 验证当前结构定位和原文后重绑，documentId 打开库文件，targetId 延续目标。历史摘录正文由宿主 lexora_reference_read 读取，不受当前文档保存或关闭影响。定位或原文变化时拒绝重绑；自己的编辑后继续 read(targetId)。返回 contentState=current 与内容版本；旧引用版本仅作来源标识，当前定位和原文必须通过验证。query 可分页、读取范围或检查格式。",
+          "access": "read",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "referenceId": {
+                "type": "string",
+                "description": "references 返回的引用 ID"
+              },
+              "documentId": {
+                "type": "string",
+                "description": "documents 返回的文档 ID"
+              },
+              "targetId": {
+                "type": "string",
+                "description": "read/create 返回的当前执行文档目标 ID；不可跨轮次或子 Agent 复用"
+              },
+              "query": {
+                "type": "object",
+                "description": "格式专属读取请求；操作和参数见 capabilities",
+                "properties": {
+                  "operation": {
+                    "type": "string",
+                    "description": "读取操作名称"
+                  },
+                  "input": {
+                    "type": "string",
+                    "description": "参数 JSON 对象字符串"
+                  }
+                },
+                "required": [
+                  "operation"
+                ],
+                "additionalProperties": false
+              },
+              "sourceMessageId": {
+                "type": "string",
+                "description": "与 referenceId 配对的来源消息 ID，由 references 返回；同 ID 存在多份快照时必须指定"
+              }
+            },
+            "required": [],
+            "additionalProperties": false
+          }
+        },
+        {
+          "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.edit",
+          "title": "编辑 Office 文档",
+          "description": "按 capabilities 公布的确定性操作修改绑定文档并保存。input 是操作参数 JSON 对象字符串。必须 targetId + expectedRevision；自身修改后目标可连续读写。冲突、取消或超时后先检查，不盲重试。mutated=true 且 saved=false 时修改已发生，只用新 revision 执行 save，不重复修改。outcome=unknown 时目标撤回，先检查文档实际状态。",
+          "access": "write",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "targetId": {
+                "type": "string",
+                "description": "read/create 返回的当前执行文档目标 ID；不可跨轮次或子 Agent 复用"
+              },
+              "expectedRevision": {
+                "type": "string",
+                "description": "最近一次读取或操作返回的 revision"
+              },
+              "operation": {
+                "type": "string",
+                "description": "当前格式 capabilities/read 公布的操作"
+              },
+              "input": {
+                "type": "string",
+                "description": "操作参数 JSON 对象字符串"
+              },
+              "referenceId": {
+                "type": "string",
+                "description": "兼容旧调用的引用 ID；可省略"
+              }
+            },
+            "required": [
+              "targetId",
+              "expectedRevision",
+              "operation"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.organize",
+          "title": "管理 Office 文档",
+          "description": "重命名、收藏、回收站、复制和恢复历史版本；versions 查询版本。除 versions 外必须传 documents 返回的数字 expectedRevision。永久删除仅通过管理页面。",
+          "access": "write",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "documentId": {
+                "type": "string",
+                "description": "documents 返回的文档 ID"
+              },
+              "action": {
+                "type": "string",
+                "description": "操作",
+                "enum": [
+                  "rename",
+                  "favorite",
+                  "trash",
+                  "restore",
+                  "duplicate",
+                  "restoreVersion",
+                  "versions"
+                ]
+              },
+              "expectedRevision": {
+                "type": "number",
+                "description": "documents 返回的记录 revision"
+              },
+              "name": {
+                "type": "string",
+                "description": "重命名/副本名称"
+              },
+              "value": {
+                "type": "boolean",
+                "description": "收藏状态"
+              },
+              "versionId": {
+                "type": "string",
+                "description": "versions 返回的历史版本 ID"
+              }
+            },
+            "required": [
+              "documentId",
+              "action"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.render",
+          "title": "查看 Office 渲染图",
+          "description": "将绑定文档渲染为图片并直接返回给主 Agent 进行视觉检查。仅限 capabilities 声明支持的格式；input 由对应渲染 schema 指定。不修改文档。",
+          "access": "read",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "targetId": {
+                "type": "string",
+                "description": "read/create 返回的当前执行文档目标 ID；不可跨轮次或子 Agent 复用"
+              },
+              "input": {
+                "type": "string",
+                "description": "渲染参数 JSON 对象字符串"
+              }
+            },
+            "required": [
+              "targetId"
+            ],
+            "additionalProperties": false
+          }
+        },
+        {
+          "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.export",
+          "title": "交付 Office 文档产物",
+          "description": "确认最新版本已保存，将文件发布为当前任务可打开/下载的产物。文件保留原格式，不覆盖原导入来源。",
+          "access": "write",
+          "parameters": {
+            "type": "object",
+            "properties": {
+              "targetId": {
+                "type": "string",
+                "description": "read/create 返回的当前执行文档目标 ID；不可跨轮次或子 Agent 复用"
+              },
+              "expectedRevision": {
+                "type": "string",
+                "description": "最近一次读取或操作返回的 revision"
+              },
+              "name": {
+                "type": "string",
+                "description": "可选导出名称，不含路径"
+              }
+            },
+            "required": [
+              "targetId",
+              "expectedRevision"
+            ],
+            "additionalProperties": false
+          }
+        }
+      ]
+    }
+  },
+  "entry": "extension.js",
+  "icon": "icon.svg",
+  "categories": [
+    "效率"
+  ],
+  "tags": [
+    "Office",
+    "文档",
+    "表格",
+    "演示文稿",
+    "PDF"
+  ]
+}

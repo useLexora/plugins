@@ -1,0 +1,241 @@
+import { repository } from './paths.mjs'
+import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
+import test from 'node:test'
+import { build } from 'esbuild'
+
+const built = await build({ entryPoints: ['src/office-view-agent.ts'], bundle: true, write: false, format: 'esm', platform: 'node' })
+const { createOfficeViewAgent } = await import(`data:text/javascript;base64,${Buffer.from(built.outputFiles[0].text).toString('base64')}`)
+
+const host = await build({ stdin: { contents: `export { extensionReferenceInputSchema } from './apps/buddy/shared/extensions/extensionReferences.ts'; export { extensionJsonSchema } from './apps/buddy/shared/extensions/extensionApi.ts'`, resolveDir: repository }, bundle: true, write: false, format: 'esm', platform: 'node' })
+const { extensionReferenceInputSchema, extensionJsonSchema } = await import(`data:text/javascript;base64,${Buffer.from(host.outputFiles[0].text).toString('base64')}`)
+
+async function fixture() {
+  let reveal
+  let acceptReference = true
+  let onMessage
+  let reply
+  let document = { id: 'document-a', name: 'Report.docx', kind: 'docx', versions: [{ id: 'content-v1' }] }
+  let dirty = false
+  let revision = 1
+  let stale = false
+  let save = async () => {}
+  let nextRead
+  let writes = 0
+  let currentSession = 'session-a'
+  const reference = { label: 'Report.docx · 段落', text: 'Same text in both documents', locator: { from: 1, to: 28 }, version: '1' }
+  const added = []
+  const revealed = []
+  let nextReveal
+  const editor = { assistant: { reference: async () => reference, read: async value => { await nextRead; return { reference: { ...reference, version: '2' }, text: reference.text, operations: ['replace_text'] } }, execute: async ({ input }, guard) => { guard.assertCurrent(); writes++; reference.text = input.text; revision++; dirty = true; return { text: reference.text, mutated: true } }, reveal: async reference => {
+    revealed.push({ documentId: document.id, reference })
+    return nextReveal ? nextReveal : true
+  } } }
+  let open = async () => {}
+  const context = {
+    signal: new AbortController().signal,
+    commands: { execute: async (_command, message) => { extensionJsonSchema.parse(message); if (message.type === 'reply') reply(message); return null } },
+    onMessage: callback => { onMessage = callback; return { dispose() {} } },
+    references: { add: async input => { if (!acceptReference) return false; added.push(extensionReferenceInputSchema.parse(input)); return true }, onReveal: callback => { reveal = callback; return { dispose() {} } } },
+  }
+  const agent = createOfficeViewAgent(context, {
+    editor: () => editor,
+    document: () => document,
+    open: id => open(id),
+    revision: () => String(revision),
+    dirty: () => dirty,
+    save: () => save(),
+    checkStored: async () => { if (stale) throw new Error('stored version changed') },
+  })
+  await agent.register('session-a')
+  const locate = (documentId, signal = new AbortController().signal) => reveal({ text: reference.text, locator: { version: 1, data: { documentId, documentVersion: 'content-v1', sessionId: 'old-session', reference } } }, signal)
+  return {
+    readBridge: (documentVersion = 'content-v1', target = false) => new Promise(resolve => { reply = resolve; onMessage(extensionJsonSchema.parse({ type: 'office-agent-request', sessionId: currentSession, documentId: 'document-a', ...(target ? { expectedRevision: '1' } : { documentVersion }), requestId: crypto.randomUUID(), operation: 'read', reference: { ...reference, text: '', textDigest: createHash('sha256').update(reference.text).digest('hex'), textLength: reference.text.length } })) }),
+    editBridge: (expectedRevision, action, input = {}) => new Promise(resolve => { reply = resolve; onMessage(extensionJsonSchema.parse({ type: 'office-agent-request', sessionId: currentSession, documentId: 'document-a', requestId: crypto.randomUUID(), operation: 'edit', expectedRevision, action, input })) }),
+    failSave: () => { save = async () => { throw new Error('disk full') } },
+    writes: () => writes,
+    cancelReference: () => { acceptReference = false },
+    agent, locate, revealed, added, reference, revealAdded: () => reveal({ text: added.at(-1).text, locator: added.at(-1).locator }, new AbortController().signal),
+    staleStored: () => { stale = true },
+    allowOpening: () => { open = async id => { stale = false; document = { ...document, id }; currentSession = `session-${id}`; await agent.register(currentSession) } },
+    deferReveal: () => new Promise(resolve => { nextReveal = new Promise(finish => resolve(finish)) }),
+    deferRead: () => new Promise(resolve => { nextRead = new Promise(finish => resolve(finish)) }),
+    setDirty: value => { dirty = value; revision++ },
+    setVersion: id => { document = { ...document, versions: [{ id }] }; revision++ },
+    saveAsVersion: id => { save = async () => { document = { ...document, versions: [{ id }] }; dirty = false } },
+    switchDocument: async id => { document = { ...document, id }; currentSession = `session-${id}`; await agent.register(currentSession) },
+  }
+}
+
+test('取消切换或正在打开时，不向当前另一份文档传递引用定位', async () => {
+  const f = await fixture()
+  assert.equal(await f.locate('document-b'), false)
+  assert.deepEqual(f.revealed, [])
+  f.allowOpening()
+  assert.equal(await f.locate('document-b'), true)
+  assert.equal(f.revealed[0].documentId, 'document-b')
+})
+
+test('引用定位结束前切换编辑会话，旧结果失效', async () => {
+  const f = await fixture()
+  const finish = await f.deferReveal()
+  const locating = f.locate('document-a')
+  await f.switchDocument('document-b')
+  finish(true)
+  assert.equal(await locating, false)
+})
+
+test('引用定位完成前取消，不报告定位成功', async () => {
+  const f = await fixture()
+  const abort = new AbortController()
+  abort.abort()
+  await assert.rejects(f.locate('document-a', abort.signal), { name: 'AbortError' })
+  assert.deepEqual(f.revealed, [])
+  const controller = new AbortController()
+  const finish = await f.deferReveal()
+  const locating = f.locate('document-a', controller.signal)
+  controller.abort()
+  finish(true)
+  await assert.rejects(locating, { name: 'AbortError' })
+})
+
+test('长引用符合宿主定位大小契约，定位恢复完整原文并复用已有文件标题', async () => {
+  const f = await fixture()
+  f.reference.text = '字'.repeat(262144)
+  await f.agent.quote()
+  assert.equal(f.added[0].text, f.reference.text)
+  assert.equal(f.added[0].title, 'Report.docx · 段落')
+  assert.ok(Buffer.byteLength(JSON.stringify(f.added[0].locator)) < 1024)
+  assert.equal(await f.revealAdded(), true)
+  assert.equal(f.revealed[0].reference.text, f.reference.text)
+  assert.equal(f.revealed[0].reference.version, '2')
+  f.reference.label = 'Sheet1!A1:B3'
+  await f.agent.quote()
+  assert.equal(f.added[1].title, 'Report.docx · Sheet1!A1:B3')
+})
+
+test('24k 中文和最坏转义文本的内部 read 往返均符合宿主 256KB 限额', async () => {
+  for (const text of ['字'.repeat(24000), 'a' + String.fromCharCode(1).repeat(23999)]) {
+    const f = await fixture()
+    f.reference.text = text
+    await f.agent.quote()
+    const reply = await f.readBridge()
+    assert.equal(reply.value.text, text)
+    assert.ok(Buffer.byteLength(JSON.stringify(reply)) < 160000)
+    assert.equal(reply.value.reference.version, '2')
+  }
+})
+
+test('其它内容保存后旧引用仍可验证定位，未保存编辑不建立写入目标', async () => {
+  const f = await fixture()
+  f.setVersion('content-v2')
+  const current = (await f.readBridge()).value
+  assert.equal(current.documentVersion, 'content-v2')
+  assert.equal(current.contentState, 'current')
+  assert.equal(current.referenceDocumentVersion, 'content-v1')
+  assert.equal(current.sourceChangedSinceReference, true)
+  assert.equal(await f.locate('document-a'), true)
+  f.setDirty(true)
+  assert.match((await f.readBridge()).error, /未保存/)
+  await assert.rejects(f.locate('document-a'), /未保存/)
+})
+
+test('保存后引用绑定新内容版本，关闭重开同版本仍可读取和定位', async () => {
+  const f = await fixture()
+  f.setDirty(true)
+  f.saveAsVersion('content-v2')
+  await f.agent.quote()
+  assert.equal(f.added[0].locator.data.documentVersion, 'content-v2')
+  f.agent.close()
+  await f.switchDocument('document-a')
+  assert.equal((await f.readBridge('content-v2')).value.text, f.reference.text)
+  assert.equal(await f.revealAdded(), true)
+})
+
+test('异步读取或定位期间新增手改，不能接受旧引用结果', async () => {
+  const f = await fixture()
+  const finishRead = await f.deferRead()
+  const reading = f.readBridge()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  f.setDirty(true)
+  finishRead()
+  assert.match((await reading).error, /文档已变化/)
+  f.setDirty(false)
+  const finishReveal = await f.deferReveal()
+  const revealing = f.locate('document-a')
+  await new Promise(resolve => setTimeout(resolve, 0))
+  f.setVersion('content-v2')
+  finishReveal(true)
+  await assert.rejects(revealing, /文档已变化/)
+})
+
+test('生成引用期间出现新修改不发布过时的定位', async () => {
+  const f = await fixture()
+  f.saveAsVersion('content-v2')
+  const finish = await f.deferRead()
+  const quoting = f.agent.quote()
+  await new Promise(resolve => setTimeout(resolve, 0))
+  f.setDirty(true)
+  finish()
+  await assert.rejects(quoting, /重新选择并引用/)
+  assert.deepEqual(f.added, [])
+})
+
+
+test('长引用只在宿主保存正文，连续目标用全文摘要校验且有界截断上下文', async () => {
+  const f = await fixture()
+  f.reference.text = 'a' + String.fromCharCode(1).repeat(262143)
+  const reply = await f.readBridge(undefined, true)
+  assert.equal(reply.error, undefined)
+  assert.equal(reply.value.reference.text, '')
+  assert.equal(reply.value.reference.textLength, 262144)
+  assert.equal(reply.value.reference.textDigest, createHash('sha256').update(f.reference.text).digest('hex'))
+  assert.equal(reply.value.truncated, true)
+  assert.ok(Buffer.byteLength(JSON.stringify(reply)) < 240 * 1024)
+})
+
+test('同文档另一页面已保存时，干净回源重开最新后验证，未保存内容不被覆盖', async () => {
+  const f = await fixture()
+  f.allowOpening();f.staleStored()
+  assert.equal(await f.locate('document-a'),true)
+  f.staleStored();f.setDirty(true)
+  await assert.rejects(f.locate('document-a'),/未保存/)
+  assert.equal(f.revealed.length,1)
+})
+
+
+test('引用捕获固定正文与位置，保存等待期间不能静默替换用户选区', async () => {
+  for (const change of [reference => { reference.text = 'Changed after capture' }, reference => { reference.locator.to = 29 }]) {
+    const f = await fixture()
+    const finish = await f.deferRead()
+    const quoting = f.agent.quote()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    change(f.reference)
+    finish()
+    await assert.rejects(quoting, /变化|定位/)
+    assert.deepEqual(f.added, [])
+  }
+})
+
+
+test('编辑后保存失败返回已执行的新修订，旧请求拒绝，补保存不再次修改', async () => {
+  const f = await fixture()
+  f.failSave()
+  const changed = await f.editBridge('1', 'replace_text', { text: 'Applied exactly once' })
+  assert.deepEqual(changed.value, { text: 'Applied exactly once', mutated: true, revision: '2', saved: false, saveError: 'disk full' })
+  const repeated = await f.editBridge('1', 'replace_text', { text: 'Must not replay' })
+  assert.match(repeated.error, /其他操作修改/)
+  assert.equal(f.reference.text, 'Applied exactly once')
+  f.saveAsVersion('content-v2')
+  const saved = await f.editBridge('2', 'save')
+  assert.deepEqual(saved.value, { text: '保存文档', mutated: false, revision: '2', documentVersion: 'content-v2', saved: true })
+  assert.equal(f.writes(), 1)
+})
+
+
+test('用户取消引用目标选择时不报错且不添加引用', async () => {
+  const f = await fixture()
+  f.cancelReference()
+  await f.agent.quote()
+  assert.deepEqual(f.added, [])
+})
