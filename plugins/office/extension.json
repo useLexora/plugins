@@ -3,8 +3,9 @@
   "format": "compiled",
   "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx",
   "name": "Lexora Office",
+  "author": "Lexora",
   "description": "文档、表格、演示文稿与 PDF 的独立工作台，集中管理文件、收藏、历史版本与回收站。",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "apiVersion": 4,
   "engines": {
     "lexora": ">=0.16.0"

@@ -6,7 +6,19 @@
  import { scriptFontHtml } from './editor/script-fonts'
  import { carryDocSeen } from './ai/tools'
  import { DOC_CSS_COMMITTED_EVENT, WRAP_WIDTHS_COMMITTED_EVENT } from './editor/cjk-punct-shrink'
-@@ -781,7 +783,7 @@
+@@ -126,9 +128,8 @@
+ import { hfFooterLine, hfLayoutResolved, hfPhantomSpec, hfWithPhantom } from './hf-phantom'
+ import { textColorValue } from './editor/text-color'
+ import { textOutlineCssValue } from './editor/text-outline'
+-import { AiAskPopover } from './components/AiAskPopover'
+-import { EDIT_QUEUE_MAX, selectionForAnchor, type DocsEditQueueItem } from './ai/edit-queue'
+-import { addQueueAnchor, clearQueueAnchors, removeQueueAnchors } from './editor/ai-queue-anchors'
++import { selectionForAnchor, type DocsEditQueueItem } from './ai/edit-queue'
++import { clearQueueAnchors, removeQueueAnchors } from './editor/ai-queue-anchors'
+ import {
+   asianCharCount,
+   countWords,
+@@ -781,7 +782,7 @@
    return !('needsPassword' in result)
  }
  
@@ -15,7 +27,17 @@
    // subscribe to language switches for re-render; strings all go through module-level t, so memoized callbacks never capture stale closures
    const { lang } = useI18n()
    const [doc, setDoc] = useState<DocState | null>(null)
-@@ -2131,7 +2133,10 @@
+@@ -1089,9 +1090,6 @@
+   } | null>(null)
+   // selection-scoped AI edit queue (anchors live as editor decorations)
+   const [editQueue, setEditQueue] = useState<DocsEditQueueItem[]>([])
+-  const editQueueRef = useRef(editQueue)
+-  editQueueRef.current = editQueue
+-  const queueSeqRef = useRef(0)
+   // opening/creating a document drops every anchor with setContent; the queue
+   // must not leak the previous file's items (they would sit orphaned at the cap)
+   useEffect(() => {
+@@ -2131,7 +2129,10 @@
      const outcome = await loadFileImpl(fileCtxRef.current, result)
      // a failed open with no document yet (boot, or the open that superseded the
      // boot open) must land on blank instead of the "Opening…" screen
@@ -27,7 +49,7 @@
      return outcome
    }, [])
    const resetFile = useCallback(() => newFileImpl(fileCtxRef.current), [])
-@@ -2310,7 +2315,13 @@
+@@ -2310,7 +2311,13 @@
    }
  
    const save = useCallback(
@@ -42,7 +64,7 @@
      [],
    )
  
-@@ -2325,7 +2336,7 @@
+@@ -2325,7 +2332,7 @@
      if (!result) return
      if (!result.ok) {
        setStatus(result.error)
@@ -51,7 +73,7 @@
      }
      setMergeSource(result.source)
      setStatus(
-@@ -5448,6 +5459,10 @@
+@@ -5448,6 +5455,10 @@
    const anyDirtyRef = useRef(false)
    const hasUnsavedChanges = isDocDirty(fileCtxRef.current)
    anyDirtyRef.current = hasUnsavedChanges
@@ -62,7 +84,41 @@
  
    // close guard: the main process queries dirty state before closing a tab/window; choosing "Save" runs a full save and reports back
    useEffect(() => {
-@@ -6935,7 +6950,7 @@
+@@ -6406,22 +6417,6 @@
+ 
+   /** every function prop of the memoized Ribbon, with stable identities (dispatches into the latest render's closures) */
+   // ---- selection-scoped AI edit queue ----
+-  const getQueueItem = useCallback(
+-    (qid: string) => editQueueRef.current.find((item) => item.qid === qid),
+-    [],
+-  )
+-  const queueAdd = (instruction: string): void => {
+-    const { from, to, empty } = editor.state.selection
+-    if (empty || editQueueRef.current.length >= EDIT_QUEUE_MAX) return
+-    const qid = `q${++queueSeqRef.current}`
+-    addQueueAnchor(editor, qid, from, to)
+-    const capturedText = editor.state.doc
+-      .textBetween(from, to, ' ', ' ')
+-      .replace(/\s+/g, ' ')
+-      .trim()
+-      .slice(0, 80)
+-    setEditQueue((queue) => [...queue, { qid, instruction, capturedText }])
+-  }
+   const queueUpdate = (qid: string, instruction: string): void =>
+     setEditQueue((queue) => queue.map((i) => (i.qid === qid ? { ...i, instruction } : i)))
+   const queueRemove = (qid: string): void => {
+@@ -6442,10 +6437,6 @@
+     if (!selection) return
+     editor.view.dispatch(editor.state.tr.setSelection(selection).scrollIntoView())
+     editor.view.focus()
+-  }
+-  const askSendNow = (text: string): void => {
+-    setShowAi(true)
+-    setAiPreset({ text, nonce: Date.now(), autoRun: true })
+   }
+ 
+   // AI comment tools run the same review-actions code paths as the comments pane
+@@ -6935,7 +6926,7 @@
      onHeader: (next: HeaderFooter) => commitHfAt(0, 'header', headerAreaView, next),
      onPageNumFormat: openPgNumModal,
      onInsertField: insertField,
@@ -71,6 +127,24 @@
      onMergeMailings: mergeMailings,
      onFooter: (next: HeaderFooter) => commitHfAt(lastSectionIdx, 'footer', footerAreaView, next),
      onHfAction: (action: HfAction) => onHfAction(action),
+@@ -7575,17 +7566,6 @@
+                 zoom={zoom / 100}
+                 pageInfo={pageInfo}
+                 onClose={closeNav}
+-              />
+-            )}
+-            {doc && (
+-              <AiAskPopover
+-                editor={editor}
+-                queueFull={editQueue.length >= EDIT_QUEUE_MAX}
+-                getItem={getQueueItem}
+-                onSendNow={askSendNow}
+-                onQueueAdd={queueAdd}
+-                onQueueUpdate={queueUpdate}
+-                onQueueRemove={queueRemove}
+               />
+             )}
+             {doc && <PasteOptionsChip editor={editor} />}
 --- a/apps/docs/src/renderer/components/ContextMenu.tsx
 +++ b/apps/docs/src/renderer/components/ContextMenu.tsx
 @@ -1,3 +1,5 @@
