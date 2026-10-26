@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import { closeHistory } from '@tiptap/pm/history'
 import { TextSelection } from '@tiptap/pm/state'
-import { replaceInlineRange, findNumId, type SelectionScope } from '../vendor/genoffice/apps/docs/src/renderer/ai/protocol'
+import { replaceInlineRange, findNumId, getSelectionScope, type SelectionScope } from '../vendor/genoffice/apps/docs/src/renderer/ai/protocol'
 import { AGENT_TOOLS, executeTool, markDocSeen } from '../vendor/genoffice/apps/docs/src/renderer/ai/tools'
 import { opCatalog } from '../vendor/genoffice/apps/docs/src/renderer/ai/ops'
 import { BLANK_BULLET_NUM_ID, BLANK_ORDERED_NUM_ID } from '../vendor/genoffice/packages/docx-engine/src/blank'
@@ -49,15 +49,12 @@ export function createDocxAssistant(getEditor: () => Editor, name: string, ensur
   const capture = (target?: OfficeEditorReference): OfficeEditorReference | null => {
     ensureActive()
     const editor = getEditor()
-    let { from, to } = editor.state.selection
+    let { from, to } = getSelectionScope(editor)
+    from ??= editor.state.selection.from; to ??= editor.state.selection.to
     if (target) {
       if (target.locator.kind !== 'docx' || !Number.isInteger(target.locator.from) || !Number.isInteger(target.locator.to)) throw new Error('文档引用位置无效。')
       from = Number(target.locator.from); to = Number(target.locator.to)
-    } else if (from === to) {
-      const pos = editor.state.doc.resolve(from)
-      if (pos.depth !== 1 || !pos.parent.isTextblock) return null
-      from = pos.start(); to = pos.end()
-    }
+    } else if (from === to) return null
     if (from < 1 || to <= from || to > editor.state.doc.content.size) return null
     const text = redactTextBetween(editor.getJSON(), from, to, '\n')
     const block = editor.state.doc.resolve(from).index(0)

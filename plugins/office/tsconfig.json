@@ -234,6 +234,9 @@
       ],
       "@genoffice/ui/ai-skills.css": [
         "./vendor/genoffice/packages/ui/src/ai-skills.css"
+      ],
+      "@lexora/office-reference-menu": [
+        "./src/office-reference-menu.tsx"
       ]
     }
   },

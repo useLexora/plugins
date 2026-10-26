@@ -1,0 +1,55 @@
+--- a/apps/docs/src/renderer/components/ContextMenu.tsx
++++ b/apps/docs/src/renderer/components/ContextMenu.tsx
+@@ -1,3 +1,4 @@
++import { OfficeReferenceItem } from '@lexora/office-reference-menu'
+ // Modified for Lexora Office; original license and copyright remain applicable.
+ // Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { useEffect, useMemo, useRef, useState } from 'react'
+@@ -364,6 +365,7 @@
+       style={{ left: pos.left, top: pos.top, minWidth: MENU_WIDTH }}
+       onContextMenu={(e) => e.preventDefault()}
+     >
++      <OfficeReferenceItem close={onClose} />
+       {spell && (
+         <>
+           {spell.suggestions.length === 0 && item(t('appSpellNoSuggestions'), { disabled: true })}
+--- a/apps/slides/src/renderer/components/ContextMenu.tsx
++++ b/apps/slides/src/renderer/components/ContextMenu.tsx
+@@ -1,3 +1,4 @@
++import { OfficeReferenceItem } from '@lexora/office-reference-menu'
+ /**
+  * Context menu — fixed positioning, kept within the viewport; closes on any click/Escape/scroll.
+  * Items that are null render as separators; items with `sub` open a one-level flyout on hover.
+@@ -122,6 +123,7 @@
+       onContextMenu={(e) => e.preventDefault()}
+       {...(keepEdit ? { 'data-keep-edit': '', onMouseDown: (e) => e.preventDefault() } : {})}
+     >
++      <OfficeReferenceItem close={onClose} />
+       {items.map((item, i) =>
+         item === null ? (
+           <div key={i} className="ctx-sep" />
+--- a/apps/pdf/src/renderer/App.tsx
++++ b/apps/pdf/src/renderer/App.tsx
+@@ -9913,21 +9913,7 @@
+                     <span className="pdf-sel-popup-sep" aria-hidden />
+                   </>
+                 )}
+-                <button
+-                  type="button"
+-                  className="pdf-sel-ask"
+-                  data-tip={onReference ? '引用到任务' : t('aiAskTitle')}
+-                  aria-label={onReference ? '引用到任务' : t('aiAskBtn')}
+-                  onClick={openAskPopover}
+-                >
+-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" aria-hidden>
+-                    <path
+-                      d="M12 3l1.7 4.6L18 9.3l-4.3 1.7L12 15.6l-1.7-4.6L6 9.3l4.3-1.7L12 3zM19 15l.85 2.3L22 18.15l-2.15.85L19 21.3l-.85-2.3-2.15-.85 2.15-.85L19 15z"
+-                      fill="currentColor"
+-                    />
+-                  </svg>
+-                  {onReference ? '引用到任务' : t('aiAskBtn')}
+-                </button>
++
+               </div>
+             )}
+             {askPop && (

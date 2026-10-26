@@ -5,9 +5,11 @@ import type { OfficeEditorReference } from './office-editor-types'
 export const OFFICE_REFERENCE_MAX_CHARS = 24_000
 export const OFFICE_CAPTURE_MAX_CHARS = 262_144
 
-export function officeTextDigest(text: string): string {
-  return Array.from(sha256(new TextEncoder().encode(text)), byte => byte.toString(16).padStart(2, '0')).join('')
+export function officeBytesDigest(bytes: Uint8Array): string {
+  return Array.from(sha256(bytes), byte => byte.toString(16).padStart(2, '0')).join('')
 }
+
+export function officeTextDigest(text: string): string { return officeBytesDigest(new TextEncoder().encode(text)) }
 
 export function compactOfficeReference(reference: OfficeEditorReference): OfficeEditorReference {
   return { ...reference, text: reference.locator.kind === 'text' && (reference.textLength ?? reference.text.length) <= OFFICE_REFERENCE_MAX_CHARS ? reference.text : '', textDigest: reference.textDigest ?? officeTextDigest(reference.text), textLength: reference.textLength ?? reference.text.length }

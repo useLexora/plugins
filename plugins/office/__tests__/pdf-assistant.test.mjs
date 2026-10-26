@@ -1,5 +1,6 @@
 import { repository } from './paths.mjs'
 import assert from 'node:assert/strict'
+import { createHash } from 'node:crypto'
 import { test } from 'node:test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -44,6 +45,9 @@ test('PDF references and suite creation preserve precise targets, atomic edits, 
     const pdfPage = fixture.addPage([595, 842])
     pdfPage.drawText('Original contract', { x: 72, y: 700, size: 16, font })
     pdfPage.drawText('Original contract', { x: 72, y: 600, size: 16, font })
+    pdfPage.drawText('Selection crosses text runs', { x: 72, y: 500, size: 16, font })
+    const italic = await fixture.embedFont(StandardFonts.HelveticaBoldOblique)
+    pdfPage.drawText('and a second styled line.', { x: 72, y: 350, size: 16, font: italic })
     for (const label of ['Second page', 'Third page']) {
       const extra = fixture.addPage([595, 842])
       extra.drawText('Original contract', { x: 72, y: 700, size: 16, font })
@@ -58,15 +62,39 @@ test('PDF references and suite creation preserve precise targets, atomic edits, 
         environment: { colorScheme: 'light' },
         onEnvironmentChange: () => ({ dispose() {} }),
         resources: { saveFile: async () => true },
+        references: { commit: async () => true, release: async () => true },
         commands: { execute: async () => ({ ok: true, value: null }) },
       }
       window.officeEditor = await module.mountPdfEditor({
         context: window.pdfContext, container: document.getElementById('editor'), bytes: new Uint8Array(bytes), name: '引用验收.pdf',
         onDirty: dirty => { window.pdfDirty = dirty },
-        onReference: reference => { window.quoted = reference },
+        captureReference: async reference => { await window.officeEditor.assistant.resolveReference(reference); window.quoted = reference; return { id: 'capture', targets: [], defaultId: null, clipboard: true } },
       })
     }, [...await fixture.save()])
     await page.locator('.textLayer span').filter({ hasText: 'Original contract' }).nth(1).waitFor()
+    await page.locator('.textLayer span').filter({ hasText: 'Selection crosses text runs' }).evaluate(span => {
+      const end = [...document.querySelectorAll('.textLayer span')].find(node => node.textContent === 'and a second styled line.')
+      const range = document.createRange(); range.setStart(span.firstChild, 5); range.setEnd(end.firstChild, 12)
+      getSelection().removeAllRanges(); getSelection().addRange(range)
+      window.crossBlockText = getSelection().toString()
+      span.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+    })
+    await page.getByRole('button', { name: '引用', exact: true }).click()
+    await page.getByRole('menuitem', { name: '复制引用', exact: true }).waitFor()
+    const crossBlock = await page.evaluate(async () => {
+      const reference = window.quoted
+      const read = await window.officeEditor.assistant.read(reference)
+      const revealed = await window.officeEditor.assistant.reveal(reference)
+      let editRejected = false
+      try { await window.officeEditor.assistant.execute({ operation: 'replace_text', reference, input: { text: 'Must not replace' } }) } catch { editRejected = true }
+      return { expected: window.crossBlockText, text: reference.text, digestCount: reference.locator.selectionPageDigests.length, editable: read.operations.includes('replace_text'), revealed, editRejected }
+    })
+    assert.equal(crossBlock.text, crossBlock.expected)
+    assert.equal(crossBlock.digestCount, 1)
+    assert.equal(crossBlock.editable, false)
+    assert.equal(crossBlock.revealed, true)
+    assert.equal(crossBlock.editRejected, true)
+    await page.keyboard.press('Escape')
     await page.locator('.textLayer span').filter({ hasText: 'Original contract' }).nth(1).evaluate(span => {
       const range = document.createRange()
       range.selectNodeContents(span)
@@ -74,8 +102,8 @@ test('PDF references and suite creation preserve precise targets, atomic edits, 
       window.getSelection().addRange(range)
       span.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
     })
-    await page.getByRole('button', { name: '引用到任务', exact: true }).click()
-    await page.waitForFunction(() => !!window.quoted)
+    await page.getByRole('button', { name: '引用', exact: true }).click()
+    await page.waitForFunction(() => window.quoted?.text === 'Original contract')
     assert.equal(await page.locator('.ai-ask-pop').count(), 0)
     const first = await page.evaluate(async () => {
       const assistant = window.officeEditor.assistant
@@ -202,7 +230,7 @@ test('PDF references and suite creation preserve precise targets, atomic edits, 
       window.getSelection().addRange(range)
       span.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
     })
-    await page.getByRole('button', { name: '引用到任务', exact: true }).click()
+    await page.getByRole('button', { name: '引用', exact: true }).click()
     await page.waitForFunction(() => window.quoted?.locator.page === 2, null, { timeout: 10000 })
     await page.evaluate(() => window.__genofficeControl({ cmd: 'goto', target: { kind: 'page', page: 1 } }))
     await page.locator('.pdf-page[data-page="0"]').scrollIntoViewIfNeeded()
@@ -278,9 +306,10 @@ test('PDF references and suite creation preserve precise targets, atomic edits, 
       const initial = await assistant.read()
       if (initial.data.pageCount !== 1) throw new Error('Blank PDF must have one page')
       await assistant.execute({ operation: 'insert_text', input: { page: 1, x: 72, y: 72, text: 'Office suite report', font_size: 24, font: 'arial', bold: true, color: '#174879', max_width: 450 } })
-      let blocked = false
-      try { await assistant.render({ page: 1 }) } catch { blocked = true }
-      if (!blocked) throw new Error('Unsaved rendering should be rejected')
+      const beforeRender = window.pdfRevision
+      const [image] = await assistant.render({ page: 1 })
+      if (!window.pdfDirty || beforeRender !== window.pdfRevision) throw new Error('Reference rendering must preserve pending edits without saving')
+      window.pendingPreview = [...image.data]
       const revision = window.pdfRevision
       const bytes = await window.officeEditor.save()
       await window.officeEditor.markSaved(bytes)
@@ -296,6 +325,10 @@ test('PDF references and suite creation preserve precise targets, atomic edits, 
       return { name: image.name, mimeType: image.mimeType, data: [...image.data] }
     })
     assert.equal(preview.mimeType, 'image/png')
+    const pendingPreview = new Uint8Array(await page.evaluate(() => window.pendingPreview))
+    await fs.writeFile(path.join(output, 'pending-reference.png'), pendingPreview)
+    await fs.writeFile(path.join(output, 'saved-reference.png'), new Uint8Array(preview.data))
+    assert.equal(createHash('sha256').update(new Uint8Array(preview.data)).digest('hex'), createHash('sha256').update(pendingPreview).digest('hex'))
     assert.deepEqual(preview.data.slice(0, 8), [137, 80, 78, 71, 13, 10, 26, 10])
     await fs.writeFile(path.join(output, preview.name), new Uint8Array(preview.data))
     const suite = await page.evaluate(async () => {

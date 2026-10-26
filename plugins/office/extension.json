@@ -8,7 +8,7 @@
   "version": "1.0.1",
   "apiVersion": 4,
   "engines": {
-    "lexora": ">=0.16.0"
+    "lexora": ">=0.17.0"
   },
   "permissions": {
     "selectedResource": "read",

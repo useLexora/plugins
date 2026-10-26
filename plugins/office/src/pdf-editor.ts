@@ -1,10 +1,11 @@
+import { PdfReferenceAction } from './pdf-reference-action'
 import { Buffer } from 'buffer'
 import { createElement } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { PdfOfficeBridge } from '../vendor/genoffice/apps/pdf/src/renderer/office-bridge'
 import { createPdfAssistant, PDF_WRITE_OPERATIONS } from './pdf-assistant'
 import { officeVersion } from './office-assistant'
-import { GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs'
+import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
 import { PDFDocument } from 'pdf-lib'
 import { zipSync } from 'fflate'
 import App from '../vendor/genoffice/apps/pdf/src/renderer/App'
@@ -17,6 +18,7 @@ import { applyAiPanelPrefs, installScreenTips } from '../vendor/genoffice/packag
 import type { PdfApi, SavedSignature, SignatureData } from '../vendor/genoffice/apps/pdf/src/shared/ipc'
 import type { OfficeEditor, OfficeEditorOptions } from './office-editor-types'
 import type { Json, LocalFile } from './lexora'
+import { DOC_OPTS } from '../vendor/genoffice/apps/pdf/src/renderer/view-config'
 import { preparePdfRuntime } from './pdf-browser-runtime'
 import { readOfficeResource } from './office-resource-bytes'
 import '@genoffice/ui/tokens.css'
@@ -118,7 +120,12 @@ export async function mountPdfEditor(options: OfficeEditorOptions): Promise<Offi
         } finally { toolBusy = false }
       },
     }
-  }, active, name)
+  }, active, name, async request => {
+    active()
+    const preview = request ? await checkedSave(bytes, request) : bytes.slice()
+    active()
+    return getDocument({ data: preview, ...DOC_OPTS }).promise
+  })
   const onOfficeBridge = (bridge: PdfOfficeBridge | null) => { officeBridge = bridge }
   const notifyDirty = (contentChanged = true) => {
     if (disposed) return
@@ -310,12 +317,7 @@ export async function mountPdfEditor(options: OfficeEditorOptions): Promise<Offi
   const ready = new Promise<void>((resolve, reject) => { resolveReady = resolve; rejectReady = reject })
   root.render(createElement(LocaleProvider, { initial: 'zh', children: createElement(App, {
     onOfficeBridge,
-    onReference: async () => {
-      const reference = await assistant.reference()
-      if (!reference) throw new Error('请先选择需要引用的文字。')
-      if (!options.onReference) throw new Error('当前页面尚未接入引用能力。')
-      await options.onReference(reference)
-    },
+    referenceAction: createElement(PdfReferenceAction, { options, assistant }),
     onStatus: (status: string) => { if (status === 'ready') resolveReady?.(); else if (status === 'error') rejectReady?.(new Error('PDF 加载失败，请检查文件。')) },
     onSaveRequest: options.onSaveRequest ? async () => {
       try { await options.onSaveRequest!(); return true } catch (error) { lastSaveError = message(error); throw error }

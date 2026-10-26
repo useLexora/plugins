@@ -1,3 +1,4 @@
+import { installOfficeReferenceMenu } from './office-reference-menu'
 import { createSlidesAssistant } from './slides-assistant'
 import type { ExportImagesOp, SavePictureOp } from '../vendor/genoffice/apps/slides/src/shared/ipc'
 import { readOfficeResource } from './office-resource-bytes'
@@ -6,6 +7,7 @@ import { createRoot } from 'react-dom/client'
 import { App } from '../vendor/genoffice/apps/slides/src/renderer/App'
 import { LocaleProvider, setModuleLang } from '../vendor/genoffice/apps/slides/src/renderer/i18n/locale'
 import { flushActiveEdit } from '../vendor/genoffice/apps/slides/src/renderer/file-actions'
+import { readEditSelection } from '../vendor/genoffice/apps/slides/src/renderer/TextEditOverlay'
 import type { ActionCtx } from '../vendor/genoffice/apps/slides/src/renderer/action-context'
 import { createBlankPptx as buildBlank } from '../vendor/genoffice/packages/pptx-engine/src/blank'
 import { defaultAiSettings } from '../vendor/genoffice/packages/ai-provider/src/providers'
@@ -134,6 +136,15 @@ export async function mountSlidesEditor(options: OfficeEditorOptions): Promise<O
       case 'slides:microphone-access': return false
       case 'slides:presenter-start': throw new Error('当前不支持独立演示窗口。')
     }
+    if (channel === 'slides:native-clipboard' && args[0] === 'copy') {
+      const selection = readEditSelection()
+      if (!selection || selection.range.collapsed) return
+      const fragment = document.createElement('div')
+      fragment.append(selection.range.cloneContents())
+      await context.clipboard.write({ text: selection.range.toString(), html: fragment.innerHTML })
+      ensureActive()
+      return
+    }
     if (channel.startsWith('slides:')) return request(channel, ...args)
     throw new Error('此操作需要在 Lexora 对话或 Office 管理页完成。')
   }
@@ -158,9 +169,11 @@ export async function mountSlidesEditor(options: OfficeEditorOptions): Promise<O
     onContext: (read: () => ActionCtx) => { readContext = read; if (read().slides.length) resolveReady?.() },
     onLoadError: (error: Error) => rejectReady?.(error),
   }) }))
+  let stopReferenceMenu = () => {}
   const dispose = () => {
     if (disposed) return
     disposed = true
+    stopReferenceMenu()
     rejectReady?.(new Error('演示文稿打开已取消。'))
     root.unmount(); worker.terminate(); css.remove(); stopTips(); subscription.dispose()
     for (const call of pending.values()) call.reject(new Error('演示文稿已关闭。'))
@@ -196,5 +209,6 @@ export async function mountSlidesEditor(options: OfficeEditorOptions): Promise<O
   context.signal.addEventListener('abort', dispose, { once: true })
   const timeout = setTimeout(() => rejectReady?.(new Error('演示文稿加载超时。')), 90000)
   try { await ready; options.onDirty(false) } catch (error) { dispose(); throw error } finally { clearTimeout(timeout) }
+  stopReferenceMenu = installOfficeReferenceMenu(options, () => editor.assistant)
   return editor
 }

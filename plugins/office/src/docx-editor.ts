@@ -1,3 +1,4 @@
+import { installOfficeReferenceMenu } from './office-reference-menu'
 import { officeVersion } from './office-assistant'
 import { createDocxAssistant } from './docx-assistant'
 import { pickMergeDataSource, writeMergeOutput } from './docx-mail-merge'
@@ -181,9 +182,11 @@ export async function mountDocxEditor(options: OfficeEditorOptions): Promise<Off
   }
   root.render(createElement(LocaleProvider, { initial: 'zh', children: createElement(App, { onFileContext, onDirty: dirty, onSaveRequest: saveRequest, onLoadError: (error: Error) => rejectReady?.(error) }) }))
   let stopDocumentChanges = () => {}
+  let stopReferenceMenu = () => {}
   const dispose = () => {
     if (disposed) return
     disposed = true
+    stopReferenceMenu()
     rejectReady?.(new Error('文档打开已取消。'))
     for (const handler of events.get('onTeardown') ?? []) handler()
     stopDocumentChanges()
@@ -242,5 +245,6 @@ export async function mountDocxEditor(options: OfficeEditorOptions): Promise<Off
     },
     dispose,
   }
+  stopReferenceMenu = installOfficeReferenceMenu(options, () => handle?.assistant)
   return handle
 }

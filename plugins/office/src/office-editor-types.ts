@@ -1,4 +1,4 @@
-import type { Json, ViewContext } from './lexora'
+import type { Json, ReferenceCapture, ViewContext } from './lexora'
 
 export interface OfficeEditorReference {
   label: string
@@ -61,7 +61,7 @@ export interface OfficeEditorOptions {
   onDirty: (dirty: boolean) => void
   onSaveRequest?: () => Promise<void>
   onSave?: (bytes: Uint8Array) => Promise<void>
-  onReference?: (reference: OfficeEditorReference) => void | Promise<void>
+  captureReference?: (reference: OfficeEditorReference) => Promise<ReferenceCapture | null>
 }
 
 export interface OfficeEditor {

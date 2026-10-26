@@ -17,7 +17,6 @@ export interface EditorChromeState {
 
 interface EditorChromeActions {
   back(): Promise<void>
-  quote(): Promise<void>
   save(): Promise<void>
   reopen(): Promise<void>
   export(): Promise<void>
@@ -88,7 +87,6 @@ function EditorChrome({ state, actions }: { state: EditorChromeState; actions: E
       </Button>
     </Dropdown>
     <div className="office-document-save">
-      <Tooltip title="将选中内容引用到任务，或复制引用"><Button type="text" disabled={disabled} onPointerDown={event => event.preventDefault()} onClick={() => void perform('quote', actions.quote)}>引用</Button></Tooltip>
       <Tooltip title={statusTip}><span className="office-save-state" role="status" aria-live="polite" data-dirty={state.dirty} data-failed={state.failed}>
         {state.loading || state.saving ? <LoadingOutlined aria-hidden="true" /> : state.failed ? <WarningOutlined aria-hidden="true" /> : state.dirty ? <span className="office-dirty-dot" aria-hidden="true" /> : <CheckOutlined aria-hidden="true" />}
         <span>{status}</span>

@@ -24,10 +24,10 @@ async function fixture() {
   let writes = 0
   let currentSession = 'session-a'
   const reference = { label: 'Report.docx · 段落', text: 'Same text in both documents', locator: { from: 1, to: 28 }, version: '1' }
-  const added = []
+  const captured = []
   const revealed = []
   let nextReveal
-  const editor = { assistant: { reference: async () => reference, read: async value => { await nextRead; return { reference: { ...reference, version: '2' }, text: reference.text, operations: ['replace_text'] } }, execute: async ({ input }, guard) => { guard.assertCurrent(); writes++; reference.text = input.text; revision++; dirty = true; return { text: reference.text, mutated: true } }, reveal: async reference => {
+  const editor = { assistant: { read: async value => { await nextRead; return { reference: { ...reference, version: '2' }, text: reference.text, operations: ['replace_text'] } }, execute: async ({ input }, guard) => { guard.assertCurrent(); writes++; reference.text = input.text; revision++; dirty = true; return { text: reference.text, mutated: true } }, reveal: async reference => {
     revealed.push({ documentId: document.id, reference })
     return nextReveal ? nextReveal : true
   } } }
@@ -36,7 +36,7 @@ async function fixture() {
     signal: new AbortController().signal,
     commands: { execute: async (_command, message) => { extensionJsonSchema.parse(message); if (message.type === 'reply') reply(message); return null } },
     onMessage: callback => { onMessage = callback; return { dispose() {} } },
-    references: { add: async input => { if (!acceptReference) return false; added.push(extensionReferenceInputSchema.parse(input)); return true }, onReveal: callback => { reveal = callback; return { dispose() {} } } },
+    references: { capture: async input => { if (!acceptReference) return null; captured.push(extensionReferenceInputSchema.parse(input)); return { id: crypto.randomUUID(), targets: [], defaultId: null, clipboard: true } }, onReveal: callback => { reveal = callback; return { dispose() {} } } },
   }
   const agent = createOfficeViewAgent(context, {
     editor: () => editor,
@@ -55,7 +55,7 @@ async function fixture() {
     failSave: () => { save = async () => { throw new Error('disk full') } },
     writes: () => writes,
     cancelReference: () => { acceptReference = false },
-    agent, locate, revealed, added, reference, revealAdded: () => reveal({ text: added.at(-1).text, locator: added.at(-1).locator }, new AbortController().signal),
+    agent, locate, revealed, captured, reference, revealCaptured: () => reveal({ text: captured.at(-1).text, locator: captured.at(-1).locator }, new AbortController().signal),
     staleStored: () => { stale = true },
     allowOpening: () => { open = async id => { stale = false; document = { ...document, id }; currentSession = `session-${id}`; await agent.register(currentSession) } },
     deferReveal: () => new Promise(resolve => { nextReveal = new Promise(finish => resolve(finish)) }),
@@ -102,23 +102,23 @@ test('引用定位完成前取消，不报告定位成功', async () => {
 test('长引用符合宿主定位大小契约，定位恢复完整原文并复用已有文件标题', async () => {
   const f = await fixture()
   f.reference.text = '字'.repeat(262144)
-  await f.agent.quote()
-  assert.equal(f.added[0].text, f.reference.text)
-  assert.equal(f.added[0].title, 'Report.docx · 段落')
-  assert.ok(Buffer.byteLength(JSON.stringify(f.added[0].locator)) < 1024)
-  assert.equal(await f.revealAdded(), true)
+  await f.agent.capture(f.reference)
+  assert.equal(f.captured[0].text, f.reference.text)
+  assert.equal(f.captured[0].title, 'Report.docx · 段落')
+  assert.ok(Buffer.byteLength(JSON.stringify(f.captured[0].locator)) < 1024)
+  assert.equal(await f.revealCaptured(), true)
   assert.equal(f.revealed[0].reference.text, f.reference.text)
-  assert.equal(f.revealed[0].reference.version, '2')
+  assert.equal(f.revealed[0].reference.version, '1')
   f.reference.label = 'Sheet1!A1:B3'
-  await f.agent.quote()
-  assert.equal(f.added[1].title, 'Report.docx · Sheet1!A1:B3')
+  await f.agent.capture(f.reference)
+  assert.equal(f.captured[1].title, 'Report.docx · Sheet1!A1:B3')
 })
 
 test('24k 中文和最坏转义文本的内部 read 往返均符合宿主 256KB 限额', async () => {
   for (const text of ['字'.repeat(24000), 'a' + String.fromCharCode(1).repeat(23999)]) {
     const f = await fixture()
     f.reference.text = text
-    await f.agent.quote()
+    await f.agent.capture(f.reference)
     const reply = await f.readBridge()
     assert.equal(reply.value.text, text)
     assert.ok(Buffer.byteLength(JSON.stringify(reply)) < 160000)
@@ -137,19 +137,21 @@ test('其它内容保存后旧引用仍可验证定位，未保存编辑不建�
   assert.equal(await f.locate('document-a'), true)
   f.setDirty(true)
   assert.match((await f.readBridge()).error, /未保存/)
-  await assert.rejects(f.locate('document-a'), /未保存/)
+  assert.equal(await f.locate('document-a'), true)
 })
 
-test('保存后引用绑定新内容版本，关闭重开同版本仍可读取和定位', async () => {
+test('保存失败仍能引用未保存快照，关闭会话后不把旧磁盘内容当原文', async () => {
   const f = await fixture()
   f.setDirty(true)
-  f.saveAsVersion('content-v2')
-  await f.agent.quote()
-  assert.equal(f.added[0].locator.data.documentVersion, 'content-v2')
+  f.failSave()
+  await f.agent.capture(f.reference)
+  assert.equal(f.captured[0].locator.version, 2)
+  assert.equal(f.captured[0].locator.data.state, 'session')
+  assert.equal(f.captured[0].locator.data.documentVersion, 'content-v1')
+  assert.equal(await f.revealCaptured(), true)
   f.agent.close()
   await f.switchDocument('document-a')
-  assert.equal((await f.readBridge('content-v2')).value.text, f.reference.text)
-  assert.equal(await f.revealAdded(), true)
+  await assert.rejects(f.revealCaptured(), /会话已关闭/)
 })
 
 test('异步读取或定位期间新增手改，不能接受旧引用结果', async () => {
@@ -173,12 +175,12 @@ test('生成引用期间出现新修改不发布过时的定位', async () => {
   const f = await fixture()
   f.saveAsVersion('content-v2')
   const finish = await f.deferRead()
-  const quoting = f.agent.quote()
+  const capturing = f.agent.capture(f.reference)
   await new Promise(resolve => setTimeout(resolve, 0))
   f.setDirty(true)
   finish()
-  await assert.rejects(quoting, /重新选择并引用/)
-  assert.deepEqual(f.added, [])
+  await assert.rejects(capturing, /重新选择并引用/)
+  assert.deepEqual(f.captured, [])
 })
 
 
@@ -199,21 +201,21 @@ test('同文档另一页面已保存时，干净回源重开最新后验证，�
   f.allowOpening();f.staleStored()
   assert.equal(await f.locate('document-a'),true)
   f.staleStored();f.setDirty(true)
-  await assert.rejects(f.locate('document-a'),/未保存/)
-  assert.equal(f.revealed.length,1)
+  assert.equal(await f.locate('document-a'),true)
+  assert.equal(f.revealed.length,2)
 })
 
 
-test('引用捕获固定正文与位置，保存等待期间不能静默替换用户选区', async () => {
+test('引用捕获固定正文与位置，解析等待期间不能静默替换用户选区', async () => {
   for (const change of [reference => { reference.text = 'Changed after capture' }, reference => { reference.locator.to = 29 }]) {
     const f = await fixture()
     const finish = await f.deferRead()
-    const quoting = f.agent.quote()
+    const capturing = f.agent.capture(f.reference)
     await new Promise(resolve => setTimeout(resolve, 0))
     change(f.reference)
     finish()
-    await assert.rejects(quoting, /变化|定位/)
-    assert.deepEqual(f.added, [])
+    await assert.rejects(capturing, /变化|定位/)
+    assert.deepEqual(f.captured, [])
   }
 })
 
@@ -233,9 +235,20 @@ test('编辑后保存失败返回已执行的新修订，旧请求拒绝，补�
 })
 
 
-test('用户取消引用目标选择时不报错且不添加引用', async () => {
+test('宿主来源失效时捕获返回空结果，不产生引用快照', async () => {
   const f = await fixture()
   f.cancelReference()
-  await f.agent.quote()
-  assert.deepEqual(f.added, [])
+  assert.equal(await f.agent.capture(f.reference), null)
+  assert.deepEqual(f.captured, [])
+})
+
+
+test('视觉与多区域 locator 转成独立 JSON 树，保持宿主的无循环快照契约', async () => {
+  const f = await fixture()
+  const rect = [0, 0, 100, 200]
+  f.reference.locator = { kind: 'visual', rects: [rect], regions: [{ pageId: '5:0', rects: [rect] }] }
+  await f.agent.capture(f.reference)
+  assert.deepEqual(JSON.parse(JSON.stringify(f.captured[0].locator.data.reference.locator)), f.reference.locator)
+  rect[0] = 10
+  assert.equal(f.captured[0].locator.data.reference.locator.rects[0][0], 0)
 })

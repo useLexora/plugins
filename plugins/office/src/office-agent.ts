@@ -5,6 +5,8 @@ import { PLUGIN_ID, fileName, type OfficeDocument, type OfficeLibraryService, ty
 
 export const OFFICE_BRIDGE = `${PLUGIN_ID}.editor-bridge`
 export interface OfficeReferenceLocator {
+  state: 'saved' | 'session'
+  revision?: string
   documentId: string
   documentVersion: string
   sessionId: string
@@ -35,7 +37,8 @@ export function parseOfficeLocator(value: Json, snapshotText?: string, snapshot?
   const reference = data && object(data.reference)
   const text = snapshotText ?? reference?.text
   if (!data || typeof data.documentId !== 'string' || typeof data.documentVersion !== 'string' || !data.documentVersion || typeof data.sessionId !== 'string' || !reference || typeof text !== 'string' || typeof reference.label !== 'string' || typeof reference.version !== 'string' || !object(reference.locator)) throw new Error('引用缺少 Office 文档定位，请重新引用原文。')
-  return { documentId: data.documentId, documentVersion: data.documentVersion, sessionId: data.sessionId, reference: { label: reference.label, text, ...(snapshot?.textDigest ? { textDigest: snapshot.textDigest, textLength: snapshot.textLength } : {}), locator: reference.locator as Record<string, Json>, version: reference.version } }
+  if (data.state !== undefined && data.state !== 'saved' && data.state !== 'session') throw new Error('引用的来源状态无效。')
+  return { state: data.state ?? 'saved', ...(typeof data.revision === 'string' ? { revision: data.revision } : {}), documentId: data.documentId, documentVersion: data.documentVersion, sessionId: data.sessionId, reference: { label: reference.label, text, ...(snapshot?.textDigest ? { textDigest: snapshot.textDigest, textLength: snapshot.textLength } : {}), locator: reference.locator as Record<string, Json>, version: reference.version } }
 }
 
 export function registerOfficeAgent(context: ExtensionContext, library?: OfficeLibraryService) {
@@ -122,7 +125,7 @@ export function registerOfficeAgent(context: ExtensionContext, library?: OfficeL
     if (typeof id !== 'string') throw new Error('请先列出任务中的 Office 引用并使用返回的 referenceId。')
     if (sourceMessageId !== undefined && (typeof sourceMessageId !== 'string' || !sourceMessageId)) throw new Error('sourceMessageId 必须使用 references 返回的消息 ID。')
     const reference = await tool.references.resolve(id, typeof sourceMessageId === 'string' ? { sourceMessageId } : undefined)
-    if (reference.locator?.version !== 1) throw new Error('此引用版本不受支持，请重新引用。')
+    if (reference.locator?.version !== 1 && reference.locator?.version !== 2) throw new Error('此引用版本不受支持，请重新引用。')
     return reference
   }
   const assertTarget = async (input: Record<string, Json>, tool: AgentToolContext) => {
@@ -195,8 +198,9 @@ export function registerOfficeAgent(context: ExtensionContext, library?: OfficeL
     if (input.referenceId) {
       const source = await resolve(input.referenceId, tool, input.sourceMessageId)
       const locator = parseOfficeLocator(source.locator!.data as Json, source.text, source)
+      if (locator.state === 'session' && sessions.get(locator.sessionId)?.documentId !== locator.documentId) throw new Error('未保存引用的编辑会话已关闭。请读取历史快照，或重新打开文档并引用。')
       const session = await ensureSession(locator.documentId, locator.sessionId, tool.signal)
-      const result = object(await request(session, 'read', { documentVersion: locator.documentVersion, reference: compactOfficeReference(locator.reference) as unknown as Json, ...queryArgs }, tool.signal))
+      const result = object(await request(session, 'read', { ...(locator.state === 'saved' ? { documentVersion: locator.documentVersion } : { referenceState: 'session', referenceRevision: locator.revision ?? '' }), reference: compactOfficeReference(locator.reference) as unknown as Json, ...queryArgs }, tool.signal))
       if (!result) throw new Error('无法读取引用。')
       return bind(session, result, tool, source, locator.reference)
     }
