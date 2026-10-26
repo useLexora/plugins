@@ -1,0 +1,76 @@
+--- a/apps/pdf/src/renderer/office-bridge.ts
++++ b/apps/pdf/src/renderer/office-bridge.ts
+@@ -11,6 +11,7 @@
+ }
+ 
+ export interface PdfOfficeBridge {
++  reveal: (regions: { page: number; rects: [number, number, number, number][] }[]) => Promise<boolean>
+   selection: () => PdfOfficeSelection | null
+   state: () => unknown
+   pendingText: () => { page: number; before?: string; after: string }[]
+--- a/apps/pdf/src/renderer/App.tsx
++++ b/apps/pdf/src/renderer/App.tsx
+@@ -970,6 +970,7 @@
+   const savedOnceRef = useRef(false)
+   const [searchOpen, setSearchOpen] = useState(false)
+   const [searchQuery, setSearchQuery] = useState('')
++  const [officeHighlights, setOfficeHighlights] = useState<SearchMatch[]>([])
+   const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([])
+   const [searchCur, setSearchCur] = useState(0)
+   const [printing, setPrinting] = useState(false)
+@@ -2430,6 +2431,11 @@
+     () => searchMatches.filter((m) => !deleted.has(m.pageIndex)),
+     [searchMatches, deleted],
+   )
++  useEffect(() => {
++    const clear = () => setOfficeHighlights([])
++    window.addEventListener('pointerdown', clear)
++    return () => window.removeEventListener('pointerdown', clear)
++  }, [])
+   const searchCurClamped = Math.min(searchCur, Math.max(0, activeMatches.length - 1))
+ 
+   const gotoMatch = useCallback(
+@@ -6589,10 +6595,29 @@
+ 
+   useLayoutEffect(() => {
+     onOfficeBridge?.({
+-      selection: () => aiSelection && selPopup ? {
+-        ...aiSelection,
+-        quads: [...selPopup.quads].map(([pageIndex, quads]) => ({ page: pageIndex + 1, quads })),
+-      } : null,
++      reveal: async (regions) => {
++        const first = regions[0]
++        const el = scrollRef.current
++        if (!first || !el || !first.rects.length) return false
++        const visIdx = visList.indexOf(first.page - 1)
++        if (visIdx < 0) return false
++        flushSync(() => setOfficeHighlights(regions.map(region => ({ pageIndex: region.page - 1, rects: region.rects }))))
++        const box = pdfRectToCss(pageGeom(first.page - 1), first.rects[0], scale)
++        el.scrollTop = Math.max(0, pageTop(visIdx) + box.top - el.clientHeight * 0.35)
++        for (let frame = 0; frame < 60; frame++) {
++          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
++          if (el.querySelector('[data-office-reference-highlight]')) return true
++        }
++        return false
++      },
++      selection: () => {
++        const selection = window.getSelection()
++        if (!selection || selection.isCollapsed || !selection.rangeCount || !scrollRef.current?.contains(selection.getRangeAt(0).commonAncestorContainer)) return null
++        const quads = selectionQuads()
++        if (!quads?.size || !selection.toString().trim()) return null
++        const pages = [...quads.keys()]
++        return { text: selection.toString(), page: Math.min(...pages) + 1, lastPage: Math.max(...pages) + 1, quads: [...quads].map(([pageIndex, quads]) => ({ page: pageIndex + 1, quads })) }
++      },
+       state: () => ({
+         documentRevision: documentVersion.current.revision,
+         redactions,
+@@ -9521,6 +9546,9 @@
+                                   }
+                                 />
+                               ))}
++                              {officeHighlights.some(hit => hit.pageIndex === origIdx) && <div className="pdf-search-layer">
++                                {officeHighlights.flatMap((hit, index) => hit.pageIndex === origIdx ? hit.rects.map((rect, i) => <div key={`${index}-${i}`} data-office-reference-highlight className="pdf-search-hit pdf-search-hit-cur" style={pdfRectToCss(geom, rect, scale)} />) : [])}
++                              </div>}
+                               {searchOpen && (
+                                 <div className="pdf-search-layer">
+                                   {activeMatches.flatMap((m, mi) =>

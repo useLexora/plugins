@@ -52,6 +52,10 @@
   ],
   "patches": [
     "genoffice.patch",
-    "branding.patch"
+    "branding.patch",
+    "reference-menu.patch",
+    "reference-pdf.patch",
+    "reference-pdf-ui.patch",
+    "reference-native-menu.patch"
   ]
 }

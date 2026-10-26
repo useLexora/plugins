@@ -4,6 +4,7 @@ import path from 'node:path'
 import { buildGenoffice, genofficeResolver } from './build-genoffice.mjs'
 import { buildPdf } from './build-pdf.mjs'
 import { univerClipboardPatch } from './build-univer-clipboard.mjs'
+import { univerContextMenuPatch } from './build-univer-contextmenu.mjs'
 import { prepareVendor } from './prepare-vendor.mjs'
 
 const root = import.meta.dirname
@@ -30,7 +31,7 @@ await build({ ...shared, entryPoints: ['src/view.ts'], outfile: 'dist/view.js', 
   if (Object.keys(result.metafile.inputs).some(input => input.includes('node_modules/@univerjs/'))) throw new Error('Office management must load Sheets separately')
   await fs.mkdir(path.join(root, 'artifacts'), { recursive: true }); await fs.writeFile(path.join(root, 'artifacts/view-metafile.json'), JSON.stringify(result.metafile))
 })
-await build({ ...shared, entryPoints: ['src/sheets-editor.ts'], outfile: 'dist/sheets-editor.js', plugins: [genofficeResolver(), univerClipboardPatch()], metafile: true }).then(async result => {
+await build({ ...shared, entryPoints: ['src/sheets-editor.ts'], outfile: 'dist/sheets-editor.js', plugins: [genofficeResolver(), univerClipboardPatch(), univerContextMenuPatch()], metafile: true }).then(async result => {
   await fs.writeFile(path.join(root, 'artifacts/sheets-metafile.json'), JSON.stringify(result.metafile))
 })
 await build({ ...shared, entryPoints: ['src/library-page.ts'], outfile: 'dist/library-page.js', plugins: [{ name: 'office-page', setup(api) { api.onResolve({ filter: /^\.\/view$/ }, () => ({ path: './view.js', external: true })) } }] })

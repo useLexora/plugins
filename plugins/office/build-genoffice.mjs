@@ -8,6 +8,7 @@ export function genofficeResolver() {
   return {
     name: 'genoffice-packages',
     setup(api) {
+      api.onResolve({ filter: /^@lexora\/office-reference-menu$/ }, () => ({ path: path.join(root, 'src/office-reference-menu.tsx') }))
       api.onResolve({ filter: /^@genoffice\// }, args => {
         const [name, ...rest] = args.path.slice('@genoffice/'.length).split('/')
         const base = path.join(root, 'vendor/genoffice/packages', name)

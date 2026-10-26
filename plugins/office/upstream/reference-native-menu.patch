@@ -1,0 +1,442 @@
+--- a/apps/slides/src/renderer/components/ContextMenu.tsx
++++ b/apps/slides/src/renderer/components/ContextMenu.tsx
+@@ -1,167 +1,89 @@
+-import { OfficeReferenceItem } from '@lexora/office-reference-menu'
+-/**
+- * Context menu — fixed positioning, kept within the viewport; closes on any click/Escape/scroll.
+- * Items that are null render as separators; items with `sub` open a one-level flyout on hover.
+- */
+-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
++import { useOfficeReferenceMenu } from '@lexora/office-reference-menu'
++import { useEffect, useLayoutEffect, useRef, useState } from 'react'
++import { createPortal } from 'react-dom'
+ import { useEscOverlay } from '../esc-overlay'
+ import { platformShortcuts } from '@genoffice/i18n'
++import { showToast } from './toast-bus'
+ 
+ export interface CtxItem {
+   label: string
+-  /** Shortcut hint on the right */
+   hint?: string
++  title?: string
+   disabled?: boolean
+   danger?: boolean
+-  /** Check mark on the left (toggle items) */
+   checked?: boolean
+   onClick?: () => void
+-  /** Flyout items (one level deep; sub-items can't nest further) */
+   sub?: Array<CtxItem | null>
+-  /** Row of color swatches rendered under the label instead of a clickable item ('none' = the clear square) */
+   swatches?: string[]
+   onSwatch?: (color: string) => void
+ }
+-
+ interface Props {
+   x: number
+   y: number
+   items: Array<CtxItem | null>
+   onClose: () => void
+-  /** Menu over a live text edit: presses must not move focus (the overlay commits on blur) */
+   keepEdit?: boolean
++  referenceKey?: object
+ }
+ 
+-export function ContextMenu({ x, y, items, onClose, keepEdit }: Props) {
++export function ContextMenu({ x, y, items, onClose, keepEdit, referenceKey }: Props) {
+   useEscOverlay(true)
+   const ref = useRef<HTMLDivElement>(null)
+   const [pos, setPos] = useState({ x, y })
+   const [openSub, setOpenSub] = useState<number | null>(null)
++  const [subPos, setSubPos] = useState({ left: 0, top: 0 })
+   const subRef = useRef<HTMLDivElement>(null)
+-  const [subLeft, setSubLeft] = useState(false)
++  const focusSub = useRef(false)
++  const reference = useOfficeReferenceMenu(referenceKey, onClose, message => showToast(message, 'error'))
++  const entries: Array<CtxItem | null> = reference ? [reference, null, ...items] : items
++  const subItems = openSub === null ? undefined : entries[openSub]?.sub
+ 
+   useLayoutEffect(() => {
+-    const el = subRef.current
+-    if (openSub == null || !el) return
+-    setSubLeft(el.getBoundingClientRect().right > window.innerWidth)
+-  }, [openSub])
+-
++    const box = ref.current?.getBoundingClientRect()
++    if (box) setPos({ x: Math.max(4, Math.min(x, innerWidth - box.width - 4)), y: Math.max(4, Math.min(y, innerHeight - box.height - 4)) })
++  }, [x, y, entries.length])
+   useLayoutEffect(() => {
+-    const el = ref.current
+-    if (!el) return
+-    const { innerWidth, innerHeight } = window
+-    const r = el.getBoundingClientRect()
+-    setPos({
+-      x: Math.min(x, Math.max(0, innerWidth - r.width - 4)),
+-      y: Math.min(y, Math.max(0, innerHeight - r.height - 4)),
+-    })
+-  }, [x, y])
+-
++    const anchor = ref.current?.querySelector<HTMLElement>(`[data-sub-index="${openSub}"]`)?.getBoundingClientRect()
++    const box = subRef.current?.getBoundingClientRect()
++    if (!anchor || !box) return
++    setSubPos({ left: Math.max(4, anchor.right + box.width <= innerWidth - 4 ? anchor.right : anchor.left - box.width), top: Math.max(4, Math.min(anchor.top, innerHeight - box.height - 4)) })
++    if (focusSub.current) { subRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus({ preventScroll: true }); focusSub.current = false }
++  }, [openSub, subItems?.length, pos])
+   useEffect(() => {
+-    // Capture: Escape only closes the menu, it must not reach the text editor (commit) or the canvas (deselect)
+     const onKey = (e: KeyboardEvent) => {
+       if (e.key !== 'Escape') return
+-      e.preventDefault()
+-      e.stopPropagation()
+-      onClose()
++      e.preventDefault(); e.stopPropagation()
++      if (openSub !== null) { setOpenSub(null); ref.current?.querySelector<HTMLButtonElement>(`[data-sub-index="${openSub}"] > button`)?.focus() }
++      else onClose()
+     }
+-    const onDown = (e: MouseEvent) => {
+-      if (!ref.current?.contains(e.target as Node)) onClose()
+-    }
++    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node) && !subRef.current?.contains(e.target as Node)) onClose() }
++    const onWheel = (e: Event) => { if (!ref.current?.contains(e.target as Node) && !subRef.current?.contains(e.target as Node)) onClose() }
+     window.addEventListener('keydown', onKey, true)
+     window.addEventListener('mousedown', onDown)
+-    window.addEventListener('wheel', onClose, { once: true })
++    window.addEventListener('wheel', onWheel)
+     window.addEventListener('blur', onClose)
++    window.addEventListener('resize', onClose)
+     return () => {
+-      window.removeEventListener('keydown', onKey, true)
+-      window.removeEventListener('mousedown', onDown)
+-      window.removeEventListener('wheel', onClose)
+-      window.removeEventListener('blur', onClose)
++      window.removeEventListener('keydown', onKey, true); window.removeEventListener('mousedown', onDown)
++      window.removeEventListener('wheel', onWheel); window.removeEventListener('blur', onClose); window.removeEventListener('resize', onClose)
+     }
+-  }, [onClose])
+-
+-  const swatchRow = (swatches: string[], onSwatch?: (color: string) => void) => (
+-    <div className="ctx-swatches-row">
+-      {swatches.map((c) => (
+-        <button
+-          key={c}
+-          className={`ctx-swatch ${c === 'none' ? 'ctx-swatch-none' : ''}`}
+-          style={c === 'none' ? undefined : { background: c }}
+-          data-tip={c}
+-          aria-label={c}
+-          onClick={() => {
+-            onClose()
+-            onSwatch?.(c)
+-          }}
+-        >
+-          {c === 'none' ? '✕' : ''}
+-        </button>
+-      ))}
+-    </div>
+-  )
+-
+-  const plainItem = (item: CtxItem, key: number) => (
+-    <button
+-      key={key}
+-      className={`ctx-item ${item.danger ? 'danger' : ''}${item.checked ? ' ctx-checked' : ''}`}
+-      disabled={item.disabled}
+-      onClick={() => {
+-        onClose()
+-        item.onClick?.()
+-      }}
+-    >
+-      <span>{item.label}</span>
+-      {item.hint && <span className="ctx-hint">{platformShortcuts(item.hint)}</span>}
+-    </button>
+-  )
+-
+-  return (
+-    <div
+-      ref={ref}
+-      className="ctx-menu"
+-      style={{ left: pos.x, top: pos.y }}
+-      onContextMenu={(e) => e.preventDefault()}
+-      {...(keepEdit ? { 'data-keep-edit': '', onMouseDown: (e) => e.preventDefault() } : {})}
+-    >
+-      <OfficeReferenceItem close={onClose} />
+-      {items.map((item, i) =>
+-        item === null ? (
+-          <div key={i} className="ctx-sep" />
+-        ) : item.swatches ? (
+-          <div key={i} className="ctx-swatches">
+-            <span className="ctx-swatches-label">{item.label}</span>
+-            {swatchRow(item.swatches, item.onSwatch)}
+-          </div>
+-        ) : item.sub ? (
+-          <div
+-            key={i}
+-            className="ctx-sub-host"
+-            onMouseEnter={() => !item.disabled && setOpenSub(i)}
+-            onMouseLeave={() => setOpenSub(null)}
+-          >
+-            <button
+-              className={`ctx-item${openSub === i ? ' ctx-sub-open' : ''}`}
+-              disabled={item.disabled}
+-              onClick={() => setOpenSub(i)}
+-            >
+-              <span>{item.label}</span>
+-              <span className="ctx-hint">▸</span>
+-            </button>
+-            {openSub === i && (
+-              <div
+-                ref={subRef}
+-                className={`ctx-menu ctx-submenu${subLeft ? ' ctx-submenu-left' : ''}`}
+-              >
+-                {item.sub.map((it, j) =>
+-                  it === null ? <div key={j} className="ctx-sep" /> : plainItem(it, j),
+-                )}
+-              </div>
+-            )}
+-          </div>
+-        ) : (
+-          plainItem(item, i)
+-        ),
+-      )}
+-    </div>
+-  )
++  }, [onClose, openSub])
++  const navigate = (event: React.KeyboardEvent, menu: HTMLElement | null) => {
++    if (!menu || !['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
++    const buttons = [...menu.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
++    if (!buttons.length) return
++    event.preventDefault(); event.stopPropagation()
++    const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
++    const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length
++    buttons[next].focus()
++  }
++  const plainItem = (item: CtxItem, key: number) => <button key={key} className={`ctx-item${item.danger ? ' danger' : ''}${item.checked ? ' ctx-checked' : ''}`} disabled={item.disabled} title={item.title ?? item.label} onClick={() => { item.onClick?.(); onClose() }}>
++    <span>{item.label}</span>{item.hint && <span className="ctx-hint">{platformShortcuts(item.hint)}</span>}
++  </button>
++  return <div ref={ref} className="ctx-menu" role="menu" style={{ left: pos.x, top: pos.y, maxHeight: 'calc(100vh - 8px)', maxWidth: 'calc(100vw - 8px)', overflowY: 'auto', boxSizing: 'border-box' }} onContextMenu={e => e.preventDefault()} onScroll={() => setOpenSub(null)} onKeyDown={e => navigate(e, ref.current)} {...(keepEdit ? { 'data-keep-edit': '', onMouseDown: (e: React.MouseEvent) => e.preventDefault() } : {})}>
++    {entries.map((item, i) => item === null ? <div key={i} className="ctx-sep" /> : item.swatches ? <div key={i} className="ctx-swatches"><span className="ctx-swatches-label">{item.label}</span><div className="ctx-swatches-row">{item.swatches.map(color => <button key={color} className={`ctx-swatch ${color === 'none' ? 'ctx-swatch-none' : ''}`} style={color === 'none' ? undefined : { background: color }} aria-label={color} onClick={() => { onClose(); item.onSwatch?.(color) }}>{color === 'none' ? '✕' : ''}</button>)}</div></div> : item.sub ? <div key={i} className="ctx-sub-host" data-sub-index={i} onMouseEnter={() => !item.disabled && setOpenSub(i)} onMouseLeave={() => setOpenSub(null)}>
++      <button className={`ctx-item${openSub === i ? ' ctx-sub-open' : ''}`} title={item.title} disabled={item.disabled} aria-haspopup="menu" aria-expanded={openSub === i} onClick={() => { if (item.onClick) { item.onClick(); onClose() } else { focusSub.current = true; setOpenSub(i) } }} onKeyDown={event => { if (event.key === 'ArrowRight') { event.preventDefault(); event.stopPropagation(); focusSub.current = true; if (openSub === i) subRef.current?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus(); else setOpenSub(i) } }}><span>{item.label}</span><span className="ctx-hint" aria-hidden="true">▸</span></button>
++      {openSub === i && createPortal(<div ref={subRef} className="ctx-menu ctx-submenu" role="menu" aria-label={item.label} {...(keepEdit ? { 'data-keep-edit': '', onMouseDown: (e: React.MouseEvent) => e.preventDefault() } : {})} style={{ position: 'fixed', ...subPos, margin: 0, maxWidth: 'min(320px, calc(100vw - 8px))', maxHeight: 'calc(100vh - 8px)', overflowY: 'auto', boxSizing: 'border-box', zIndex: 201 }} onKeyDown={event => { if (event.key === 'ArrowLeft') { event.preventDefault(); event.stopPropagation(); setOpenSub(null); ref.current?.querySelector<HTMLButtonElement>(`[data-sub-index="${i}"] > button`)?.focus() } else navigate(event, subRef.current) }}>{item.sub.map((child, j) => child ? plainItem(child, j) : <div key={j} className="ctx-sep" />)}</div>, document.body)}
++    </div> : plainItem(item, i))}
++  </div>
+ }
+--- a/apps/slides/src/renderer/App.tsx
++++ b/apps/slides/src/renderer/App.tsx
+@@ -2314,6 +2314,23 @@
+     void window.slidesApi.clipboardProbe().then(setHasClipboard)
+     setCtxMenu({ kind: 'text', x, y, collapsed })
+   }, [])
++
++  useEffect(() => {
++    const onKey = (event: KeyboardEvent) => {
++      if (event.isComposing || !(event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey)) return
++      if (ctxMenu || !(event.target instanceof Element) || event.target.closest('.ctx-menu')) return
++      if (event.target.closest('input,textarea,[contenteditable=true]') && !event.target.closest('.slide-text-editor')) return
++      const rect = selectionRect(selectedIds)
++      if (!rect) return
++      event.preventDefault(); event.stopPropagation()
++      if (editing || editingCell) {
++        const target = document.activeElement
++        target?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom }))
++      } else onCanvasContextMenu(selectedIds[0], rect.left, rect.bottom)
++    }
++    window.addEventListener('keydown', onKey, true)
++    return () => window.removeEventListener('keydown', onKey, true)
++  }, [ctxMenu, selectedIds, editing, editingCell, selectionRect, onCanvasContextMenu])
+ 
+   // Menu commands. Cut/copy/paste dispatch by context: text mode goes back to the native clipboard, canvas mode uses the element clipboard
+   useEffect(() => {
+@@ -4736,6 +4753,7 @@
+           x={ctxMenu.x}
+           y={ctxMenu.y}
+           items={ctxItems}
++          referenceKey={ctxMenu.kind === 'element' || ctxMenu.kind === 'text' ? ctxMenu : undefined}
+           onClose={() => setCtxMenu(null)}
+           keepEdit={ctxMenu.kind === 'text'}
+         />
+--- a/apps/slides/src/renderer/TextEditOverlay.tsx
++++ b/apps/slides/src/renderer/TextEditOverlay.tsx
+@@ -1273,6 +1273,13 @@
+   savedSel = { root, range: sel.getRangeAt(0).cloneRange() }
+ }
+ 
++export function readEditSelection(): { root: HTMLElement; range: Range } | null {
++  const selection = window.getSelection()
++  const root = selection?.anchorNode?.parentElement?.closest<HTMLElement>('.slide-text-editor')
++  if (root && selection?.rangeCount && root.contains(selection.focusNode)) return { root, range: selection.getRangeAt(0).cloneRange() }
++  return savedSel?.root.isConnected && savedSel.root.contains(savedSel.range.commonAncestorContainer) ? { root: savedSel.root, range: savedSel.range.cloneRange() } : null
++}
++
+ export function restoreEditSelection(): boolean {
+   if (!savedSel?.root.isConnected) return false
+   savedSel.root.focus()
+--- a/apps/pdf/src/renderer/App.tsx
++++ b/apps/pdf/src/renderer/App.tsx
+@@ -6617,14 +6617,10 @@
+         }
+         return false
+       },
+-      selection: () => {
+-        const selection = window.getSelection()
+-        if (!selection || selection.isCollapsed || !selection.rangeCount || !scrollRef.current?.contains(selection.getRangeAt(0).commonAncestorContainer)) return null
+-        const quads = selectionQuads()
+-        if (!quads?.size || !selection.toString().trim()) return null
+-        const pages = [...quads.keys()]
+-        return { text: selection.toString(), page: Math.min(...pages) + 1, lastPage: Math.max(...pages) + 1, quads: [...quads].map(([pageIndex, quads]) => ({ page: pageIndex + 1, quads })) }
+-      },
++      selection: () => aiSelection && selPopup ? {
++        ...aiSelection,
++        quads: [...selPopup.quads].map(([pageIndex, quads]) => ({ page: pageIndex + 1, quads })),
++      } : null,
+       state: () => ({
+         documentRevision: documentVersion.current.revision,
+         redactions,
+--- a/apps/docs/src/renderer/components/ContextMenu.tsx
++++ b/apps/docs/src/renderer/components/ContextMenu.tsx
+@@ -1,7 +1,8 @@
+-import { OfficeReferenceItem } from '@lexora/office-reference-menu'
++import { createPortal } from 'react-dom'
++import { useOfficeReferenceMenu } from '@lexora/office-reference-menu'
+ // Modified for Lexora Office; original license and copyright remain applicable.
+ // Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+-import { useEffect, useMemo, useRef, useState } from 'react'
++import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+ import type { Editor } from '@tiptap/core'
+ import type { Command } from '@tiptap/pm/state'
+ import { NodeSelection, TextSelection } from '@tiptap/pm/state'
+@@ -161,6 +162,17 @@
+   const { t, lang } = useI18n()
+   const ref = useRef<HTMLDivElement>(null)
+   const [submenu, setSubmenu] = useState<string | null>(null)
++  const reference = useOfficeReferenceMenu(menu, onClose, message => showToast(message, 'error'))!
++  const referenceHost = useRef<HTMLDivElement>(null)
++  const referenceMenu = useRef<HTMLDivElement>(null)
++  const [referencePos, setReferencePos] = useState({ left: 0, top: 0 })
++  useLayoutEffect(() => {
++    if (submenu !== 'reference') return
++    const anchor = referenceHost.current?.getBoundingClientRect()
++    const box = referenceMenu.current?.getBoundingClientRect()
++    if (anchor && box) setReferencePos({ left: Math.max(8, anchor.right + box.width <= innerWidth - 8 ? anchor.right : anchor.left - box.width), top: Math.max(8, Math.min(anchor.top, innerHeight - box.height - 8)) })
++  }, [submenu, reference.sub.length])
++
+ 
+   // ---- spelling section (Word: suggestions · Add to Dictionary · Language) ----
+   const spell = spellcheckEnabled() && editor.isEditable ? menu.spell : null
+@@ -274,7 +286,7 @@
+ 
+   useEffect(() => {
+     const close = (e: MouseEvent) => {
+-      if (!ref.current?.contains(e.target as Node)) onClose()
++      if (!ref.current?.contains(e.target as Node) && !referenceMenu.current?.contains(e.target as Node)) onClose()
+     }
+     const onKey = (e: KeyboardEvent) => {
+       if (e.key === 'Escape') onClose()
+@@ -338,14 +350,18 @@
+       onClick?: () => void
+       submenuKey?: string
+       ai?: boolean
++      title?: string
+     },
+   ) => (
+     <button
+       className="ctx-item"
+       disabled={opts.disabled}
++      title={opts.title}
++      aria-haspopup={opts.submenuKey ? 'menu' : undefined}
++      aria-expanded={opts.submenuKey ? submenu === opts.submenuKey : undefined}
+       data-tip={opts.ai ? t('appAiBadgeTip') : undefined}
+       onMouseEnter={() => setSubmenu(opts.submenuKey ?? null)}
+-      onClick={opts.submenuKey ? undefined : opts.onClick}
++      onClick={opts.onClick ?? (opts.submenuKey ? () => setSubmenu(opts.submenuKey!) : undefined)}
+     >
+       <span className="ctx-label">{label}</span>
+       {opts.ai && (
+@@ -354,9 +370,23 @@
+         </span>
+       )}
+       {opts.key && <span className="ctx-key">{platformShortcuts(opts.key)}</span>}
+-      {opts.submenuKey && <span className="ctx-arrow">›</span>}
++      {opts.submenuKey && <span className="ctx-arrow" aria-hidden="true">›</span>}
+     </button>
+   )
++
++  const referenceItem = <div ref={referenceHost} className="ctx-item-wrap" onMouseLeave={() => setSubmenu(null)} onMouseDown={event => event.preventDefault()} onKeyDown={event => {
++    if (event.key === 'ArrowRight' && !reference.disabled) { event.preventDefault(); setSubmenu('reference'); requestAnimationFrame(() => referenceMenu.current?.querySelector<HTMLButtonElement>('button')?.focus()) }
++    if (event.key === 'ArrowLeft' || event.key === 'Escape' && submenu === 'reference') { event.preventDefault(); event.stopPropagation(); setSubmenu(null); referenceHost.current?.querySelector<HTMLButtonElement>('button')?.focus() }
++  }}>
++    {item(reference.label, { disabled: reference.disabled, title: reference.title, submenuKey: 'reference', onClick: reference.onClick })}
++    {submenu === 'reference' && !reference.disabled && createPortal(<div ref={referenceMenu} className="ctx-submenu" role="menu" aria-label="引用" style={{ position: 'fixed', ...referencePos, maxWidth: 'min(320px, calc(100vw - 16px))', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto', boxSizing: 'border-box', zIndex: 201 }} onKeyDown={event => {
++      if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return
++      const buttons = [...referenceMenu.current!.querySelectorAll<HTMLButtonElement>('button')]
++      event.preventDefault(); event.stopPropagation()
++      const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
++      buttons[event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length]?.focus()
++    }}>{reference.sub.map(choice => <button type="button" key={choice.label} className="ctx-item" title={choice.label} onClick={choice.onClick}><span className="ctx-label">{choice.label}</span></button>)}</div>, document.body)}
++  </div>
+ 
+   return (
+     <div
+@@ -365,7 +395,9 @@
+       style={{ left: pos.left, top: pos.top, minWidth: MENU_WIDTH }}
+       onContextMenu={(e) => e.preventDefault()}
+     >
+-      <OfficeReferenceItem close={onClose} />
++      {referenceItem}
++      <div className="ctx-sep" />
++      {!canEdit ? item(t('appCopy'), { disabled: !hasSelection, onClick: run(() => clipboard('copy')) }) : <>
+       {spell && (
+         <>
+           {spell.suggestions.length === 0 && item(t('appSpellNoSuggestions'), { disabled: true })}
+@@ -793,6 +825,7 @@
+         item(t('appHyperlinkMenu'), { key: '⌘K', disabled: !canEdit, onClick: run(onLink) })
+       )}
+       {item(t('appNewComment'), { disabled: !canComment, onClick: run(onNewComment) })}
++      </>}
+     </div>
+   )
+ }
+--- a/apps/docs/src/renderer/App.tsx
++++ b/apps/docs/src/renderer/App.tsx
+@@ -6073,7 +6073,6 @@
+   /** Editor right-click menu, only inside the document body */
+   const onDocContextMenu = useCallback(
+     (e: ReactMouseEvent) => {
+-      if (readMode || isProtected) return
+       if (!(e.target as HTMLElement).closest('.doc-page')) return
+       // no preventDefault: Blink must still request a context menu so the main
+       // process receives the misspelling data it relays to this menu
+@@ -6092,7 +6091,7 @@
+       }
+       let imageSrc: string | null = null
+       // Word behavior: right-clicking outside the selection moves the cursor there first (menu items act on the clicked block)
+-      if (editor) {
++      if (editor?.isEditable) {
+         // Right-clicking directly on an image / floating object selects it as a
+         // node (Word shows Wrap Text / Position on a plain right-click), so the
+         // context menu can offer wrap + z-order without a prior left-click.
+@@ -7607,6 +7606,12 @@
+                     className={docZoomClass}
+                     onClick={onDocClick}
+                     onContextMenu={onDocContextMenu}
++                    onKeyDown={event => {
++                      if (!event.nativeEvent.isComposing && (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey)) {
++                        event.preventDefault(); event.stopPropagation()
++                        event.target.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }))
++                      }
++                    }}
+                     onDoubleClick={onDocDoubleClick}
+                     style={
+                       multipage && mpLayout
+--- a/apps/docs/src/renderer/styles.css
++++ b/apps/docs/src/renderer/styles.css
+@@ -13943,3 +13943,5 @@
+ .rb-field-item:hover {
+   background: var(--color-bg-subtle);
+ }
++
++.ctx-submenu .ctx-item > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+--- a/apps/slides/src/renderer/styles.css
++++ b/apps/slides/src/renderer/styles.css
+@@ -9452,3 +9452,5 @@
+ .m3d-turn.turning .m3d-turn-handle {
+   cursor: grabbing;
+ }
++
++.ctx-submenu .ctx-item > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

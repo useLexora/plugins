@@ -275,7 +275,7 @@ export async function startOffice(context: ViewContext, root: HTMLElement, persi
       const page = element('section', 'office-editor-page')
       const toolbar = element('div', 'office-chrome-host')
       chrome = mountEditorChrome(toolbar, { name: latest.name, kind: latest.kind, dirty: false, saving: false, failed: false, loading: true }, {
-        back: showLibrary, quote: () => agent.quote(), save: () => save(true), reopen: async () => { if (current) await open(current) }, export: exportCurrent, copy: copyCurrent,
+        back: showLibrary, save: () => save(true), reopen: async () => { if (current) await open(current) }, export: exportCurrent, copy: copyCurrent,
         error: error => notice(error instanceof Error ? error.message : String(error), true),
       })
       syncDocumentInfo()
@@ -283,7 +283,7 @@ export async function startOffice(context: ViewContext, root: HTMLElement, persi
       page.append(toolbar, canvas); editorHost.append(page)
       const options: OfficeEditorOptions = {
         context, container: canvas, bytes, name: latest.name,
-        onReference: reference => agent.quote(reference),
+        captureReference: reference => agent.capture(reference),
         onSaveRequest: () => { if (current?.id !== latest.id || editorGeneration !== sessionGeneration) return Promise.reject(new Error('文档会话已失效。')); return save(true) },
         onDirty(value) {
           if (disposed || !current || editorGeneration !== sessionGeneration) return

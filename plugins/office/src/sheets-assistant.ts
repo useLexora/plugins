@@ -1,11 +1,11 @@
-import { CellValueType, HorizontalAlign, VerticalAlign, WrapStrategy, type ICellData, type IRange, type IStyleData } from '@univerjs/core'
+import { RANGE_TYPE, CellValueType, HorizontalAlign, VerticalAlign, WrapStrategy, type ICellData, type IRange, type IStyleData } from '@univerjs/core'
 import { z } from 'zod'
 import { parseRange } from '../vendor/genoffice/packages/xlsx-gateway/src/domain/cell-address'
 import type { Json } from './lexora'
 import type { createUniver } from './create-univer'
 import type { WorkbookModel } from './engine'
 import type { OfficeEditorAssistant, OfficeEditorReference } from './office-editor-types'
-import { assertOfficeReference, assertOfficeReferenceText, officeReference, officeReplacement, OFFICE_REFERENCE_MAX_CHARS } from './office-assistant'
+import { assertOfficeReference, assertOfficeReferenceText, officeReference, officeReplacement, OFFICE_CAPTURE_MAX_CHARS, OFFICE_REFERENCE_MAX_CHARS } from './office-assistant'
 
 type Runtime = ReturnType<typeof createUniver>
 type Workbook = NonNullable<ReturnType<Runtime['univerAPI']['getActiveWorkbook']>>
@@ -72,7 +72,7 @@ export function assistantCell(value: Json): ICellData {
 }
 
 
-export function createSheetsAssistant(api: Runtime['univerAPI'], book: Workbook, model: WorkbookModel, signature: () => string, ensureActive: () => void, selectionCount: () => number, checkRange?: (sheetId: string, range: IRange) => void): OfficeEditorAssistant {
+export function createSheetsAssistant(api: Runtime['univerAPI'], book: Workbook, model: WorkbookModel, signature: () => string, ensureActive: () => void, selections: () => IRange[], revealRanges: (sheetId: string, ranges: IRange[]) => void, checkRange?: (sheetId: string, range: IRange) => void): OfficeEditorAssistant {
   const ensure = () => { ensureActive(); if (model.readOnlyReason?.includes('隐私标记')) throw new Error('此工作簿含有隐私标记，暂不向助手提供内容。') }
   const sheetFor = (id: unknown) => { if (typeof id !== 'string') throw new Error('请明确指定 sheetId。'); const sheet = book.getSheetBySheetId(id); if (!sheet) throw new Error('工作表不存在。'); return sheet }
   const rangeFor = (sheetId: unknown, candidate: unknown, limit = 2000) => {
@@ -90,12 +90,49 @@ export function createSheetsAssistant(api: Runtime['univerAPI'], book: Workbook,
   const capture = (reference?: OfficeEditorReference) => {
     ensure()
     if (book.isCellEditing()) throw new Error('请先确认当前单元格的编辑。')
-    if (!reference && selectionCount() > 1) throw new Error('请只选择一个连续区域后再引用。')
     if (reference && reference.locator.kind !== 'xlsx') throw new Error('工作表引用无效。')
-    const target = rangeFor(reference?.locator.sheetId ?? book.getActiveSheet()?.getSheetId(), reference?.locator.range ?? book.getActiveRange()?.getRange(), 400)
-    const text = JSON.stringify({ sheet: target.sheet.getSheetName(), range: target.selected.getA1Notation(), values: target.selected.getValues(), formulas: target.selected.getFormulas() })
-    const { startRow, endRow, startColumn, endColumn } = target.range
-    return { ...target, captured: officeReference(`${target.sheet.getSheetName()}!${target.selected.getA1Notation()}`, text, { kind: 'xlsx', sheetId: target.sheetId, range: { startRow, endRow, startColumn, endColumn } }, [signature(), target.sheetId, target.selected.getCellDataGrid()]) }
+    const display = !reference || reference.locator.contentFormat === 'display'
+    const sheetId = reference?.locator.sheetId ?? book.getActiveSheet()?.getSheetId()
+    const sheet = sheetFor(sheetId)
+    const requested = reference ? (Array.isArray(reference.locator.ranges) ? reference.locator.ranges : [reference.locator.range]) : selections()
+    if (!requested.length || requested.length > 64) throw new Error('请选择 1–64 个区域后引用。')
+    let clipped = reference?.locator.clipped === true
+    let cells = 0
+    let characters = 0
+    const targets = requested.map(candidate => {
+      let range = candidate as unknown as IRange
+      if (!reference) {
+        if (range.rangeType === RANGE_TYPE.COLUMN || range.rangeType === RANGE_TYPE.ALL) range = { ...range, startRow: 0, endRow: sheet.getMaxRows() - 1 }
+        if (range.rangeType === RANGE_TYPE.ROW || range.rangeType === RANGE_TYPE.ALL) range = { ...range, startColumn: 0, endColumn: sheet.getMaxColumns() - 1 }
+      }
+      if (!reference && (range.endRow >= sheet.getMaxRows() - 1 || range.endColumn >= sheet.getMaxColumns() - 1)) {
+        const data = book.save().sheets[sheet.getSheetId()].cellData ?? {}
+        let lastRow = range.startRow; let lastColumn = range.startColumn
+        for (const [r, row] of Object.entries(data)) for (const [c, cell] of Object.entries(row) as Array<[string, ICellData]>) {
+          if (+r >= range.startRow && +r <= range.endRow && +c >= range.startColumn && +c <= range.endColumn && cell && (cell.v != null || cell.f || cell.p)) { lastRow = Math.max(lastRow, +r); lastColumn = Math.max(lastColumn, +c) }
+        }
+        const next = { ...range, endRow: Math.min(range.endRow, lastRow), endColumn: Math.min(range.endColumn, lastColumn) }
+        clipped ||= next.endRow !== range.endRow || next.endColumn !== range.endColumn
+        range = next
+      }
+      const target = rangeFor(sheetId, range, display ? OFFICE_CAPTURE_MAX_CHARS : 400)
+      cells += target.rows * target.columns
+      if (cells > OFFICE_CAPTURE_MAX_CHARS) throw new Error('所选区域过大，请缩小范围；引用最多 262,144 个字符。')
+      const rows: string[] = []
+      if (display) for (let row = 0; row < target.rows; row += 256) {
+        for (const values of sheet.getRange(target.range.startRow + row, target.range.startColumn, Math.min(256, target.rows - row), target.columns).getDisplayValues()) {
+          const line = values.map(value => /[\t\n\r"]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value).join('\t')
+          characters += line.length + 1
+          if (characters > OFFICE_CAPTURE_MAX_CHARS) throw new Error('所选内容超过 262,144 字符，请缩小范围后引用。')
+          rows.push(line)
+        }
+      }
+      return { ...target, text: display ? rows.join('\n') : JSON.stringify({ sheet: sheet.getSheetName(), range: target.selected.getA1Notation(), values: target.selected.getValues(), formulas: target.selected.getFormulas() }) }
+    })
+    const text = targets.map(target => targets.length > 1 ? `${sheet.getSheetName()}!${target.selected.getA1Notation()}\n${target.text}` : target.text).join('\n\n')
+    const ranges = targets.map(target => target.range as unknown as Json)
+    const locator: Record<string, Json> = { kind: 'xlsx', sheetId: sheet.getSheetId(), range: ranges[0], ...(display ? { contentFormat: 'display', ...(ranges.length > 1 ? { ranges } : {}), ...(clipped ? { clipped: true } : {}) } : {}) }
+    return { ...targets[0], ranges: targets.map(target => target.range), captured: officeReference(`${sheet.getSheetName()}!${targets.map(target => target.selected.getA1Notation()).join(', ')}${clipped ? '（已裁剪空白行列）' : ''}`, text, locator, [signature(), sheet.getSheetId()]) }
   }
   const operations = () => model.readOnlyReason ? [] : [...Object.keys(writeSchemas), 'replace_text', 'undo']
   const writable = (sheetId: string, range?: IRange) => {
@@ -108,6 +145,7 @@ export function createSheetsAssistant(api: Runtime['univerAPI'], book: Workbook,
     ensure()
     const referenced = reference ? capture(reference) : undefined
     if (reference && referenced) assertOfficeReferenceText(reference, referenced.captured)
+    if (referenced && !query && (referenced.ranges.length > 1 || referenced.rows * referenced.columns > 2000)) return { text: referenced.captured.text, reference: referenced.captured, operations: operations() }
     const operation = query?.operation ?? (referenced ? 'read_range' : 'get_workbook_context')
     const schema = readSchemas[operation as keyof typeof readSchemas]
     if (!schema) throw new Error('工作簿不支持此读取操作。')
@@ -145,6 +183,7 @@ export function createSheetsAssistant(api: Runtime['univerAPI'], book: Workbook,
       if (book.isCellEditing()) throw new Error('请先确认当前单元格编辑。')
       if (operation === 'undo') { const changed = await api.undo(); return { text: changed ? '已撤销上一次表格修改。' : '没有可撤销的修改。', mutated: changed } }
       const target = reference ? capture(reference) : undefined
+      if (target && target.ranges.length > 1) throw new Error('多区域引用可供阅读；修改时请明确读取一个连续区域作为目标。')
       if (reference && target) assertOfficeReference(reference, target.captured)
       if (operation === 'replace_text') {
         if (!target || target.rows * target.columns !== 1) throw new Error('replace_text 需要一个单元格引用。')
@@ -202,6 +241,6 @@ export function createSheetsAssistant(api: Runtime['univerAPI'], book: Workbook,
       }
       return { text: `${operation} 已执行；公式缓存需在 Excel 或 LibreOffice 重算。`, mutated: signature() !== before }
     },
-    reveal: async reference => { const target = capture(reference); assertOfficeReferenceText(reference, target.captured); book.setActiveSheet(target.sheet); book.setActiveRange(target.selected); return true },
+    reveal: async reference => { const target = capture(reference); assertOfficeReferenceText(reference, target.captured); book.setActiveSheet(target.sheet); revealRanges(target.sheetId, target.ranges); return true },
   }
 }

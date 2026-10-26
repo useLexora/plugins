@@ -1,3 +1,5 @@
+import { installSheetsReferenceMenu } from './sheets-reference-menu'
+import type { OfficeEditorOptions } from './office-editor-types'
 import { createSheetsAssistant } from './sheets-assistant'
 import { SheetsSelectionsService } from '@univerjs/sheets'
 import type { OfficeEditorAssistant } from './office-editor-types'
@@ -41,15 +43,7 @@ import {
   REORDER_RANGE_MUTATION, COPY_SHEET_COMMAND, pixelsToCharacterWidth, NOTE_MUTATIONS,
 } from '../vendor/genoffice/apps/sheets/src/renderer/app-constants'
 
-export interface SheetsMountOptions {
-  context: ViewContext
-  container: HTMLElement
-  bytes: Uint8Array
-  name: string
-  onDirty: (dirty: boolean) => void
-  onSave?: (bytes: Uint8Array) => Promise<void>
-  onSaveRequest?: () => Promise<void>
-}
+export type SheetsMountOptions = OfficeEditorOptions
 export interface SheetsEditorHandle {
   assistant?: OfficeEditorAssistant
   save: () => Promise<Uint8Array>
@@ -102,7 +96,8 @@ export function sheetPlanFromSnapshot(model: WorkbookModel, snapshot: IWorkbookD
   return { renames, additions, removals, hiddenChanges, order: snapshot.sheetOrder.map(id => snapshot.sheets[id].name!), orderChanged }
 }
 
-export async function mountSheets({ context, container, bytes, name, onDirty, onSave, onSaveRequest }: SheetsMountOptions): Promise<SheetsEditorHandle> {
+export async function mountSheets(options: SheetsMountOptions): Promise<SheetsEditorHandle> {
+  const { context, container, bytes, name, onDirty, onSave, onSaveRequest } = options
   context.signal.throwIfAborted()
   container.style.cssText = 'height:100%;min-height:0;display:flex;flex-direction:column;position:relative'
   const notice = document.createElement('div')
@@ -138,9 +133,11 @@ export async function mountSheets({ context, container, bytes, name, onDirty, on
   })
   worker.addEventListener('error', event => { const error = new Error(event.message || '表格引擎运行失败'); rejectAll(error); fail(error) })
   let runtime: ReturnType<typeof createUniver> | undefined = undefined
+  let stopReferenceMenu = () => {}
   const dispose = () => {
     if (disposed) return
     disposed = true
+    stopReferenceMenu()
     cleanup.splice(0).forEach(fn => fn())
     rejectAll(new Error('文档已关闭'))
     worker.terminate()
@@ -407,7 +404,9 @@ export async function mountSheets({ context, container, bytes, name, onDirty, on
   const assistant = createSheetsAssistant(api, book, model, signature, () => {
     context.signal.throwIfAborted()
     if (disposed) throw new Error('工作簿已关闭。')
-  }, () => runtime!.univer.__getInjector().get(SheetsSelectionsService).getCurrentSelections().length, (sheetId, candidate) => {
+  }, () => runtime!.univer.__getInjector().get(SheetsSelectionsService).getCurrentSelections().map(selection => selection.range), (sheetId, ranges) => {
+    runtime!.univer.__getInjector().get(SheetsSelectionsService).setSelections(ranges.map(range => ({ range, primary: null, style: null })))
+  }, (sheetId, candidate) => {
     const restricted = model.sheets.find(sheet => sheet.id === sheetId)?.readOnlyRanges.some(ref => {
       const range = shiftCellArea(parseRange(ref), journal.structuralOps.get(sheetId) ?? [])
       return range && range.startRow <= candidate.endRow && range.endRow >= candidate.startRow && range.startColumn <= candidate.endColumn && range.endColumn >= candidate.startColumn
@@ -417,6 +416,8 @@ export async function mountSheets({ context, container, bytes, name, onDirty, on
   try { await runtime.univer.__getInjector().get(LifecycleService).onStage(LifecycleStages.Rendered) }
   catch (error) { dispose(); throw error }
   context.signal.throwIfAborted()
+  const injector = runtime.univer.__getInjector()
+  stopReferenceMenu = installSheetsReferenceMenu(options, assistant, injector)
   return { assistant, save, markSaved, dispose }
 }
 

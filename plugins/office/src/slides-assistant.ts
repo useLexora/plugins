@@ -1,7 +1,8 @@
 import { flushSync } from 'react-dom'
-import type { RenderSlide } from '../vendor/genoffice/packages/pptx-render/src'
+import { anchorId, describeNode, promptLabel } from '../vendor/genoffice/apps/slides/src/renderer/ai/edit-queue'
+import { readEditSelection } from '../vendor/genoffice/apps/slides/src/renderer/TextEditOverlay'
+import type { RenderNode, RenderSlide } from '../vendor/genoffice/packages/pptx-render/src'
 import type { ActionCtx } from '../vendor/genoffice/apps/slides/src/renderer/action-context'
-import { flushActiveEdit } from '../vendor/genoffice/apps/slides/src/renderer/file-actions'
 import { formatSlideDump } from '../vendor/genoffice/apps/slides/src/renderer/ai/slides-skill'
 import { runLayoutScript } from '../vendor/genoffice/apps/slides/src/renderer/ai/layout-script'
 import { OP_DOCS, opGuide, OP_GROUPS } from '../vendor/genoffice/packages/pptx-ops/src/op-docs'
@@ -10,7 +11,7 @@ import { renderSlidesToPngBase64 } from '../vendor/genoffice/apps/slides/src/ren
 import { redactGuardFor } from '../vendor/genoffice/apps/slides/src/renderer/ai/redact-guard'
 import type { Json } from './lexora'
 import { textForModel, redactLabelsOf } from '../vendor/genoffice/apps/slides/src/renderer/ai/redact-view'
-import { assertOfficeReference, assertOfficeReferenceText, officeReference, officeReplacement, OFFICE_REFERENCE_MAX_CHARS } from './office-assistant'
+import { assertOfficeReference, assertOfficeReferenceText, officeReference, officeReplacement, officeTextDigest, officeVersion, OFFICE_REFERENCE_MAX_CHARS } from './office-assistant'
 import type { OfficeEditorAssistant, OfficeEditorExecutionGuard, OfficeEditorReference } from './office-editor-types'
 
 interface Snapshot { revision: number; slides: RenderSlide[]; detail?: { applied?: boolean; dryRun?: boolean; records?: Json[]; plan?: string[] } }
@@ -41,6 +42,9 @@ export function createSlidesAssistant(getContext: () => ActionCtx, request: (met
     finally { guard?.signal?.removeEventListener('abort', cancel) }
   }
   const snapshot = async () => { ensureActive(); return await request('assistant-snapshot') as Snapshot }
+  const flatten = (nodes: RenderNode[]): RenderNode[] => nodes.flatMap(node => node.type === 'group' ? [node, ...flatten(node.children)] : [node])
+  const nodeText = (node: RenderNode): string => node.type === 'group' ? node.children.map(nodeText).filter(Boolean).join('\n\n') : textForModel(node) || promptLabel(describeNode(node))
+  const flatText = (text: string) => text.replace(/[\r\n]/g, '')
   const locate = (state: Snapshot, reference?: OfficeEditorReference) => {
     const ctx = getContext()
     if (reference && (reference.locator.kind !== 'pptx' || typeof reference.locator.slidePath !== 'string' || !Array.isArray(reference.locator.sourceIds))) throw new Error('演示文稿引用位置无效。')
@@ -49,12 +53,31 @@ export function createSlidesAssistant(getContext: () => ActionCtx, request: (met
     if (!slide) throw new Error('引用的幻灯片已不存在。')
     const sourceIds = reference ? reference.locator.sourceIds as string[] : [...ctx.selectedIds]
     if (!sourceIds.every(id => typeof id === 'string')) throw new Error('引用元素无效。')
-    const nodes = sourceIds.map(id => slide.nodes.find(node => (node.durableId ?? node.sourceId) === id || node.sourceId === id))
-    if (nodes.some(node => !node)) throw new Error('所选元素已变化或位于组合内部，请重新引用独立文本框。')
+    const nodes = sourceIds.map(id => flatten(slide.nodes).find(node => (node.durableId ?? node.sourceId) === id || node.sourceId === id))
+    if (nodes.some(node => !node)) throw new Error('所选元素已不存在，请重新引用。')
     const present = nodes.filter(node => !!node)
-    const ids = present.map(node => node.durableId ?? node.sourceId)
-    const text = present.length ? present.map(node => textForModel(node)).join('\n\n') : formatSlideDump(slide)
-    const captured = officeReference(`${name} · 第 ${index + 1} 页${present.length ? ` · ${present.length} 个元素` : ''}`, text, { kind: 'pptx', slidePath: slide.partPath ?? '', sourceIds: ids }, { revision: state.revision, slide: slide.partPath, nodes: present.length ? present : slide.nodes })
+    const ids = present.map(anchorId)
+    let text = present.length ? present.map(nodeText).join('\n\n') : formatSlideDump(slide)
+    const visual = reference?.locator.visual === true
+    const visualFingerprint = officeVersion([present, slide.widthPx, slide.heightPx])
+    if (visual) {
+      if (reference?.locator.visualFingerprint !== visualFingerprint) throw new Error('引用对象的外观已变化，请重新引用；原图片仍可查看。')
+      text = reference.label
+    }
+    const textRange = reference?.locator.textRange
+    if (textRange && typeof textRange === 'object' && !Array.isArray(textRange)) {
+      if (present.length !== 1) throw new Error('文字选区必须属于一个对象。')
+      const node = present[0]
+      if (node.type === 'table' && textRange.cell && typeof textRange.cell === 'object' && !Array.isArray(textRange.cell)) {
+        const cell = node.cells.find(cell => cell.row === (textRange.cell as Record<string, Json>).row && cell.col === (textRange.cell as Record<string, Json>).col)
+        if (!cell) throw new Error('引用的表格单元格已不存在。')
+        text = cell.text?.lines.map(line => line.runs.map(run => run.redact ? '' : run.text).join('')).join('\n') ?? ''
+      }
+      const plain = flatText(text)
+      if (!Number.isInteger(textRange.start) || !Number.isInteger(textRange.end) || Number(textRange.start) < 0 || Number(textRange.end) <= Number(textRange.start) || Number(textRange.end) > plain.length || officeTextDigest(plain) !== textRange.digest) throw new Error('引用文字或所在对象已变化，请重新选择。')
+      text = plain.slice(Number(textRange.start), Number(textRange.end))
+    }
+    const captured = officeReference(visual ? reference!.label : `${name} · 第 ${index + 1} 页${textRange ? ' · 文字选区' : present.length ? ` · ${present.length} 个元素` : ''}`, text, { kind: 'pptx', slidePath: slide.partPath ?? '', sourceIds: ids, ...(visual ? { visual: true, visualFingerprint } : {}), ...(textRange ? { textRange } : {}) }, { revision: state.revision, slide: slide.partPath, nodes: present.length ? present : slide.nodes })
     return { captured, slide, index, nodes: present }
   }
   const slideAt = (state: Snapshot, value: unknown) => {
@@ -100,12 +123,26 @@ export function createSlidesAssistant(getContext: () => ActionCtx, request: (met
       const ctx = getContext()
       const page = ctx.slides[ctx.current]
       if (!page) return null
-      const sourceIds = [...ctx.selectedIds]
-      await flushActiveEdit(ctx)
-      ensureActive()
-      if (getContext().editingActiveRef.current) throw new Error('请先完成当前文本编辑后再引用。')
+      const sourceIds = ctx.editing ? [ctx.editing.sourceId] : ctx.editingCell ? [ctx.editingCell.sourceId] : [...ctx.selectedIds]
+      if (!sourceIds.length) return null
+      let textRange: Record<string, Json> | undefined
+      if (ctx.editingActiveRef.current) {
+        const selection = readEditSelection()
+        if (!selection || selection.range.collapsed) return null
+        const { root, range: selected } = selection
+        const before = selected.cloneRange(); before.selectNodeContents(root); before.setEnd(selected.startContainer, selected.startOffset)
+        const start = flatText(before.toString()).length
+        const whole = document.createRange(); whole.selectNodeContents(root)
+        textRange = { start, end: start + flatText(selected.toString()).length, digest: officeTextDigest(flatText(whole.toString())), ...(ctx.editingCell ? { cell: { row: ctx.editingCell.row, col: ctx.editingCell.col } } : {}) }
+      }
       const state = await snapshot()
-      return locate(state, { label: '', text: '', version: '', locator: { kind: 'pptx', slidePath: page.partPath ?? '', sourceIds } }).captured
+      ensureActive()
+      try {
+        return locate(state, { label: '', text: '', version: '', locator: { kind: 'pptx', slidePath: page.partPath ?? '', sourceIds, ...(textRange ? { textRange } : {}) } }).captured
+      } catch (error) {
+        if (ctx.editingActiveRef.current) throw new Error('请先完成当前文字编辑，再引用所选内容。')
+        throw error
+      }
     },
     read,
     execute: async ({ operation, input, reference }, guard) => {
@@ -117,6 +154,8 @@ export function createSlidesAssistant(getContext: () => ActionCtx, request: (met
       if (operation === 'undo') {
         result = await command(state.revision, 'slides:undo', undefined, guard)
       } else if (operation === 'apply_ops') {
+        if (reference?.locator.visual) throw new Error('图片引用不能用作文字修改目标。请明确读取可写对象。')
+        if (reference?.locator.textRange) throw new Error('局部文字引用不能用于批量修改。请使用 replace_text，或明确读取新的文档目标。')
         if (reference) assertOfficeReference(reference, locate(state, reference).captured)
         if (Object.keys(input ?? {}).some(key => !['ops', 'dryRun'].includes(key))) throw new Error('apply_ops 只接受 ops 与 dryRun。')
         if (input?.dryRun !== undefined && typeof input.dryRun !== 'boolean') throw new Error('dryRun 必须为 boolean。')
@@ -130,13 +169,17 @@ export function createSlidesAssistant(getContext: () => ActionCtx, request: (met
         result = await command(state.revision, 'slides:apply-txn', { ops: input.ops, dryRun: input.dryRun === true, isolation: 'atomic' }, guard)
       } else {
         if (operation !== 'replace_text') throw new Error('演示文稿不支持此操作。')
-        if (!reference) throw new Error('请先引用一个独立文本框。')
+        if (!reference || reference.locator.visual) throw new Error('请先引用一个独立文本框的文字。')
         const target = locate(state, reference)
         assertOfficeReference(reference, target.captured)
         const node = target.nodes[0]
         if (target.nodes.length !== 1 || !node || !['shape', 'text'].includes(node.type) || node.decoration) throw new Error('首期仅支持替换一个独立文本框；组合、表格和图表仅供读取。')
         if ((node.type === 'shape' || node.type === 'text') && node.text?.lines.some(line => line.runs.some(run => run.redact))) throw new Error('所选文本框含有已隐藏于模型的内容，不能整体替换。')
-        const text = officeReplacement(input)
+        const replacement = officeReplacement(input)
+        const range = reference.locator.textRange as Record<string, Json> | undefined
+        const original = textForModel(node)
+        if (range && original.includes('\n')) throw new Error('跨排版行的局部文字暂不支持自动替换，请在编辑器修改，或读取整个文本框作为目标。')
+        const text = range ? original.slice(0, Number(range.start)) + replacement + original.slice(Number(range.end)) : replacement
         if (text === textForModel(node)) return { text: '文本未发生变化。', mutated: false }
         const id = node.durableId ?? node.sourceId
         const edits = runLayoutScript(`setText(${JSON.stringify(id)}, ${JSON.stringify(text)});`, [{ id, type: node.type, text: textForModel(node), ...node.box, rotation: node.box.rotationDeg }], { w: target.slide.widthPx, h: target.slide.heightPx })
@@ -152,6 +195,38 @@ export function createSlidesAssistant(getContext: () => ActionCtx, request: (met
       const target = locate(await snapshot(), reference)
       assertOfficeReferenceText(reference, target.captured)
       flushSync(() => { const ctx = getContext(); ctx.setCurrent(target.index); ctx.setSelectedIds(target.nodes.map(node => node.sourceId)) })
+      const range = reference.locator.textRange as Record<string, Json> | undefined
+      if (range) {
+        const node = target.nodes[0]
+        const parent = flatten(target.slide.nodes).find(item => item.type === 'group' && flatten(item.children).includes(node))
+        flushSync(() => {
+          const ctx = getContext()
+          if (node.type === 'table' && range.cell && typeof range.cell === 'object' && !Array.isArray(range.cell)) ctx.setEditingCell({ sourceId: node.sourceId, row: Number(range.cell.row), col: Number(range.cell.col) })
+          else ctx.setEditing({ sourceId: node.sourceId, ...(parent ? { groupId: parent.sourceId } : {}) })
+        })
+        for (let frame = 0; frame < 12; frame++) {
+          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+          ensureActive()
+          const root = document.querySelector('.slide-text-editor')
+          if (!root) continue
+          const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+          const nodes: Text[] = []; while (walker.nextNode()) nodes.push(walker.currentNode as Text)
+          if (officeTextDigest(flatText(nodes.map(node => node.data).join(''))) !== range.digest) continue
+          const selection = document.createRange(); let offset = 0; let started = false; let ended = false
+          for (const node of nodes) {
+            for (let index = 0; index <= node.length; index++) {
+              if (!started && offset === range.start) { selection.setStart(node, index); started = true }
+              if (offset === range.end) { selection.setEnd(node, index); ended = true; break }
+              if (index < node.length && !/[\r\n]/.test(node.data[index])) offset++
+            }
+            if (ended) break
+          }
+          if (!started || !ended) return false
+          window.getSelection()?.removeAllRanges(); window.getSelection()?.addRange(selection)
+          return true
+        }
+        return false
+      }
       return true
     },
   }

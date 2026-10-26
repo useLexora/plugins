@@ -1,0 +1,53 @@
+--- a/apps/pdf/src/renderer/App.tsx
++++ b/apps/pdf/src/renderer/App.tsx
+@@ -2,7 +2,7 @@
+ // Modified for the Lexora plugin (2026); see vendor/genoffice/PATCHES.md.
+ import { Fragment, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+ import { handlePdfControl, type ControlRequest } from './control'
+-import type { CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
++import type { CSSProperties, ReactNode, MouseEvent as ReactMouseEvent } from 'react'
+ // legacy build: the modern build relies on new APIs like Math.sumPrecise that the current
+ // Electron V8 lacks, making embedded font parsing fail and whole pages render as garbled raw char codes
+ import { GlobalWorkerOptions, getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs'
+@@ -373,7 +373,7 @@
+ ] as const
+ type RibbonTab = (typeof RIBBON_TABS)[number]['id'] | 'fillForm' | 'formDesign'
+ 
+-export default function App({ onStatus, onSaveRequest, onOfficeBridge, onReference }: { onStatus?: (status: string) => void; onSaveRequest?: () => Promise<boolean>; onOfficeBridge?: (bridge: PdfOfficeBridge | null) => void; onReference?: () => Promise<void> }) {
++export default function App({ onStatus, onSaveRequest, onOfficeBridge, onReference, referenceAction }: { onStatus?: (status: string) => void; onSaveRequest?: () => Promise<boolean>; onOfficeBridge?: (bridge: PdfOfficeBridge | null) => void; onReference?: () => Promise<void>; referenceAction?: ReactNode }) {
+   const { lang, t } = useI18n()
+   const collapse = useRibbonCollapse('genoffice-pdf-ribbon-collapsed', {
+     collapse: t('ribbonCollapse'),
+@@ -908,6 +908,13 @@
+     y: number
+     quads: Map<number, number[][]>
+   } | null>(null)
++  const selectionToolbar = useRef<HTMLDivElement>(null)
++  useLayoutEffect(() => {
++    if (!selPopup || !selectionToolbar.current) return
++    const halfWidth = selectionToolbar.current.getBoundingClientRect().width / 2
++    const x = Math.max(halfWidth + 8, Math.min(selPopup.x, window.innerWidth - halfWidth - 8))
++    if (x !== selPopup.x) setSelPopup({ ...selPopup, x })
++  }, [selPopup])
+   /** AI scope selection cached at mouseup — the native DOM selection collapses the
+       moment focus moves into the AI panel, so the chip/context read this snapshot.
+       Cleared by clicking elsewhere on the document or the chip's ×. */
+@@ -9891,6 +9898,9 @@
+             {selPopup && (
+               <div
+                 className="pdf-sel-popup"
++                ref={selectionToolbar}
++                role="toolbar"
++                aria-label="文字选区操作"
+                 style={{ left: selPopup.x, top: selPopup.y }}
+                 onMouseDown={(e) => e.preventDefault()}
+               >
+@@ -9941,7 +9951,7 @@
+                     <span className="pdf-sel-popup-sep" aria-hidden />
+                   </>
+                 )}
+-
++                {referenceAction}
+               </div>
+             )}
+             {askPop && (

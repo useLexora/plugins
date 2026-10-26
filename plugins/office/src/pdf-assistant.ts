@@ -1,8 +1,9 @@
 import { quadToRect } from '../vendor/genoffice/apps/pdf/src/renderer/annotations'
 import { AGENT_TOOLS, countOccurrences, locateOccurrence } from '../vendor/genoffice/apps/pdf/src/renderer/ai/tools'
+import type { PageEntry } from '../vendor/genoffice/apps/pdf/src/renderer/search'
 import type { PdfOfficeBridge } from '../vendor/genoffice/apps/pdf/src/renderer/office-bridge'
 import type { OfficeEditorAssistant, OfficeEditorQuery, OfficeEditorReference } from './office-editor-types'
-import { assertOfficeReference, officeReference, officeReplacement, officeVersion, officeTextDigest, sameOfficeReferenceText } from './office-assistant'
+import { assertOfficeReference, officeReference, officeReplacement, officeVersion, officeTextDigest, officeBytesDigest, sameOfficeReferenceText } from './office-assistant'
 import type { Json } from './lexora'
 
 type Rect = [number, number, number, number]
@@ -32,7 +33,7 @@ function referencePages(reference: OfficeEditorReference): { page: number; lastP
 }
 
 function referenceRects(reference: OfficeEditorReference): Rect[] {
-  const value = reference.locator.rects
+  const value = reference.locator.rects ?? (Array.isArray(reference.locator.regions) ? reference.locator.regions.flatMap(region => region && typeof region === 'object' && !Array.isArray(region) && Array.isArray(region.rects) ? region.rects : []) : undefined)
   if (!Array.isArray(value) || !value.length || value.length > 256) throw new Error('PDF 引用缺少有效选区坐标，请重新引用。')
   return value.map(rect => {
     if (!Array.isArray(rect) || rect.length !== 4 || !rect.every(item => typeof item === 'number' && Number.isFinite(item))) throw new Error('PDF 引用坐标无效。')
@@ -44,6 +45,10 @@ function referenceRects(reference: OfficeEditorReference): Rect[] {
 
 function overlap(rect: Rect, target: Rect): number {
   return Math.max(0, Math.min(rect[2], target[2]) - Math.max(rect[0], target[0])) * Math.max(0, Math.min(rect[3], target[3]) - Math.max(rect[1], target[1]))
+}
+
+function selectionPageDigest(entry: PageEntry): string {
+  return officeVersion({ text: entry.text, items: entry.items.map(({ start, end, x, y, w, h, rot }) => [start, end, x, y, w, h, !!rot]) })
 }
 
 export async function pdfReferenceOccurrence(bridge: PdfOfficeBridge, reference: OfficeEditorReference): Promise<number> {
@@ -99,7 +104,7 @@ async function resolvePages(bridge: PdfOfficeBridge, reference: OfficeEditorRefe
   return { ...reference, locator: { ...reference.locator, page: Math.min(...pages), lastPage: Math.max(...pages) } }
 }
 
-export function createPdfAssistant(current: () => PdfOfficeBridge, active: () => void, name: string): OfficeEditorAssistant {
+export function createPdfAssistant(current: () => PdfOfficeBridge, active: () => void, name: string, snapshotDocument?: (snapshot: ReturnType<PdfOfficeBridge['snapshot']>) => Promise<NonNullable<ReturnType<PdfOfficeBridge['deps']['doc']>>>): OfficeEditorAssistant {
   const version = () => officeVersion(current().state())
   const check = (expected: string) => {
     active()
@@ -141,11 +146,18 @@ export function createPdfAssistant(current: () => PdfOfficeBridge, active: () =>
     const before = version()
     const resolved = await resolvePages(bridge, reference)
     const { page, lastPage } = referencePages(resolved)
+    if (resolved.locator.kind === 'visual') {
+      const image = (await assistant.render!({ page, region: resolved.locator.region ?? null }))[0]
+      if (officeBytesDigest(image.data) !== resolved.locator.imageDigest) throw new Error('引用页面的图像已变化，请重新引用；原图片仍可查看。')
+      check(before)
+      return { ...resolved, version: before }
+    }
     if (bridge.pendingText().some(edit => edit.page >= page && edit.page <= lastPage)) throw new Error('引用页存在未保存文字修改，请保存后重新读取当前内容。')
-    if (resolved.locator.kind === 'text' && page === lastPage && resolved.text && (resolved.textLength ?? resolved.text.length) === resolved.text.length) {
+    const selectionDigests = resolved.locator.selectionPageDigests
+    if (!selectionDigests && resolved.locator.kind === 'text' && page === lastPage && resolved.text && (resolved.textLength ?? resolved.text.length) === resolved.text.length) {
       await pdfReferenceOccurrence(bridge, resolved)
     } else {
-      const digests = resolved.locator.pageTextDigests
+      const digests = selectionDigests ?? resolved.locator.pageTextDigests
       const ids = resolved.locator.pageIds as string[]
       if (Array.isArray(digests) && digests.length === ids.length && digests.every(value => typeof value === 'string')) {
         const index = await bridge.deps.searchIndex()
@@ -155,7 +167,7 @@ export function createPdfAssistant(current: () => PdfOfficeBridge, active: () =>
           const position = ref ? ids.indexOf(`${ref.num}:${ref.gen}`) : -1
           if (position < 0) continue
           const entry = index?.[currentPage - 1]
-          if (!entry || officeTextDigest(entry.text) !== digests[position]) throw new Error('引用页面的原文已变化，无法验证原选区；历史快照仍可阅读，请重新选择当前内容。')
+          if (!entry || (selectionDigests ? selectionPageDigest(entry) : officeTextDigest(entry.text)) !== digests[position]) throw new Error('引用页面的原文已变化，无法验证原选区；历史快照仍可阅读，请重新选择当前内容。')
         }
       } else if (resolved.locator.kind === 'page' && lastPage - page < 10) {
         const result = await bridge.execute('read_pages', { start: page, end: lastPage }, () => check(before))
@@ -165,12 +177,12 @@ export function createPdfAssistant(current: () => PdfOfficeBridge, active: () =>
     check(before)
     return { ...resolved, version: before }
   }
-  const pageTextDigests = async (bridge: PdfOfficeBridge, pages: number[]) => {
+  const pageTextDigests = async (bridge: PdfOfficeBridge, pages: number[], selection = false) => {
     const index = await bridge.deps.searchIndex()
     return pages.map(page => {
       const entry = index?.[page - 1]
       if (!entry) throw new Error('无法验证引用页面的文字，请等待页面加载完成。')
-      return officeTextDigest(entry.text)
+      return selection ? selectionPageDigest(entry) : officeTextDigest(entry.text)
     })
   }
   const read = async (reference?: OfficeEditorReference, query?: OfficeEditorQuery) => {
@@ -202,28 +214,33 @@ export function createPdfAssistant(current: () => PdfOfficeBridge, active: () =>
     const text = `${result.output}${pending ? `\n\n当前未保存的修改：${pending}` : ''}${textChanges.length ? `\n文字改动（已显示在编辑器中，尚未写入文件）：${JSON.stringify(textChanges)}` : ''}`.slice(0, 24000)
     const refreshed = operation !== 'read_pages' ? undefined : reference && input.start === undefined && input.end === undefined ? { ...reference, version: before } : officeReference(`${name} · 第 ${page}${lastPage === page ? '' : `–${lastPage}`} 页`, text, { kind: 'page', page, lastPage, pageIds: await pageIds(bridge, Array.from({ length: lastPage - page + 1 }, (_, index) => page + index)), pageTextDigests: await pageTextDigests(bridge, Array.from({ length: lastPage - page + 1 }, (_, index) => page + index)) }, bridge.state())
     check(before)
+    let canReplace = false
+    if (!bridge.deps.readOnly() && !textChanges.length && reference?.locator.kind === 'text' && selected.page === selected.lastPage && (reference.textLength ?? reference.text.length) <= 24000 && reference.text === reference.text.trim()) {
+      try { await pdfReferenceOccurrence(bridge, reference); canReplace = true } catch { /* The snapshot remains readable even when it is not a single editable run. */ }
+      check(before)
+    }
     return {
       text,
-      operations: [...(!bridge.deps.readOnly() ? PDF_WRITE_OPERATIONS : []), ...(!bridge.deps.readOnly() && !textChanges.length && reference?.locator.kind === 'text' && selected.page === selected.lastPage && (reference.textLength ?? reference.text.length) <= 24000 && reference.text === reference.text.trim() ? ['replace_text'] : []), ...(bridge.canUndo() ? ['undo'] : [])],
+      operations: [...(!bridge.deps.readOnly() ? PDF_WRITE_OPERATIONS : []), ...(canReplace ? ['replace_text'] : []), ...(bridge.canUndo() ? ['undo'] : [])],
       reference: refreshed,
     }
   }
-  return {
+  const assistant: OfficeEditorAssistant = {
     capabilities,
     resolveReference,
     async reference() {
       active()
       const bridge = current()
       const selection = bridge.selection()
-      if (!selection?.text.trim()) return (await read(undefined, { operation: 'read_pages', input: { start: bridge.deps.currentPage() } })).reference ?? null
+      if (!selection?.text.trim()) return null
       const before = version()
       const ids = await pageIds(bridge, selection.quads.map(value => value.page))
       check(before)
-      const digests = await pageTextDigests(bridge, selection.quads.map(value => value.page))
+      const digests = await pageTextDigests(bridge, selection.quads.map(value => value.page), true)
       check(before)
       const rects = selection.quads.flatMap(value => value.quads.map(quadToRect))
-      if (rects.length > 256) throw new Error('PDF 选区超过 256 个文字区域，请缩小选区后再引用。')
-      return officeReference(`${name} · 第 ${selection.page}${selection.lastPage === selection.page ? '' : `–${selection.lastPage}`} 页`, selection.text, { kind: 'text', page: selection.page, lastPage: selection.lastPage, pageIds: ids, pageTextDigests: digests, rects }, bridge.state())
+      if (rects.length > 128) throw new Error('PDF 选区超过 128 个文字区域，请缩小选区后再引用。')
+      return officeReference(`${name} · 第 ${selection.page}${selection.lastPage === selection.page ? '' : `–${selection.lastPage}`} 页`, selection.text, { kind: 'text', page: selection.page, lastPage: selection.lastPage, pageIds: ids, selectionPageDigests: digests, regions: selection.quads.map((value, index) => ({ pageId: ids[index], rects: value.quads.map(quadToRect) })) }, bridge.state())
     },
     read,
     async execute(request, guard) {
@@ -280,40 +297,76 @@ export function createPdfAssistant(current: () => PdfOfficeBridge, active: () =>
       const before = version()
       const assertCurrent = () => { check(before); guard?.signal?.throwIfAborted(); guard?.assertCurrent() }
       assertCurrent()
-      if (bridge.snapshot()) throw new Error('请先保存 PDF，再渲染最终页面。')
-      const doc = bridge.deps.doc()
-      if (!doc) throw new Error('PDF 尚未准备就绪。')
-      const number = pageNumber(input.page, doc.numPages)
+      const savedDocument = bridge.deps.doc()
+      if (!savedDocument) throw new Error('PDF 尚未准备就绪。')
+      const number = pageNumber(input.page, savedDocument.numPages)
+      if (bridge.deps.isDeleted(number - 1)) throw new Error('引用页面已删除。')
+      const pending = bridge.snapshot()
+      if (pending && !snapshotDocument) throw new Error('此视图无法读取未保存的页面图片。')
       const scale = input.scale ?? 1.5
       if (typeof scale !== 'number' || !Number.isFinite(scale) || scale < 0.5 || scale > 2) throw new Error('scale 必须在 0.5 到 2 之间。')
-      const page = await doc.getPage(number)
-      assertCurrent()
-      const base = page.getViewport({ scale: 1 })
-      const viewport = page.getViewport({ scale: Math.min(scale, 2048 / Math.max(base.width, base.height)) })
+      const region = input.region ?? [0, 0, 1, 1]
+      if (!Array.isArray(region) || region.length !== 4 || !region.every(value => typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1) || Number(region[2]) <= Number(region[0]) || Number(region[3]) <= Number(region[1])) throw new Error('页面区域无效，请重新选择。')
+      const transient = snapshotDocument ? await snapshotDocument(pending) : undefined
       const canvas = document.createElement('canvas')
-      canvas.width = Math.ceil(viewport.width)
-      canvas.height = Math.ceil(viewport.height)
-      const rendering = page.render({ canvas, viewport })
-      const cancel = () => rendering.cancel()
-      guard?.signal?.addEventListener('abort', cancel, { once: true })
+      const output = document.createElement('canvas')
+      let cancel = () => {}
       try {
+        assertCurrent()
+        const doc = transient ?? savedDocument
+        const renderedPage = pending ? bridge.deps.pageOrder().indexOf(number - 1) + 1 : number
+        if (renderedPage < 1) throw new Error('引用页面已删除。')
+        const page = await doc.getPage(renderedPage)
+        assertCurrent()
+        const base = page.getViewport({ scale: 1 })
+        const viewport = page.getViewport({ scale: Math.min(scale, 2048 / Math.max(base.width, base.height)) })
+        canvas.width = Math.ceil(viewport.width)
+        canvas.height = Math.ceil(viewport.height)
+        const rendering = page.render({ canvas, viewport })
+        cancel = () => rendering.cancel()
+        guard?.signal?.addEventListener('abort', cancel, { once: true })
         await rendering.promise
         assertCurrent()
-        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'))
+        const x = Number(region[0]) * canvas.width; const y = Number(region[1]) * canvas.height
+        output.width = Math.max(1, Math.round((Number(region[2]) - Number(region[0])) * canvas.width))
+        output.height = Math.max(1, Math.round((Number(region[3]) - Number(region[1])) * canvas.height))
+        output.getContext('2d')!.drawImage(canvas, x, y, output.width, output.height, 0, 0, output.width, output.height)
+        const blob = await new Promise<Blob | null>(resolve => output.toBlob(resolve, 'image/png'))
         if (!blob) throw new Error('PDF 页面渲染失败。')
         const data = new Uint8Array(await blob.arrayBuffer())
         assertCurrent()
         return [{ name: `${name.replace(/\.pdf$/i, '')}-page-${number}.png`, mimeType: 'image/png', data }]
       } finally {
         guard?.signal?.removeEventListener('abort', cancel)
-        canvas.width = 0
-        canvas.height = 0
+        canvas.width = 0; canvas.height = 0
+        output.width = 0; output.height = 0
+        await transient?.loadingTask.destroy()
       }
     },
     async reveal(reference) {
       active()
       const bridge = current()
-      return bridge.deps.gotoPage(referencePages(await resolveReference(reference)).page)
+      const resolved = await resolveReference(reference)
+      const doc = bridge.deps.doc()!
+      const locations = new Map<string, number>()
+      for (let page = 1; page <= doc.numPages; page++) {
+        const { ref } = await doc.getPage(page)
+        if (ref) locations.set(`${ref.num}:${ref.gen}`, page)
+      }
+      const stored = resolved.locator.regions
+      if (Array.isArray(stored)) {
+        const regions = stored.map(value => {
+          if (!value || typeof value !== 'object' || Array.isArray(value) || typeof value.pageId !== 'string') throw new Error('引用页坐标无效。')
+          const page = locations.get(value.pageId)
+          if (!page) throw new Error('引用页面已不存在。')
+          return { page, rects: referenceRects({ ...reference, locator: { rects: value.rects } }) }
+        })
+        return bridge.reveal(regions)
+      }
+      const { page, lastPage } = referencePages(resolved)
+      if (page !== lastPage) throw new Error('旧跨页引用缺少各页坐标，请重新引用；历史正文仍可阅读。')
+      return bridge.reveal([{ page, rects: referenceRects(resolved) }])
     },
   }
+  return assistant
 }

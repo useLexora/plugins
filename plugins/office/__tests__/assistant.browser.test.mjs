@@ -10,6 +10,7 @@ import { build } from 'esbuild'
 import JSZip from 'jszip'
 import { genofficeResolver } from '../build-genoffice.mjs'
 import { univerClipboardPatch } from '../build-univer-clipboard.mjs'
+import { univerContextMenuPatch } from '../build-univer-contextmenu.mjs'
 
 const root = path.resolve(import.meta.dirname, '..')
 const out = path.join(root, 'artifacts/assistant-browser')
@@ -25,10 +26,11 @@ before(async () => {
     alias: { 'node:crypto': path.join(root, 'src/shims/crypto.ts'), 'node:fs': path.join(root, 'src/shims/docx-fs.ts'), 'node:fs/promises': path.join(root, 'src/shims/docx-fs.ts'), 'node:stream/promises': path.join(root, 'src/shims/docx-fs.ts'), 'node:zlib': path.join(root, 'src/shims/docx-zlib.ts'), 'node:path': path.join(root, 'src/shims/slides-path.ts') },
     loader: { '.ttf': 'file', '.woff': 'file', '.woff2': 'file', '.svg': 'file', '.png': 'file', '.jpg': 'file' },
   }
-  await build({ ...shared, entryPoints: { 'slides-worker': 'src/slides-worker.ts', 'sheets-editor': 'src/sheets-editor.ts', 'engine-worker': 'src/worker.ts', 'docx-editor': 'src/docx-editor.ts', 'docx-worker': 'vendor/genoffice/apps/docs/src/renderer/parse-worker.ts' }, plugins: [genofficeResolver(), univerClipboardPatch()] })
+  await build({ ...shared, entryPoints: { 'slides-worker': 'src/slides-worker.ts', 'sheets-editor': 'src/sheets-editor.ts', 'engine-worker': 'src/worker.ts', 'docx-editor': 'src/docx-editor.ts', 'docx-worker': 'vendor/genoffice/apps/docs/src/renderer/parse-worker.ts' }, plugins: [genofficeResolver(), univerClipboardPatch(), univerContextMenuPatch()] })
   await build({ ...shared, stdin: { resolveDir: root, sourcefile: 'assistant-fixture.ts', contents: `
     import { Editor } from '@tiptap/core';
-    import { compactOfficeReference } from './src/office-assistant';
+    import { compactOfficeReference, officeTextDigest } from './src/office-assistant';
+    window.officeTextDigest = officeTextDigest;
     window.compactReference = compactOfficeReference;
     import { editorExtensions } from './vendor/genoffice/apps/docs/src/renderer/editor/extensions';
     import { createDocxAssistant } from './src/docx-assistant';
@@ -94,6 +96,7 @@ test('DOCX 引用不随光标移动，段内替换保持邻文和格式，可撤
     const undone=doc.getText()
     const old=await assistant.reference(); doc.commands.insertContentAt(1,'新增')
     let rejected=false; try {await assistant.execute({operation:'replace_text',reference:old,input:{text:'错误'}})} catch {rejected=true}
+    doc.commands.setTextSelection({from:7,to:11})
     const rebound=await assistant.read({...await assistant.reference(),version:'older-session'})
     return {ref,text,after,undone,rejected,rebound:rebound.reference.version!=='older-session'}
   })
@@ -359,4 +362,68 @@ test('XLSX 旧引用在别处修改保存重开后重绑，选区值变化拒绝
     editor.dispose();return {text:read.reference.text,reveal,rejected}
   })
   assert.match(result.text,/引用原文/);assert.equal(result.reveal,true);assert.equal(result.rejected,true)
+})
+
+
+test('XLSX 大范围引用不受写操作格数限制，整列裁剪空尾部', {timeout:90000}, async t => {
+  const page = await fixture(t)
+  await page.evaluate(async () => {
+    const {mountSheets} = await import('/sheets-editor.js')
+    window.sheetEditor = await mountSheets({context:{signal:new AbortController().signal,workers:{create:async url=>new Worker(url,{type:'module'})}},container:document.querySelector('#app'),bytes:new Uint8Array(await(await fetch('/blank.xlsx')).arrayBuffer()),name:'范围.xlsx',onDirty:()=>{}})
+    window.assistant = sheetEditor.assistant
+    const initial = JSON.parse((await assistant.read()).text)
+    const sheetId = initial.sheets[0].sheetId
+    await assistant.execute({operation:'set_cells',input:{sheetId,range:'A1',values:[['第一行']]}})
+    await assistant.execute({operation:'set_cells',input:{sheetId,range:'A81',values:[['末行']]}})
+  })
+  const nameBox = page.locator('input.univer-appearance-none')
+  await nameBox.fill('A1:E90'); await nameBox.press('Enter')
+  const selected = await page.evaluate(() => assistant.reference())
+  assert.match(selected.text, /^第一行/); assert.match(selected.text, /末行/)
+  assert.equal(selected.text.split('\n').length, 90)
+  await nameBox.fill('A:A'); await nameBox.press('Enter')
+  const fullColumn = await page.evaluate(() => assistant.reference())
+  assert.equal(fullColumn.locator.clipped, true)
+  assert.equal(fullColumn.locator.range.endRow, 80)
+  assert.equal(fullColumn.text.split('\n').length, 81)
+  const multiple = await page.evaluate(async selected => {
+    const ranges = [0,80].map(row => ({startRow:row,endRow:row,startColumn:0,endColumn:0}))
+    const sheet = selected.label.split('!')[0]
+    const text = `${sheet}!A1\n第一行\n\n${sheet}!A81\n末行`
+    const reference = {...selected,text,locator:{kind:'xlsx',sheetId:selected.locator.sheetId,range:ranges[0],contentFormat:'display',ranges}}
+    await assistant.reveal(reference)
+    const captured = await assistant.reference()
+    let guarded = false
+    try { await assistant.execute({operation:'replace_text',reference:captured,input:{text:'不能静默只改第一段'}}) } catch { guarded = true }
+    return {text:captured.text,ranges:captured.locator.ranges,guarded}
+  }, selected)
+  assert.equal(multiple.ranges.length,2)
+  assert.match(multiple.text,/!A1\n第一行[\s\S]*!A81\n末行/)
+  assert.equal(multiple.guarded,true)
+  await page.evaluate(() => sheetEditor.dispose())
+})
+
+
+test('PPTX 重复文字引用按对象内偏移替换，保留邻文和原生页面渲染', {timeout:90000}, async t => {
+  const page = await fixture(t)
+  const result = await page.evaluate(async () => {
+    await makeSlides()
+    const text = 'Before target middle target after'
+    const id = await addText(text)
+    slideCtx.selectedIds = [id]
+    const full = await assistant.reference()
+    const start = text.lastIndexOf('target')
+    const selected = {...full, text:'target', locator:{...full.locator,textRange:{start,end:start+6,digest:officeTextDigest(text)}}}
+    const current = await assistant.resolveReference(selected)
+    await assistant.execute({operation:'replace_text', reference:current, input:{text:'changed'}})
+    const after = await assistant.reference()
+    const [image] = await assistant.render({slideIndexes:[0]})
+    const bytes = [...(await rpc('save')).bytes]
+    worker.terminate()
+    return {text:after.text,bytes,png:[...image.data.slice(0,8)]}
+  })
+  assert.equal(result.text,'Before target middle changed after')
+  const zip = await JSZip.loadAsync(new Uint8Array(result.bytes))
+  assert.match(await zip.file('ppt/slides/slide1.xml').async('string'), /Before target middle changed after/)
+  assert.deepEqual(result.png,[137,80,78,71,13,10,26,10])
 })
