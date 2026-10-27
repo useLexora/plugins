@@ -30,6 +30,12 @@ async function install(app, page) {
 }
 async function office(page) {
   await page.locator('.desktop-app-sidebar').getByRole('button', { name: 'Office', exact: true }).click()
+  await expect.poll(async () => {
+    for (const frame of page.frames()) {
+      if (await frame.getByRole('button', { name: '文档库', exact: true }).isVisible().catch(() => false)) return true
+    }
+    return false
+  }).toBe(true)
   let frame
   await expect.poll(async () => {
     for (const item of page.frames()) {
@@ -37,7 +43,7 @@ async function office(page) {
     }
     return false
   }, { timeout: 40000 }).toBe(true)
-  await expect(frame.getByRole('button', { name: '全部文件', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(frame.getByRole('button', { name: '文档库', exact: true })).toHaveAttribute('aria-current', 'page')
   return frame
 }
 async function create(frame, kind, name) {
@@ -77,7 +83,7 @@ test('PDF 在隔离插件中编辑中文、批注、页面并跨重启恢复', a
   await expect(frame.locator('.pdf-thumb')).toHaveCount(3)
   await expect(frame.locator('.office-save-state')).toHaveText('已保存', { timeout: 30000 })
   await page.screenshot({ path: testInfo.outputPath('01-pdf-edited.png') })
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
   let row = frame.getByRole('row').filter({ hasText: 'PDF 办公验收.pdf' })
   await expect(row).toBeVisible()
   const output = testInfo.outputPath('office.pdf')

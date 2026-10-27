@@ -29,6 +29,12 @@ async function install(app, page) {
 }
 async function office(page) {
   await page.locator('.desktop-app-sidebar').getByRole('button', { name: 'Office', exact: true }).click()
+  await expect.poll(async () => {
+    for (const frame of page.frames()) {
+      if (await frame.getByRole('button', { name: '文档库', exact: true }).isVisible().catch(() => false)) return true
+    }
+    return false
+  }).toBe(true)
   let frame
   await expect.poll(async () => {
     for (const item of page.frames()) {
@@ -36,7 +42,7 @@ async function office(page) {
     }
     return false
   }, { timeout: 40000 }).toBe(true)
-  await expect(frame.getByRole('button', { name: '全部文件', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(frame.getByRole('button', { name: '文档库', exact: true })).toHaveAttribute('aria-current', 'page')
   return frame
 }
 async function create(frame, kind, name) {
@@ -95,7 +101,7 @@ test('邮件合并读取收件人并导出独立DOCX，保留库中模板', asyn
   await panel.getByRole('button', { name: '关闭', exact: true }).click()
   await frame.locator('.office-document-bar').getByRole('button', { name: '保存', exact: true }).click()
   await expect(frame.locator('.office-save-state')).toHaveText('已保存')
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
   const templatePath = testInfo.outputPath('template.docx')
   await app.evaluate(({ dialog }, output) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: output }) }, templatePath)
   await documentAction(frame, frame.getByRole('row').filter({ hasText: '邀请函模板.docx' }), '导出')

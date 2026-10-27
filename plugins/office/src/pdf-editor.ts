@@ -145,16 +145,7 @@ export async function mountPdfEditor(options: OfficeEditorOptions): Promise<Offi
     bytes = next.slice()
     generation++
     notifyDirty(!serializing)
-    if (!serializing) {
-      if (options.onSaveRequest) await options.onSaveRequest()
-      else {
-        if (!options.onSave) throw new Error('请使用 Office 顶栏保存。')
-        await options.onSave(next)
-        active()
-        acknowledged = generation
-        notifyDirty(false)
-      }
-    }
+
   }
   const exportPdf = async (next: Uint8Array, suggestedName: string) => {
     const fileName = suggestedName.replace(/\.pdf$/i, '') + '.pdf'
@@ -184,7 +175,13 @@ export async function mountPdfEditor(options: OfficeEditorOptions): Promise<Offi
       try {
         checkPath(request.path)
         if (request.targetPath) throw new Error('请使用 Office 顶栏的导出或另存副本。')
-        await publish(await checkedSave(bytes, request))
+        const next = await checkedSave(bytes, request)
+        await publish(next)
+        if (!serializing && !options.onSaveRequest && options.onSave) {
+          await options.onSave(next)
+          acknowledged = generation
+          notifyDirty(false)
+        }
         return { ok: true }
       } catch (error) { lastSaveError = message(error); return failure(error) }
     },

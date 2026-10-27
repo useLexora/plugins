@@ -15,6 +15,6 @@ PDF 是固定布局。先 `read(targetId,query:{operation:"inspect"})` 检查页
 
 自己的修改后继续 `read(targetId,query)` 检查最新保存内容，使用最新 revision；原引用仍是快照。不要每步要求用户重新引用。用户手改造成版本冲突时检查文档并重新打开明确 documentId，勿重试旧修改。
 
-完成后读正文/批注/表单结果，对改动页面调用 `render(targetId,input:'{"page":1}')` 检查溢出、遮挡、字体和可读性，然后 `export` 发布任务产物。保存只更新文档库，导入原件不变。
+完成后读正文/批注/表单结果，对改动页面调用 `render(targetId,input:'{"page":1}')` 检查溢出、遮挡、字体和可读性，然后 `export` 发布任务产物。本地文件显式 save 才写回原件；文档库自动保存，export 独立发布当前缓冲的任务产物。
 
 创建与版式工作读 [固定布局创作](references/authoring.md)。

@@ -55,3 +55,20 @@ export function confirmLeaving(root: HTMLElement, error: string, signal?: AbortS
     root.append(panel); panel.showModal()
   })
 }
+
+export function confirmLocalClose(root: HTMLElement, name: string, signal?: AbortSignal): Promise<'save' | 'discard' | 'cancel'> {
+  return new Promise(resolve => {
+    if (signal?.aborted) { resolve('cancel'); return }
+    const panel = element('dialog', 'office-dialog')
+    const heading = element('h2', '', `保存对 ${name} 的修改？`)
+    heading.id = `office-close-${crypto.randomUUID()}`
+    panel.setAttribute('aria-labelledby', heading.id)
+    panel.append(heading, element('p', '', '当前修改尚未保存到文件。'))
+    const finish = (choice: 'save' | 'discard' | 'cancel') => { signal?.removeEventListener('abort', cancel); panel.close(); panel.remove(); resolve(choice) }
+    const cancel = () => finish('cancel')
+    const actions = element('div', 'office-dialog-actions')
+    actions.append(button('取消', cancel), button('不保存', () => finish('discard')), button('保存', () => finish('save'), 'primary'))
+    panel.append(actions); panel.addEventListener('cancel', event => { event.preventDefault(); cancel() })
+    signal?.addEventListener('abort', cancel, { once: true }); root.append(panel); panel.showModal()
+  })
+}

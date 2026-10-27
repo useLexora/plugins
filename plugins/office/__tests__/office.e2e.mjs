@@ -41,14 +41,20 @@ async function install(app, page, packagePath = archive) {
 }
 async function office(page) {
   await page.locator('.desktop-app-sidebar').getByRole('button', { name: 'Office', exact: true }).click()
+  await expect.poll(async () => {
+    for (const frame of page.frames()) {
+      if (await frame.getByRole('button', { name: '文档库', exact: true }).isVisible().catch(() => false)) return true
+    }
+    return false
+  }).toBe(true)
   let frame
   await expect.poll(async () => {
     for (const item of page.frames()) {
-      if (item.url().startsWith('lexora-extension:') && await (await item.frameElement()).isVisible().catch(() => false) && await item.getByRole('button', { name: '全部文件', exact: true }).isVisible().catch(() => false)) { frame = item; return true }
+      if (item.url().startsWith('lexora-extension:') && await (await item.frameElement()).isVisible().catch(() => false) && await item.getByRole('button', { name: '文档库', exact: true }).isVisible().catch(() => false)) { frame = item; return true }
     }
     return false
   }, { timeout: 40000 }).toBe(true)
-  await expect(frame.getByRole('button', { name: '全部文件', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(frame.getByRole('button', { name: '文档库', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(page.locator(`[data-extension-page="${manifest.id}"] > header`)).toHaveCount(0)
   return frame
 }
@@ -76,7 +82,7 @@ test('独立 Office 管理页保存真实 DOCX、版本恢复、回收站与跨�
   expect(await frame.evaluate(() => ({ origin, node: typeof process, desktop: typeof window.lexoraDesktop }))).toEqual({ origin: 'null', node: 'undefined', desktop: 'undefined' })
   await editor.fill('季度办公计划\n中文、格式与版本都需要可靠保存。')
   await expect(frame.locator('.office-save-state')).toHaveText('已保存', { timeout: 30000 })
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
   let row = frame.getByRole('row').filter({ hasText: '季度办公计划.docx' })
   await expect(row).toBeVisible()
   await row.getByRole('button', { name: '收藏', exact: true }).click()
@@ -89,7 +95,7 @@ test('独立 Office 管理页保存真实 DOCX、版本恢复、回收站与跨�
   await row.getByRole('button', { name: '打开', exact: true }).click()
   await expect(editor).toContainText('季度办公计划')
   await editor.fill('第二个版本\n保留先前版本供恢复。')
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
   await documentAction(frame, row, '版本')
   const history = frame.getByRole('dialog', { name: '版本历史', exact: true })
   await expect(history.locator('.office-version-row')).toHaveCount(3)
@@ -112,7 +118,7 @@ test('独立 Office 管理页保存真实 DOCX、版本恢复、回收站与跨�
   await frame.getByRole('button', { name: '回收站', exact: true }).click()
   await row.getByRole('button', { name: '恢复', exact: true }).click()
   await expect(frame.getByText('已恢复文件', { exact: true })).toBeVisible()
-  await frame.getByRole('button', { name: '全部文件', exact: true }).click()
+  await frame.getByRole('button', { name: '文档库', exact: true }).click()
   await expect(row).toBeVisible()
   await expect(frame.locator('.ant-message-notice')).toHaveCount(0)
   await page.screenshot({ path: testInfo.outputPath('02-library-files.png') })
@@ -127,7 +133,7 @@ test('独立 Office 管理页保存真实 DOCX、版本恢复、回收站与跨�
   await frame.getByRole('checkbox', { name: '选择 季度计划.docx', exact: true }).check()
   await row.getByRole('button', { name: '季度计划.docx', exact: true }).click()
   await expect(editor).toContainText('季度办公计划')
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
   await expect(frame.getByRole('button', { name: '我的收藏', exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(frame.getByRole('textbox', { name: '搜索文件', exact: true })).toHaveValue('季度计划')
   await expect(frame.getByRole('group', { name: '文件类型' }).getByRole('button', { name: '文档', exact: true })).toHaveAttribute('aria-pressed', 'true')
@@ -468,8 +474,14 @@ test('Office 套件由主 Agent 新建 PDF、连续编辑、查看原生图片�
     const text = execFileSync('pdftotext', [artifact.current_path, '-'], { encoding: 'utf8' })
     expect(text).toContain('Office suite report'); expect(text).toContain('Continuous editing verified.')
     expect(real ? imageVerified : requests.some(body => body.messages?.some(message => Array.isArray(message.content) && message.content.some(part => part.type === 'image_url')))).toBe(true)
-    if (!real) expect(results.find(item => item.documents)?.documents).toHaveLength(1)
+    if (!real) {
+      expect(results.find(item => item.documents)?.documents).toHaveLength(1)
+      expect(results.filter(item => item.mutated).every(item => item.saved === true)).toBe(true)
+      expect(results.find(item => item.artifact)?.saved).toBeUndefined()
+    }
     await page.screenshot({ path: testInfo.outputPath('suite-delivered.png') })
+    const editor = page.frames().find(frame => frame.url().startsWith('lexora-extension:'))
+    await editor.getByRole('button', { name: 'Office 首页', exact: true }).click()
   } finally {
     await fs.writeFile(testInfo.outputPath('suite-evidence.json'), JSON.stringify({ results, requestCount: requests.length }, null, 2))
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve))
@@ -491,7 +503,7 @@ test('保留数据卸载旧包后安装当前包，文档、收藏、版本与�
   await expect(frame.locator('.office-save-state')).toHaveText('已保存', { timeout: 30000 })
   await editor.fill('迁移前最新内容')
   await expect(frame.locator('.office-save-state')).toHaveText('已保存', { timeout: 30000 })
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
   let row = frame.getByRole('row').filter({ hasText: '迁移保留文档.docx' })
   await row.getByRole('button', { name: '收藏', exact: true }).click()
   await expect(row.getByRole('button', { name: '取消收藏', exact: true })).toBeVisible()
@@ -582,13 +594,14 @@ test('四格式引用：原生表格菜单、局部文字、PDF 浮动工具栏�
   await frame.getByRole('button', { name: '视图', exact: true }).click()
   await frame.locator('.status-view-btn[aria-label=阅读视图]').click()
   const readingBody = frame.locator('.tiptap').first()
+  await expect(readingBody).toHaveAttribute('contenteditable', 'false')
   await selectText(readingBody, 10, 14)
   await readingBody.dispatchEvent('contextmenu', { clientX: 300, clientY: 300 })
   expect(await copyReference()).toContain('保留后文')
   await expect(frame.locator('.ctx-menu').getByRole('button', { name: '剪切', exact: true })).toHaveCount(0)
   await page.keyboard.press('Escape')
 
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
 
   await selectFiles(app, [path.join(project, 'fixtures/business.xlsx')])
   await frame.getByRole('button', { name: '导入文件', exact: true }).first().click()
@@ -642,7 +655,7 @@ test('四格式引用：原生表格菜单、局部文字、PDF 浮动工具栏�
   }
   await page.evaluate(() => window.lexoraDesktop.settings.update({ desktop: { theme: { id: 'lexora.themes.classic-light' } } }))
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(win => win.isVisible()).setContentSize(1600, 1050))
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
 
   await create(frame, '演示文稿', '四格式引用幻灯片')
   await expect(frame.locator('.stage-rel')).toBeVisible({ timeout: 60000 })
@@ -709,7 +722,7 @@ test('四格式引用：原生表格菜单、局部文字、PDF 浮动工具栏�
   await page.screenshot({ path: testInfo.outputPath('pptx-native-multiple-selection.png') })
 
 
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
 
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
   const document = await PDFDocument.create(); const font = await document.embedFont(StandardFonts.Helvetica)

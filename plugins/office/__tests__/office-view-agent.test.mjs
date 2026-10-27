@@ -15,11 +15,12 @@ async function fixture() {
   let acceptReference = true
   let onMessage
   let reply
-  let document = { id: 'document-a', name: 'Report.docx', kind: 'docx', versions: [{ id: 'content-v1' }] }
+  let document = { id: 'document-a', name: 'Report.docx', kind: 'docx', version: 'content-v1' }
   let dirty = false
   let revision = 1
   let stale = false
   let save = async () => {}
+  let checkpoint = async () => {}
   let nextRead
   let writes = 0
   let currentSession = 'session-a'
@@ -45,6 +46,8 @@ async function fixture() {
     revision: () => String(revision),
     dirty: () => dirty,
     save: () => save(),
+    checkpoint: () => checkpoint(),
+    export: async () => ({ id: crypto.randomUUID(), name: document.name, size: 1 }),
     checkStored: async () => { if (stale) throw new Error('stored version changed') },
   })
   await agent.register('session-a')
@@ -54,6 +57,8 @@ async function fixture() {
     editBridge: (expectedRevision, action, input = {}) => new Promise(resolve => { reply = resolve; onMessage(extensionJsonSchema.parse({ type: 'office-agent-request', sessionId: currentSession, documentId: 'document-a', requestId: crypto.randomUUID(), operation: 'edit', expectedRevision, action, input })) }),
     failSave: () => { save = async () => { throw new Error('disk full') } },
     writes: () => writes,
+    deferCheckpoint: () => new Promise(resolve => { checkpoint = () => new Promise(finish => resolve(finish)) }),
+    setLocal: () => { document = { ...document, local: { kind: 'file', writable: true } } },
     cancelReference: () => { acceptReference = false },
     agent, locate, revealed, captured, reference, revealCaptured: () => reveal({ text: captured.at(-1).text, locator: captured.at(-1).locator }, new AbortController().signal),
     staleStored: () => { stale = true },
@@ -61,8 +66,8 @@ async function fixture() {
     deferReveal: () => new Promise(resolve => { nextReveal = new Promise(finish => resolve(finish)) }),
     deferRead: () => new Promise(resolve => { nextRead = new Promise(finish => resolve(finish)) }),
     setDirty: value => { dirty = value; revision++ },
-    setVersion: id => { document = { ...document, versions: [{ id }] }; revision++ },
-    saveAsVersion: id => { save = async () => { document = { ...document, versions: [{ id }] }; dirty = false } },
+    setVersion: id => { document = { ...document, version: id }; revision++ },
+    saveAsVersion: id => { save = async () => { document = { ...document, version: id }; dirty = false } },
     switchDocument: async id => { document = { ...document, id }; currentSession = `session-${id}`; await agent.register(currentSession) },
   }
 }
@@ -126,7 +131,7 @@ test('24k 中文和最坏转义文本的内部 read 往返均符合宿主 256KB 
   }
 })
 
-test('其它内容保存后旧引用仍可验证定位，未保存编辑不建立写入目标', async () => {
+test('其它内容保存后旧引用仍可验证定位，未保存编辑可读取当前缓冲区', async () => {
   const f = await fixture()
   f.setVersion('content-v2')
   const current = (await f.readBridge()).value
@@ -136,7 +141,7 @@ test('其它内容保存后旧引用仍可验证定位，未保存编辑不建�
   assert.equal(current.sourceChangedSinceReference, true)
   assert.equal(await f.locate('document-a'), true)
   f.setDirty(true)
-  assert.match((await f.readBridge()).error, /未保存/)
+  assert.equal((await f.readBridge()).value.dirty, true)
   assert.equal(await f.locate('document-a'), true)
 })
 
@@ -251,4 +256,35 @@ test('视觉与多区域 locator 转成独立 JSON 树，保持宿主的无循�
   assert.deepEqual(JSON.parse(JSON.stringify(f.captured[0].locator.data.reference.locator)), f.reference.locator)
   rect[0] = 10
   assert.equal(f.captured[0].locator.data.reference.locator.rects[0][0], 0)
+})
+
+ test('本地文件 AI 修改只改变缓冲区，显式保存后才报告已落盘', async () => {
+ const f = await fixture()
+ f.setLocal()
+ f.failSave()
+ const edited = await f.editBridge('1', 'replace_text', { text: 'unsaved buffer' })
+ assert.equal(edited.value.mutated, true)
+ assert.equal(edited.value.saved, false)
+ assert.equal(edited.value.dirty, true)
+ assert.equal(edited.value.saveError, undefined)
+ const failed = await f.editBridge('2', 'save')
+ assert.equal(failed.value.saved, false)
+ assert.match(failed.value.saveError, /disk full/)
+ assert.equal(f.writes(), 1)
+ f.saveAsVersion('content-v2')
+ const saved = await f.editBridge('2', 'save')
+ assert.equal(saved.value.saved, true)
+ assert.equal(saved.value.documentVersion, 'content-v2')
+ })
+
+test('记录 AI 恢复草稿期间的用户修改不能被当成本次操作的新目标', async () => {
+ const f = await fixture()
+ f.setLocal()
+ const ready = f.deferCheckpoint()
+ const editing = f.editBridge('1', 'replace_text', { text: 'AI change' })
+ const finish = await ready
+ f.setDirty(true)
+ finish()
+ assert.match((await editing).error, /期间文档被修改/)
+ assert.equal(f.writes(), 1)
 })

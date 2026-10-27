@@ -14,13 +14,13 @@ description: 管理 Office 文档库、新建或交付 DOCX/XLSX/PPTX/PDF 文件
 - 历史引用的解释、总结、对照：先用宿主 `lexora_reference_list` 获取引用身份，再以返回的 `sourceMessageId`、`kind`、`referenceId` 调用 `lexora_reference_read`，用 `offset`/`limit` 分页读取引用时保存的正文，不需要打开或保存当前文档。
 - 检查或修改引用对应的当前内容：`references → read(sourceMessageId,referenceId)`。Office 验证当前结构定位和准确原文，成功后建立新的 target。其它位置保存不直接使引用失效；目标原文变化、定位不唯一或无法验证时拒绝重绑，不把旧快照当作当前内容。独立页面复制的引用粘贴进任务后也走这条链。
 - 已在文档库：`documents → read(documentId)`。名称可能重复，结合 ID、修改时间和用户意图选择。
-- 新建：`create(kind,name)` 返回 `targetId/revision`，再读取对应格式能力并写入内容。
-- 本机文件或任务附件尚未入库：使用宿主现有“用 Office 打开”或文档库导入入口；不要用原路径覆盖插件私有文件。相同来源打开会复用原库记录，用户明确要求另存时才 duplicate。
+- 新建：`create(kind,name)` 在文档库中创建文件并返回 `targetId/revision`，再读取对应格式能力并写入内容。
+- 本机文件：通过“打开本地文件”或宿主的“用 Office 打开”进入原文件编辑；引用后建立目标，不要求入库。任务产物对应的本地文件同样直接编辑原件，消息引用快照独立保留。只有 Office 新建和明确导入的文件交由文档库维护。
 
 调用 `capabilities(targetId)` 后，按任务读取 `docx`、`xlsx`、`pptx` 或 `pdf` 技能。每个技能也能独立完成格式内的创建、修改和交付，不必反复加载全部技能。
 
 `references` 返回每条引用的 `sourceMessageId/referenceId`，必须配对使用，不能只按引用 ID 选择最新消息。`read` 返回当前内容（`contentState=current`）、文档版本、操作目标和 revision；`edit` 使用同一 `targetId` 及最新 `expectedRevision`，`input` 为对应操作 schema 的 JSON 对象字符串。自己的修改后继续 `read(targetId,query)`，原引用不会因此更新。需要指定新位置时用格式查询参数，不依赖当前鼠标选区。用户手改、其他页面修改、关闭会话或租约到期后，旧目标会拒绝；新轮次、排队执行与子 Agent 必须分别重新读取，不能沿用其他执行的 targetId；检查最新文档 ID 后重新打开，不重放旧请求。
 
-保存后检查真实内容和结构；对版式敏感的交付，在格式支持时用 `render` 看图核对，再 `export(targetId,expectedRevision)`。`saved=true` 只代表文档库已保存；`export` 发布当前任务的产物卡片，才是文件交付。不要声称覆盖了导入来源，也不要伪造产物路径或链接。
+修改后检查真实内容和结构；版式敏感的交付在格式支持时用 `render` 看图，再 `export(targetId,expectedRevision)` 发布任务产物。本地文件修改默认只进入缓冲；用户明确要求保存原件时执行 `edit(operation="save")`。Office 新建的文件自动存入文档库，通过 export 交付任务产物。`saved=true` 表示当前绑定位置已保存；文档库仍自动保存。`export` 不代表原件已保存，不伪造路径或链接。
 
 管理和失败恢复时读 [文档生命周期](references/lifecycle.md)。

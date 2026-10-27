@@ -165,7 +165,7 @@ export function registerOfficeAgent(context: ExtensionContext, library?: OfficeL
       const target = await assertTarget(input, tool)
       return request(target, 'capabilities', { expectedRevision: target.revision }, tool.signal)
     }
-    return { ok: true, formats: ['docx', 'xlsx', 'pptx', 'pdf'], skills: ['office', 'docx', 'xlsx', 'pptx', 'pdf'], entryPoints: { snapshot: 'lexora_reference_list → lexora_reference_read(sourceMessageId,kind,referenceId[,offset,limit])', reference: 'references → read(sourceMessageId,referenceId)（验证当前定位并绑定目标）', library: 'documents → read(documentId)', create: 'create(kind,name)' }, workflow: 'lexora_reference_read 读取不可变历史快照；read 读取当前文档并返回 targetId/revision，定位或原文改变时拒绝重新绑定。targetId 仅在当前执行有效，不跨轮次或子 Agent 复用。edit 使用 expectedRevision；自身修改后用 read(targetId) 继续读取最新文档，原引用仍是快照。export 发布任务产物；render 返回模型图片（以目标能力为准）。', tools: ['references', 'documents', 'create', 'read', 'edit', 'organize', 'render', 'export'], limits: { fileBytes: 67108864, retainedVersions: 12, targetLifetimeSeconds: 600 }, persistence: '修改保存到 Office 文档库；不会覆盖导入来源。' }
+    return { ok: true, formats: ['docx', 'xlsx', 'pptx', 'pdf'], skills: ['office', 'docx', 'xlsx', 'pptx', 'pdf'], entryPoints: { snapshot: 'lexora_reference_list → lexora_reference_read(sourceMessageId,kind,referenceId[,offset,limit])', reference: 'references → read(sourceMessageId,referenceId)（验证当前定位并绑定目标）', library: 'documents → read(documentId)', create: 'create(kind,name)' }, workflow: 'lexora_reference_read 读取不可变历史快照；read 读取当前文档并返回 targetId/revision，定位或原文改变时拒绝重新绑定。targetId 仅在当前执行有效，不跨轮次或子 Agent 复用。edit 使用 expectedRevision；自身修改后用 read(targetId) 继续读取最新文档，原引用仍是快照。export 发布任务产物；render 返回模型图片（以目标能力为准）。', tools: ['references', 'documents', 'create', 'read', 'edit', 'organize', 'render', 'export'], limits: { fileBytes: 67108864, retainedVersions: 12, targetLifetimeSeconds: 600 }, persistence: '本地文件编辑先应用到当前缓冲，edit(action=save) 才写回原件；Office 新建和导入的文档库文件自动保存。export 发布当前内容为任务产物，不改变原件保存状态。' }
   })
   handle('references', async (_input, tool) => {
     const result = await tool.references.list()
@@ -262,10 +262,12 @@ export function registerOfficeAgent(context: ExtensionContext, library?: OfficeL
     if (input.expectedRevision !== target.revision) throw new Error('导出版本已变化，请使用最新 revision。')
     const result = object(await request(target, 'export', { expectedRevision: target.revision }, tool.signal))
     const file = object(result?.file)
-    if (!file || typeof file.id !== 'string' || typeof result?.revision !== 'string') throw new Error('文档未能保存和导出。')
+    if (!file || typeof file.id !== 'string' || typeof result?.revision !== 'string') throw new Error('文档未能导出。')
     target.revision = result.revision
-    const artifact = await tool.artifacts.publish({ resource: { id: file.id }, name: fileName(input.name ?? file.name, result.kind as OfficeKind) })
-    return { ok: true, targetId: input.targetId, revision: target.revision, saved: true, documentVersion: result.documentVersion, artifact: { ...artifact } }
+    try {
+      const artifact = await tool.artifacts.publish({ resource: { id: file.id }, name: fileName(input.name ?? file.name, result.kind as OfficeKind) })
+      return { ok: true, targetId: input.targetId, revision: target.revision, documentVersion: result.documentVersion, artifact: { ...artifact } }
+    } finally { await context.resources.release({ id: file.id }).catch(() => {}) }
   })
   context.signal.addEventListener('abort', () => {
     for (const item of [...pending.values()]) item.finish(undefined, new Error('Office 插件已停止。'))

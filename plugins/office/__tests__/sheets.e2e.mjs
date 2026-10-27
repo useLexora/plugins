@@ -31,10 +31,16 @@ test('Office 表格真实编辑、自动保存、导出与从文档库重开', a
   await expect(review).toBeHidden()
   await expect.poll(() => page.evaluate(async id => (await window.lexoraDesktop.extensions.list()).find(item => item.manifest.id === id)?.enabled, manifest.id)).toBe(true)
   await page.locator('.desktop-app-sidebar').getByRole('button', { name: 'Office', exact: true }).click()
+  await expect.poll(async () => {
+    for (const frame of page.frames()) {
+      if (await frame.getByRole('button', { name: '文档库', exact: true }).isVisible().catch(() => false)) return true
+    }
+    return false
+  }).toBe(true)
   let frame
   await expect.poll(async () => {
     frame = page.frames().find(candidate => candidate.url().startsWith('lexora-extension:') && !candidate.isDetached())
-    return frame && await frame.getByRole('button', { name: '全部文件', exact: true }).getAttribute('aria-current') === 'page'
+    return frame && await frame.getByRole('button', { name: '文档库', exact: true }).getAttribute('aria-current') === 'page'
   }, { timeout: 30000 }).toBe(true)
   await app.evaluate(({ dialog }, file) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [file] }) }, source)
   await frame.getByRole('button', { name: '导入文件', exact: true }).first().click()
@@ -68,7 +74,7 @@ test('Office 表格真实编辑、自动保存、导出与从文档库重开', a
   expect(worksheet.match(/<c\b[^>]*r="B5"[^>]*>[\s\S]*?<\/c>/)?.[0]).toContain('界面验收修改')
   expect(createHash('sha256').update(await fs.readFile(source)).digest('hex')).toBe(before)
   await page.screenshot({ path: testInfo.outputPath('office-sheets-edited.png'), animations: 'disabled' })
-  await frame.locator('.office-document-bar').getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.locator('.office-document-bar').getByRole('button', { name: 'Office 首页', exact: true }).click()
   await row.getByRole('button', { name: '打开', exact: true }).click()
   await expect(frame.locator('.office-document-title')).toContainText('business.xlsx')
   await expect(nameBox).toHaveValue(/^A1(?::H1)?$/, { timeout: 60000 })
