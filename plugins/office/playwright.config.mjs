@@ -8,7 +8,7 @@ const artifacts = process.env.LEXORA_TEST_ARTIFACT_DIR ??= path.join(project, 'a
 
 export default defineConfig({
   testDir: path.join(project, '__tests__'),
-  testMatch: ['office.e2e.mjs', 'sheets.e2e.mjs', 'slides.e2e.mjs', 'pdf.e2e.mjs', 'docx-mail-merge.e2e.mjs', 'source-opening.e2e.mjs'],
+  testMatch: ['office.e2e.mjs', 'sheets.e2e.mjs', 'slides.e2e.mjs', 'pdf.e2e.mjs', 'docx-mail-merge.e2e.mjs', 'source-opening.e2e.mjs', 'local-files.e2e.mjs'],
   outputDir: path.join(artifacts, 'results'),
   reporter: [['list'], ['html', { outputFolder: path.join(artifacts, 'report'), open: 'never' }], ['json', { outputFile: path.join(artifacts, 'report.json') }]],
   workers: 1,

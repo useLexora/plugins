@@ -3,11 +3,15 @@ import { createRoot } from 'react-dom/client'
 import { App, Alert, Button, Drawer, Dropdown, Form, Input, Modal, Select, Table, Tag, Tooltip, type TableColumnsType, type MenuProps } from 'antd'
 import { OfficeTheme } from './office-theme'
 import { ClockCircleOutlined, CopyOutlined, DeleteOutlined, DownloadOutlined, EditOutlined, FolderOpenOutlined, HistoryOutlined, InboxOutlined, EllipsisOutlined, SearchOutlined, StarFilled, StarOutlined, UndoOutlined, UploadOutlined } from '@ant-design/icons'
-import { fileName, KIND_LABEL, type OfficeDocument, type OfficeKind } from './office-library'
+import type { EditableDocument } from './lexora'
+import { fileName, kindOf, KIND_LABEL, type OfficeDocument, type OfficeKind } from './office-library'
 import { dateLabel, sizeLabel } from './office-ui'
 import { OfficeFileBadge } from './office-home-icons'
 
 export interface LibraryActions {
+  pick(): Promise<void>
+  resume(doc: EditableDocument): Promise<void>
+  forget(doc: EditableDocument): Promise<void>
   open(doc: OfficeDocument): Promise<void>
   create(kind: OfficeKind, name?: string): Promise<void>
   import(): Promise<void>
@@ -17,7 +21,8 @@ export interface LibraryActions {
 }
 
 const scopes = [
-  { id: 'all', label: '全部文件', icon: <FolderOpenOutlined aria-hidden="true" /> },
+  { id: 'all', label: '文档库', icon: <FolderOpenOutlined aria-hidden="true" /> },
+  { id: 'local', label: '本地文件', icon: <FolderOpenOutlined aria-hidden="true" /> },
   { id: 'recent', label: '最近使用', icon: <ClockCircleOutlined aria-hidden="true" /> },
   { id: 'favorite', label: '我的收藏', icon: <StarOutlined aria-hidden="true" /> },
   { id: 'trash', label: '回收站', icon: <DeleteOutlined aria-hidden="true" /> },
@@ -42,7 +47,7 @@ function LibraryDropdown({ items, children }: { items: MenuProps['items']; child
 }
 
 
-function Library({ documents, actions, host, loading }: { documents: OfficeDocument[]; actions: LibraryActions; host: HTMLElement; loading: boolean }) {
+function Library({ documents, recent, actions, host, loading }: { documents: OfficeDocument[]; recent: EditableDocument[]; actions: LibraryActions; host: HTMLElement; loading: boolean }) {
   const { message } = App.useApp()
   const [scope, setScope] = useState<string>('all')
   const [greeting] = useState(() => { const hour = new Date().getHours(); return hour < 12 ? '早上好。' : hour < 18 ? '下午好。' : '晚上好。' })
@@ -72,6 +77,12 @@ function Library({ documents, actions, host, loading }: { documents: OfficeDocum
     && (scope !== 'favorite' || doc.favorite) && (kind === 'all' || doc.kind === kind)
     && doc.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     .sort((a, b) => scope === 'recent' || sort === 'opened' ? b.openedAt - a.openedAt : sort === 'name' ? a.name.localeCompare(b.name, 'zh-CN') : sort === 'size' ? b.versions[0].file.size - a.versions[0].file.size : b.updatedAt - a.updatedAt), [documents, scope, kind, query, sort])
+  const local = scope === 'local'
+  const localFiles = useMemo(() => recent.filter(doc => (kind === 'all' || kindOf(doc.name) === kind)
+    && doc.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
+    .sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name, 'zh-CN') : sort === 'size' ? b.size - a.size : b.openedAt - a.openedAt), [recent, kind, query, sort])
+  const count = local ? localFiles.length : filtered.length
+  const totalSize = local ? localFiles.reduce((sum, doc) => sum + doc.size, 0) : filtered.reduce((sum, doc) => sum + doc.versions[0].file.size, 0)
   const picked = filtered.filter(doc => selection.includes(doc.id))
   const versionDocument = documents.find(doc => doc.id === versionId)
   useEffect(() => { if (versionId && !versionDocument) setVersionId(undefined) }, [versionId, versionDocument])
@@ -148,19 +159,19 @@ function Library({ documents, actions, host, loading }: { documents: OfficeDocum
   const hasFilter = Boolean(query.trim()) || kind !== 'all'
   const empty = <div className="office-empty">
     <span className="office-empty-mark" aria-hidden="true">{scope === 'trash' ? <DeleteOutlined aria-hidden="true" /> : hasFilter ? <SearchOutlined aria-hidden="true" /> : <InboxOutlined aria-hidden="true" />}</span>
-    <h2>{hasFilter ? '没有找到文件' : scope === 'trash' ? '回收站是空的' : scope === 'favorite' ? '还没有收藏文件' : '从一份文件开始'}</h2>
-    <p>{hasFilter ? '试试其他名称，或清除当前筛选。' : scope === 'trash' ? '删除的文件会保留在这里，直到你彻底删除。' : scope === 'favorite' ? '点击文件旁的星标，把常用文件留在这里。' : '创建文档、表格、演示文稿，或导入已有文件。'}</p>
-    {hasFilter ? <Button onClick={resetFilters}>清除筛选</Button> : scope === 'all' || scope === 'recent' ? <Button aria-label="导入文件" icon={<UploadOutlined aria-hidden="true" />} loading={pending.has('import')} onClick={() => void execute('import', actions.import)}>导入文件</Button> : null}
+    <h2>{hasFilter ? '没有找到文件' : local ? '还没有打开过本地文件' : scope === 'trash' ? '回收站是空的' : scope === 'favorite' ? '还没有收藏文件' : '从一份文件开始'}</h2>
+    <p>{hasFilter ? '试试其他名称，或清除当前筛选。' : local ? '打开已有文件，直接在原位置编辑和保存。' : scope === 'trash' ? '删除的文件会保留在这里，直到你彻底删除。' : scope === 'favorite' ? '点击文件旁的星标，把常用文件留在这里。' : '创建文档、表格、演示文稿，或将已有文件导入文档库。'}</p>
+    {hasFilter ? <Button onClick={resetFilters}>清除筛选</Button> : local ? <Button icon={<FolderOpenOutlined aria-hidden="true" />} loading={pending.has('pick')} onClick={() => void execute('pick', actions.pick)}>打开本地文件</Button> : scope === 'all' || scope === 'recent' ? <Button aria-label="导入文件" icon={<UploadOutlined aria-hidden="true" />} loading={pending.has('import')} onClick={() => void execute('import', actions.import)}>导入文档库</Button> : null}
   </div>
   return <div className="office-library">
     <main ref={main} className="office-library-main">
       <header className="office-home-hero"><h1>{greeting}<span>有什么想做的吗？</span></h1></header>
-      <section className="office-quick-cards" aria-label="创建或导入文件">
+      <section className="office-quick-cards" aria-label="创建或打开文件">
         {kinds.map(item => <button type="button" className="office-quick-card" key={item} aria-label={`新建${KIND_LABEL[item]}`} onClick={() => promptName({ kind: item })}>
           <OfficeFileBadge kind={item} size={34} /><span className="office-quick-copy"><strong>{KIND_LABEL[item]}</strong><span>.{item}</span></span>
         </button>)}
-        <button type="button" className="office-quick-card office-import-card" aria-label="导入文件" aria-busy={pending.has('import')} disabled={pending.has('import')} onClick={() => void execute('import', actions.import)}>
-          <span className="office-import-mark"><FolderOpenOutlined aria-hidden="true" /></span><span className="office-quick-copy"><strong>{pending.has('import') ? '正在导入…' : '导入本地文件'}</strong><span>.docx / .xlsx / .csv / .pptx / .pdf</span></span>
+        <button type="button" className="office-quick-card office-import-card" aria-label="打开本地文件" aria-busy={pending.has('pick')} disabled={pending.has('pick')} onClick={() => void execute('pick', actions.pick)}>
+          <span className="office-import-mark"><FolderOpenOutlined aria-hidden="true" /></span><span className="office-quick-copy"><strong>{pending.has('pick') ? '正在打开…' : '打开本地文件'}</strong><span>在原位置编辑和保存</span></span>
         </button>
       </section>
       <div className="office-library-navigation">
@@ -169,13 +180,21 @@ function Library({ documents, actions, host, loading }: { documents: OfficeDocum
       </div>
       <div className="office-library-tools">
         <div className="office-type-filters" role="group" aria-label="文件类型">{[['all', '全部'], ...Object.entries(KIND_LABEL)].map(([id, label]) => <button type="button" key={id} aria-pressed={kind === id} onClick={() => { setKind(id); setSelection([]) }}>{label}</button>)}</div>
-        <div className="office-list-order"><Select variant="borderless" className="office-sort" aria-label="排序方式" value={scope === 'recent' ? 'opened' : sort} onChange={value => { setSort(value); if (scope === 'recent') setScope('all') }} options={[{ value: 'updated', label: '最近修改' }, { value: 'opened', label: '最近打开' }, { value: 'name', label: '名称' }, { value: 'size', label: '文件大小' }]} /><span>{filtered.length} 个文件</span></div>
+        <div className="office-list-order">{!local && scope !== 'trash' && <Button size="small" type="text" aria-label="导入文件" icon={<UploadOutlined aria-hidden="true" />} loading={pending.has('import')} onClick={() => void execute('import', actions.import)}>导入文档库</Button>}<Select variant="borderless" className="office-sort" aria-label="排序方式" value={scope === 'recent' ? 'opened' : sort} onChange={value => { setSort(value); if (scope === 'recent') setScope('all') }} options={[{ value: 'updated', label: local ? '最近打开' : '最近修改' }, { value: 'opened', label: '最近打开' }, { value: 'name', label: '名称' }, { value: 'size', label: '文件大小' }]} /><span>{count} 个文件</span></div>
       </div>
       <div className={`office-selection-bar ${picked.length ? 'has-selection' : ''}`}>
         {picked.length ? <><strong>已选择 {picked.length} 个文件</strong><div className="office-actions">{scope === 'trash' ? <Button size="small" icon={<UndoOutlined aria-hidden="true" />} loading={pending.has('batch')} onClick={() => void execute('batch', () => batchSelected('restore'), '已恢复所选文件')}>恢复所选</Button> : <Button size="small" icon={<StarOutlined aria-hidden="true" />} loading={pending.has('batch')} onClick={() => void execute('batch', () => batchSelected('favorite', { value: true }), '已收藏所选文件')}>收藏所选</Button>}
-          <Button size="small" danger icon={<DeleteOutlined aria-hidden="true" />} disabled={pending.has('batch')} onClick={() => remove(picked, scope === 'trash')}>{scope === 'trash' ? '彻底删除' : '移入回收站'}</Button><Button type="text" size="small" onClick={() => setSelection([])}>取消选择</Button></div></> : hasFilter ? <><span>{filtered.length} 个文件符合筛选</span><Button type="text" size="small" onClick={resetFilters}>清除筛选</Button></> : null}
+          <Button size="small" danger icon={<DeleteOutlined aria-hidden="true" />} disabled={pending.has('batch')} onClick={() => remove(picked, scope === 'trash')}>{scope === 'trash' ? '彻底删除' : '移入回收站'}</Button><Button type="text" size="small" onClick={() => setSelection([])}>取消选择</Button></div></> : hasFilter ? <><span>{count} 个文件符合筛选</span><Button type="text" size="small" onClick={resetFilters}>清除筛选</Button></> : null}
       </div>
       <div className="office-table-area" ref={scroller}>
+        {local ? <Table<EditableDocument> className="office-file-table" rowKey="id" tableLayout="fixed" pagination={false} dataSource={localFiles} loading={loading} locale={{ emptyText: empty }}
+          onRow={doc => ({ 'data-document-id': doc.id, onDoubleClick: event => { if (!(event.target as HTMLElement).closest('button')) void execute(doc.id, () => actions.resume(doc)) } })}
+          columns={([
+            { title: '文件名称', key: 'name', render: (_, doc) => <div className="office-file-identity"><OfficeFileBadge kind={kindOf(doc.name)} size={26} /><div className="office-file-label"><button type="button" className="office-file-name" title={doc.name} disabled={pending.has(doc.id)} onClick={() => void execute(doc.id, () => actions.resume(doc))}>{doc.name}</button><span className="office-local-location" title={doc.location}>{doc.location}{doc.recovery ? ' · 有恢复草稿' : ''}</span></div></div> },
+            { title: '最近打开', key: 'opened', width: 140, render: (_, doc) => <time>{dateLabel(doc.openedAt)}</time> },
+            { title: '大小', key: 'size', width: 88, render: (_, doc) => sizeLabel(doc.size) },
+            { title: '操作', key: 'actions', width: 100, className: 'office-row-actions', render: (_, doc) => <div className="office-row-buttons"><Button type="text" size="small" loading={pending.has(doc.id)} onClick={() => void execute(doc.id, () => actions.resume(doc))}>打开</Button><LibraryDropdown items={[{ key: 'forget', label: '移除记录', disabled: doc.recovery, onClick: () => void execute(doc.id, () => actions.forget(doc)) }]}><Button type="text" size="small" aria-label="更多操作" disabled={pending.has(doc.id)} icon={<EllipsisOutlined aria-hidden="true" />} /></LibraryDropdown></div> },
+          ] satisfies TableColumnsType<EditableDocument>).filter(column => (column.key !== 'size' || width > 670) && (column.key !== 'opened' || width > 510))} /> :
         <Table<OfficeDocument> className="office-file-table" rowKey="id" tableLayout="fixed" pagination={false} dataSource={filtered} loading={loading} locale={{ emptyText: empty }}
           rowSelection={{ selectedRowKeys: selection, onChange: keys => setSelection(keys), columnWidth: 40, columnTitle: undefined, getTitleCheckboxProps: () => ({ 'aria-label': '选择所有文件' }), getCheckboxProps: doc => ({ 'aria-label': `选择 ${doc.name}`, disabled: pending.has(doc.id) }) }}
           onRow={doc => ({ 'data-document-id': doc.id, onDoubleClick: event => { if (doc.trashedAt === null && !(event.target as HTMLElement).closest('button,input')) void execute(doc.id, () => actions.open(doc)) } })}
@@ -185,9 +204,9 @@ function Library({ documents, actions, host, loading }: { documents: OfficeDocum
             { title: '大小', key: 'size', width: 88, className: 'office-column-size', render: (_, doc) => sizeLabel(doc.versions[0].file.size) },
             { title: '操作', key: 'actions', width: 140, className: 'office-row-actions', render: (_, doc) => <div className="office-row-buttons">{scope === 'trash' ? <Button aria-label="恢复" type="text" size="small" loading={pending.has(doc.id)} onClick={() => void execute(doc.id, () => actions.mutate('restore', doc), '已恢复文件')}>恢复</Button> : <><Button aria-label="打开" aria-busy={pending.has(doc.id)} type="text" size="small" loading={pending.has(doc.id)} onClick={() => void execute(doc.id, () => actions.open(doc))}>打开</Button><Tooltip title={doc.favorite ? '取消收藏' : '收藏'}><Button type="text" size="small" className={doc.favorite ? 'office-star-active' : ''} aria-label={doc.favorite ? '取消收藏' : '收藏'} disabled={pending.has(doc.id)} icon={doc.favorite ? <StarFilled aria-hidden="true" /> : <StarOutlined aria-hidden="true" />} onClick={() => void execute(doc.id, () => actions.mutate('favorite', doc, { value: !doc.favorite }))} /></Tooltip></>}
               <LibraryDropdown items={rowMenu(doc)}><Button type="text" size="small" aria-label="更多操作" disabled={pending.has(doc.id)} icon={<EllipsisOutlined aria-hidden="true" />} /></LibraryDropdown></div> },
-          ] satisfies TableColumnsType<OfficeDocument>).filter(column => (column.key !== 'size' || width > 670) && (column.key !== 'updated' || width > 510))} />
+          ] satisfies TableColumnsType<OfficeDocument>).filter(column => (column.key !== 'size' || width > 670) && (column.key !== 'updated' || width > 510))} />}
       </div>
-      <footer className="office-library-footer"><span>{sizeLabel(filtered.reduce((sum, doc) => sum + doc.versions[0].file.size, 0))} · {filtered.length} 个文件</span><span>自动保存到文档库 · 保留最近 12 个版本</span></footer>
+      <footer className="office-library-footer"><span>{sizeLabel(totalSize)} · {count} 个文件</span><span>{local ? '保存时更新原文件' : '自动保存到文档库 · 保留最近 12 个版本'}</span></footer>
     </main>
     <Modal title={namePrompt?.doc ? '重命名' : `新建${KIND_LABEL[namePrompt?.kind ?? 'docx']}`} open={Boolean(namePrompt)} getContainer={() => host} destroyOnHidden onCancel={() => { if (!pending.has('name')) setNamePrompt(undefined) }} onOk={submitName} confirmLoading={pending.has('name')} okText={namePrompt?.doc ? '保存名称' : '创建'} cancelText="取消" cancelButtonProps={{ disabled: pending.has('name') }} maskClosable={!pending.has('name')} keyboard={!pending.has('name')} afterOpenChange={open => { if (open) host.querySelector<HTMLInputElement>('#office-file-name')?.select() }}>
       <p className="office-form-description">{namePrompt?.doc ? '修改文档库中的名称，文件内容和版本保持不变。' : '文件会自动保存到文档库。'}</p>
@@ -209,8 +228,9 @@ function Library({ documents, actions, host, loading }: { documents: OfficeDocum
 export function mountLibrary(host: HTMLElement, actions: LibraryActions) {
   const root = createRoot(host)
   let documents: OfficeDocument[] = []
+  let recent: EditableDocument[] = []
   let loading = true
-  const render = () => root.render(<OfficeTheme host={host}><Library host={host} actions={actions} documents={documents} loading={loading} /></OfficeTheme>)
+  const render = () => root.render(<OfficeTheme host={host}><Library host={host} actions={actions} documents={documents} recent={recent} loading={loading} /></OfficeTheme>)
   render()
-  return { update(next: OfficeDocument[]) { documents = next; loading = false; render() }, dispose() { root.unmount() } }
+  return { update(next: OfficeDocument[], local: EditableDocument[]) { documents = next; recent = local; loading = false; render() }, dispose() { root.unmount() } }
 }

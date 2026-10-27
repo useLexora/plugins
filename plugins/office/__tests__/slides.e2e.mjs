@@ -30,6 +30,12 @@ async function install(app, page) {
 
 async function office(page) {
   await page.locator('.desktop-app-sidebar').getByRole('button', { name: 'Office', exact: true }).click()
+  await expect.poll(async () => {
+    for (const frame of page.frames()) {
+      if (await frame.getByRole('button', { name: '文档库', exact: true }).isVisible().catch(() => false)) return true
+    }
+    return false
+  }).toBe(true)
   let frame
   await expect.poll(async () => {
     for (const item of page.frames()) {
@@ -37,7 +43,7 @@ async function office(page) {
     }
     return false
   }, { timeout: 40000 }).toBe(true)
-  await expect(frame.getByRole('button', { name: '全部文件', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(frame.getByRole('button', { name: '文档库', exact: true })).toHaveAttribute('aria-current', 'page')
   return frame
 }
 
@@ -109,14 +115,14 @@ test('PPTX 在隔离插件中编辑中文、表格、图表并跨重启恢复', 
   await frame.locator('.notes-pane textarea').fill('已完成第一季度汇报。')
   await save(frame)
   await page.screenshot({ path: testInfo.outputPath('01-slides-edited.png') })
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
   await expectPresentation(await exportFromLibrary(app, frame, fileName, testInfo.outputPath('slides-edited.pptx')), '已完成第一季度汇报。')
 
   await frame.getByRole('row').filter({ hasText: fileName }).getByRole('button', { name: '打开', exact: true }).click()
   await expect(frame.locator('.notes-pane textarea')).toHaveValue('已完成第一季度汇报。', { timeout: 60000 })
   await frame.locator('.notes-pane textarea').fill('重启前保存的中文演讲备注。')
   await save(frame)
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
   await instance.stop()
 
   ;({ app, page } = await instance.launch())
@@ -127,7 +133,7 @@ test('PPTX 在隔离插件中编辑中文、表格、图表并跨重启恢复', 
   await expect(frame.locator('.notes-pane textarea')).toHaveValue('重启前保存的中文演讲备注。')
   await expect(frame.locator('.office-save-state')).toHaveText('已保存')
   await page.screenshot({ path: testInfo.outputPath('02-slides-reopened.png') })
-  await frame.getByRole('button', { name: '文档库', exact: true }).click()
+  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
   await expectPresentation(await exportFromLibrary(app, frame, fileName, testInfo.outputPath('slides-reopened.pptx')), '重启前保存的中文演讲备注。')
   expect(errors).toEqual([])
 })

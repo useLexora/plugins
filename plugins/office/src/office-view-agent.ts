@@ -1,15 +1,17 @@
-import type { Json, ViewContext } from './lexora'
+import type { Json, ViewContext, LocalFile } from './lexora'
 import type { OfficeEditor, OfficeEditorQuery, OfficeEditorReference } from './office-editor-types'
-import type { OfficeDocument } from './office-library'
+import type { OfficeOpenDocument } from './office-document'
 import { OFFICE_BRIDGE, parseOfficeLocator } from './office-agent'
 import { assertOfficeReferenceText, compactOfficeReference } from './office-assistant'
 
 interface ViewAgentPorts {
   editor(): OfficeEditor | undefined
-  document(): OfficeDocument | undefined
+  document(): OfficeOpenDocument | undefined
   revision(): string
   dirty(): boolean
   save(): Promise<void>
+  checkpoint?(): Promise<void>
+  export(): Promise<LocalFile>
   checkStored(): Promise<void>
   open(documentId: string): Promise<void>
 }
@@ -48,7 +50,7 @@ export function createOfficeViewAgent(context: ViewContext, ports: ViewAgentPort
     assertOfficeReferenceText(captured, reference)
     const { text, ...location } = captured
     const title = reference.label.startsWith(`${document.name} · `) ? reference.label : `${document.name} · ${reference.label}`
-    return context.references.capture({ kind: 'content', source: 'view', title, text, locator: { version: 2, data: { documentId: document.id, documentVersion: document.versions[0].id, state, revision, sessionId: capturedSession, reference: JSON.parse(JSON.stringify(location)) as Json } } })
+    return context.references.capture({ kind: 'content', source: 'view', title, text, locator: { version: 2, data: { documentId: document.id, documentVersion: document.version, state, revision, sessionId: capturedSession, reference: JSON.parse(JSON.stringify(location)) as Json } } })
   }
   const subscription = context.onMessage(raw => {
     const message = object(raw)
@@ -83,7 +85,6 @@ export function createOfficeViewAgent(context: ViewContext, ports: ViewAgentPort
       assertCurrent()
       if (message.operation === 'ping') return { ready: true }
       if (message.operation === 'read' || message.operation === 'capabilities' || message.operation === 'render') {
-        if (ports.dirty()) throw new Error('文档存在未保存的手动修改，请保存后重新打开目标。')
         if (message.operation === 'capabilities') {
           const capabilities = await editor.assistant.capabilities?.() ?? { writeOperations: (await editor.assistant.read(reference)).operations }
           assertCurrent()
@@ -111,11 +112,11 @@ export function createOfficeViewAgent(context: ViewContext, ports: ViewAgentPort
         assertCurrent()
         const result = await editor.assistant.read(reference, object(message.query) as OfficeEditorQuery | undefined)
         assertCurrent()
-        if (ports.dirty() || document!.versions[0].id !== ports.document()?.versions[0]?.id) throw new Error('读取期间文档已变化，请重新读取当前目标。')
+        if (document!.version !== ports.document()?.version) throw new Error('读取期间文档已变化，请重新读取当前目标。')
         const selected = result.reference ?? reference
         const location = selected ? compactOfficeReference(selected) : undefined
-        const documentVersion = document!.versions[0].id
-        const value = { ...result, contentState: 'current', revision, kind: document!.kind, name: document!.name, documentVersion, ...(location ? { reference: location } : {}), ...(message.referenceState === 'session' ? { referenceState: 'session', sourceChangedSinceReference: message.referenceRevision !== revision } : typeof message.documentVersion === 'string' ? { referenceState: 'saved', referenceDocumentVersion: message.documentVersion, sourceChangedSinceReference: message.documentVersion !== documentVersion } : {}) } as unknown as Record<string, Json>
+        const documentVersion = document!.version
+        const value = { ...result, contentState: 'current', dirty: ports.dirty(), persistence: document!.local ? document!.local.kind : 'library', revision, kind: document!.kind, name: document!.name, documentVersion, ...(location ? { reference: location } : {}), ...(message.referenceState === 'session' ? { referenceState: 'session', sourceChangedSinceReference: message.referenceRevision !== revision } : typeof message.documentVersion === 'string' ? { referenceState: 'saved', referenceDocumentVersion: message.documentVersion, sourceChangedSinceReference: message.documentVersion !== documentVersion } : {}) } as unknown as Record<string, Json>
         if (new TextEncoder().encode(JSON.stringify(value)).length > 220 * 1024) {
           value.text = result.text.slice(0, 2000) + '\n上下文已截断，请用格式查询缩小范围；定位原文仍完整保留。'
           value.truncated = true
@@ -127,7 +128,13 @@ export function createOfficeViewAgent(context: ViewContext, ports: ViewAgentPort
         return value
       }
       if ((message.operation !== 'edit' && message.operation !== 'export') || message.expectedRevision !== revision) throw new Error('文档版本已变化，请重新读取目标，禁止重试旧修改。')
-      const action = message.operation === 'export' ? 'save' : message.action
+      if (message.operation === 'export') {
+        const file = await ports.export()
+        assertCurrent()
+        return { revision, kind: document!.kind, documentVersion: document!.version, file } as unknown as Json
+      }
+      if (document?.local && !document.local.writable) throw new Error('原文件只读，请先另存为后再编辑。')
+      const action = message.action
       if (action !== 'save' && action !== 'undo') {
         const current = await editor.assistant.read(reference)
         assertCurrent()
@@ -136,20 +143,27 @@ export function createOfficeViewAgent(context: ViewContext, ports: ViewAgentPort
       const result = action === 'save' ? { text: '保存文档', mutated: false } : await editor.assistant.execute({ operation: String(action), input: object(message.input) ?? {}, reference }, { signal, assertCurrent })
       if (sessionId !== capturedSession || editor !== ports.editor()) throw new Error('文档会话已关闭，请检查已执行的修改。')
       const appliedRevision = ports.revision()
+      let recoveryError: string | undefined
+      if (document?.local && action !== 'save' && result.mutated) {
+        try { await ports.checkpoint?.() } catch (error) { recoveryError = error instanceof Error ? error.message : String(error) }
+      }
+      if (sessionId !== capturedSession || editor !== ports.editor()) throw new Error('文档会话已关闭，请检查已执行的修改。')
+      if (ports.revision() !== appliedRevision) throw new Error('保存恢复草稿期间文档被修改，请重新读取目标。')
       try {
         signal.throwIfAborted()
+        if (document?.local && action !== 'save') {
+          return { ...result, revision: appliedRevision, documentVersion: document.version, saved: false, dirty: ports.dirty(), persistence: document.local.kind, ...(recoveryError ? { recoveryError } : {}) } as unknown as Json
+        }
         await ports.save()
         if (ports.dirty()) throw new Error('编辑内容尚未全部保存，请使用当前 revision 重试 save，不要重复修改。')
       } catch (error) {
         if (ports.revision() !== appliedRevision) throw new Error('保存期间文档被修改，请检查实际内容后重新打开目标。')
-        if (message.operation === 'export') throw error
         return { ...result, revision: appliedRevision, saved: false, saveError: error instanceof Error ? error.message : String(error) } as unknown as Json
       }
       signal.throwIfAborted()
       if (sessionId !== capturedSession || editor !== ports.editor() || ports.revision() !== appliedRevision) throw new Error('保存期间文档被修改，请检查实际内容后重新打开目标。')
       const savedDocument = ports.document()!
-      if (message.operation === 'export') return { revision: appliedRevision, kind: savedDocument.kind, documentVersion: savedDocument.versions[0].id, file: { ...savedDocument.versions[0].file, name: savedDocument.name } } as unknown as Json
-      return { ...result, revision: appliedRevision, documentVersion: savedDocument.versions[0].id, saved: true } as unknown as Json
+      return { ...result, revision: appliedRevision, documentVersion: savedDocument.version, saved: true } as unknown as Json
     }
     queue = queue.catch(() => {}).then(async () => {
       try { await reply(await execute()) } catch (error) { await reply(undefined, error) }
@@ -177,10 +191,10 @@ export function createOfficeViewAgent(context: ViewContext, ports: ViewAgentPort
     const capturedSession = sessionId
     if (!editor?.assistant?.reveal || !capturedSession || ports.document()?.id !== locator.documentId) return false
     const revision = ports.revision()
-    const savedVersion = ports.document()?.versions[0]?.id
+    const savedVersion = ports.document()?.version
     const revealed = await editor.assistant.reveal(locator.reference)
     signal.throwIfAborted()
-    if (editor === ports.editor() && sessionId === capturedSession && (ports.revision() !== revision || ports.document()?.versions[0]?.id !== savedVersion)) throw new Error('定位期间文档已变化，请重试定位当前内容。')
+    if (editor === ports.editor() && sessionId === capturedSession && (ports.revision() !== revision || ports.document()?.version !== savedVersion)) throw new Error('定位期间文档已变化，请重试定位当前内容。')
     return revealed && editor === ports.editor() && sessionId === capturedSession && ports.document()?.id === locator.documentId
   })
   context.signal.addEventListener('abort', () => { close(); subscription.dispose(); reveal.dispose() }, { once: true })

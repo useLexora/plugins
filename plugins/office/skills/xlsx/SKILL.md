@@ -13,8 +13,8 @@ description: 使用 Lexora Office 创建、分析、修改和交付 XLSX，处�
 
 写值或公式用 set_cells；格式用 format_range；同一表的值/格式批次用 batch，可先 dryRun。工作表、行列、冻结、合并和排序仅使用 capabilities 公布的操作。input 是 JSON 对象字符串，写入使用当前 targetId 和最新 expectedRevision。
 
-自己的修改后继续 `read(targetId,query)`，不是重新解析旧引用。用户手改造成冲突时，检查文档并重新打开明确 documentId。saved=false 时只重试保存，不重复已经应用的修改。
+自己的修改后继续 `read(targetId,query)`，不是重新解析旧引用。用户手改造成冲突时，检查文档并重新打开明确 documentId。saved=false 表示尚未写盘；有 saveError 才代表保存失败。按用户要求补保存，不重复已经应用的修改。
 
 公式必须显式写作 `{formula:"=SUM(B2:B5)"}`；普通以 `=` 开头的字符串仍是文本。插件目前不重算公式，缓存值可能旧或为空，不能宣称已验证计算结果。图表/透视表等未开放写操作的对象保持原件，不擅自重建。
 
-按 [数据、格式与验收](references/workflow.md) 检查实际内容后 `export` 发布任务产物。保存到文档库不等于覆盖原文件。当前 XLSX 工具没有原生页面图片，格式检查以读取结构及编辑器为准。
+按 [数据、格式与验收](references/workflow.md) 检查实际内容后 `export` 发布任务产物。本地文件保存写回绑定原件；文档库副本独立保存。当前 XLSX 工具没有原生页面图片，格式检查以读取结构及编辑器为准。

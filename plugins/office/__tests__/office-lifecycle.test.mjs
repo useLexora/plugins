@@ -70,6 +70,7 @@ async function harness({ empty = false, rejectMount = false } = {}) {
         references: { onReveal: handler => { window.revealOfficeReference = handler; return { dispose() {} } } },
         onMessage: () => ({ dispose() {} }), setState: async () => {}, setDocumentInfo: async info => { window.documentInfo = info },
         workers: { create: async (url, options) => new Worker(url, options) },
+        documents: { list: async () => [] },
         resources: {
           getUrl: async () => '/fixture.pdf', saveFile: async () => true, release: async () => {},
           createFile: async input => { window.lastSavedBytes = [...input.data]; const file = { id: crypto.randomUUID(), name: input.name, size: input.data.length, mimeType: input.mimeType }; files.push(file); return file },
@@ -83,7 +84,7 @@ async function harness({ empty = false, rejectMount = false } = {}) {
       window.starting = startOffice(context, document.getElementById('app'))
       window.starting.catch(error => { window.openError = error.message })
     }, empty)
-    if (empty) await expect(page.getByRole('heading', { name: '从一份文件开始', exact: true })).toBeVisible()
+    if (empty) { await expect(page.getByRole('heading', { name: '从一份文件开始', exact: true })).toBeVisible() }
     else await page.waitForFunction(() => window.mountReady === true, null, { timeout: 10000 })
   }
   return { page, open, errors, close: async () => { await browser.close(); await new Promise(resolve => server.close(resolve)) } }

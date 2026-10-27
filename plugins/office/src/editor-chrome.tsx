@@ -13,13 +13,17 @@ export interface EditorChromeState {
   saving: boolean
   failed: boolean
   loading: boolean
+  location: string
+  local: boolean
+  writable: boolean
 }
 
 interface EditorChromeActions {
   back(): Promise<void>
   save(): Promise<void>
   reopen(): Promise<void>
-  export(): Promise<void>
+  saveAs(): Promise<void>
+  reveal(): Promise<void>
   copy(): Promise<void>
   error(error: unknown): void
 }
@@ -54,10 +58,10 @@ function EditorChrome({ state, actions }: { state: EditorChromeState; actions: E
   }, [menuOpen])
   const disabled = state.loading || !!pending
   const status = state.loading ? '正在打开' : state.saving ? '正在保存' : state.failed ? '保存失败' : state.dirty ? '未保存' : '已保存'
-  const statusTip = state.failed ? '修改仍保留在当前页面，可重试保存、导出或另存副本。' : state.dirty ? '修改将自动保存到文档库。' : '文档保存在 Office 文档库中。'
+  const statusTip = state.failed ? '修改尚未保存，可重试保存或另存为。' : state.local ? state.dirty ? '修改尚未写入原文件。' : state.location : '自动保存到 Office 文档库。'
   const items: MenuProps['items'] = [
-    { key: 'export', icon: <DownloadOutlined aria-hidden="true" />, label: '导出', onClick: () => void perform('export', actions.export) },
-    { key: 'copy', icon: <CopyOutlined aria-hidden="true" />, label: '另存副本', onClick: () => void perform('copy', actions.copy) },
+    { key: 'saveAs', icon: <DownloadOutlined aria-hidden="true" />, label: '另存为…', onClick: () => void perform('saveAs', actions.saveAs) },
+    { key: 'copy', icon: <CopyOutlined aria-hidden="true" />, label: '保存副本…', onClick: () => void perform('copy', actions.copy) },
     { type: 'divider' },
     { key: 'reopen', icon: <ReloadOutlined aria-hidden="true" />, label: '重新打开', onClick: () => void perform('reopen', actions.reopen) },
   ]
@@ -72,7 +76,7 @@ function EditorChrome({ state, actions }: { state: EditorChromeState; actions: E
   return <header className="office-document-bar" aria-label="文档操作" onKeyDownCapture={event => {
     if (event.key === 'Escape' && menuOpen) onMenuKeyDown(event)
   }}>
-    <Tooltip title="文档库"><Button type="text" className="office-chrome-icon" icon={<ArrowLeftOutlined aria-hidden="true" />} aria-label="文档库" disabled={disabled} onClick={() => void perform('back', actions.back)} /></Tooltip>
+    <Tooltip title={'Office 首页'}><Button type="text" className="office-chrome-icon" icon={<ArrowLeftOutlined aria-hidden="true" />} aria-label={'Office 首页'} disabled={disabled} onClick={() => void perform('back', actions.back)} /></Tooltip>
     <span className="office-document-separator" aria-hidden="true" />
     <Dropdown trigger={['click']} destroyOnHidden popupRender={menu => <div ref={menuPopupRef}>{menu}</div>} open={menuOpen} disabled={disabled} menu={{ items, onClick: () => setMenuOpen(false), onKeyDown: onMenuKeyDown }} onOpenChange={(open, info) => {
       setMenuOpen(open)
@@ -86,6 +90,7 @@ function EditorChrome({ state, actions }: { state: EditorChromeState; actions: E
         <DownOutlined aria-hidden="true" className="office-document-caret" />
       </Button>
     </Dropdown>
+    <Button type="text" className="office-document-location" onClick={() => void perform('reveal', actions.reveal)}>{state.location}{!state.writable ? ' · 原件只读' : ''}</Button>
     <div className="office-document-save">
       <Tooltip title={statusTip}><span className="office-save-state" role="status" aria-live="polite" data-dirty={state.dirty} data-failed={state.failed}>
         {state.loading || state.saving ? <LoadingOutlined aria-hidden="true" /> : state.failed ? <WarningOutlined aria-hidden="true" /> : state.dirty ? <span className="office-dirty-dot" aria-hidden="true" /> : <CheckOutlined aria-hidden="true" />}

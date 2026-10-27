@@ -3,10 +3,8 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createHash } from 'node:crypto'
-import { DatabaseSync } from 'node:sqlite'
 import { build } from 'esbuild'
 import JSZip from 'jszip'
-import { editorAction } from './library-locators.mjs'
 
 const project = path.resolve(import.meta.dirname, '..')
 
@@ -55,7 +53,7 @@ async function closeEditor(page, frame) {
   await expect.poll(() => page.frames().includes(frame)).toBe(false)
 }
 
-test('同一任务产物的新授权复用已编辑文档，同名不同来源保持独立', async ({ buddy }, testInfo) => {
+test('任务产物直接编辑本地原件，两份同名文件保持独立且打开不入库', async ({ buddy }, testInfo) => {
   const blankModule = testInfo.outputPath('blank-docx.mjs')
   await build({ entryPoints: [path.join(project, 'vendor/genoffice/packages/docx-engine/src/blank.ts')], outfile: blankModule, bundle: true, platform: 'node', format: 'esm' })
   const { buildBlankDocx } = await import(pathToFileURL(blankModule).href)
@@ -77,7 +75,7 @@ test('同一任务产物的新授权复用已编辑文档，同名不同来源�
       }
       return names
     },
-  }, async ({ app, page, outputs, directory, instance }) => {
+  }, async ({ app, page, outputs, directory }) => {
     const errors = []
     app.context().on('weberror', event => errors.push(String(event.error())))
     await install(app, page)
@@ -97,92 +95,31 @@ test('同一任务产物的新授权复用已编辑文档，同名不同来源�
     expect(firstGrant.resource.sourceId).toBe(secondGrant.resource.sourceId)
     expect(firstGrant.resource.sourceId).not.toBe(otherGrant.resource.sourceId)
 
-    await outputs.nth(0).getByRole('button', { name: filename, exact: true }).click()
-    let frame = await visibleEditor(page, '来源1的原始内容')
-    const stateFiles = []
-    for await (const file of fs.glob(`**/extensions/data/${manifest.id}/state.json`, { cwd: instance.home })) stateFiles.push(path.join(instance.home, file))
-    expect(stateFiles).toHaveLength(1)
-    const library = async () => JSON.parse(await fs.readFile(stateFiles[0], 'utf8')).value
-    await expect.poll(async () => (await library()).documents.length).toBe(1)
-    const initial = (await library()).documents[0]
-    expect(initial.sourceId).toBe(firstGrant.resource.sourceId)
-    await frame.locator('.tiptap[contenteditable="true"]').first().fill('在文档库中保存的编辑，不应被源文件覆盖。')
-    await expect(frame.locator('.office-save-state')).toHaveText('已保存', { timeout: 30000 })
-    const saved = (await library()).documents[0]
-    expect(saved.revision).toBeGreaterThan(initial.revision)
-    await closeEditor(page, frame)
-
-    for (let index = 0; index < 2; index++) {
-      await outputs.nth(0).getByRole('button', { name: filename, exact: true }).click()
-      frame = await visibleEditor(page, '在文档库中保存的编辑，不应被源文件覆盖。')
-      const current = (await library()).documents
-      expect(current).toHaveLength(1)
-      expect(current[0].id).toBe(saved.id)
-      expect(current[0].versions[0].id).toBe(saved.versions[0].id)
+    for (const [index, text] of ['来源1的原始内容', '来源2的原始内容'].entries()) {
+      await outputs.nth(index).getByRole('button', { name: filename, exact: true }).click()
+      const frame = await visibleEditor(page, text)
+      await expect(frame.getByRole('dialog')).toHaveCount(0)
+      const destination = path.join(directory, ['first', 'second'][index], filename)
+      await frame.locator('.tiptap[contenteditable="true"]').first().fill(`原件已编辑${index + 1}`)
+      await expect(frame.locator('.office-save-state')).toHaveText('未保存')
+      expect(digest(await fs.readFile(destination))).toBe(originalHashes[index])
+      await frame.locator('.office-document-bar').getByRole('button', { name: '保存', exact: true }).click()
+      await expect(frame.locator('.office-save-state')).toHaveText('已保存')
+      const zip = await JSZip.loadAsync(await fs.readFile(destination))
+      expect(await zip.file('word/document.xml').async('text')).toContain(`原件已编辑${index + 1}`)
       await closeEditor(page, frame)
     }
-
-    await outputs.nth(1).getByRole('button', { name: filename, exact: true }).click()
-    frame = await visibleEditor(page, '来源2的原始内容')
-    const independent = (await library()).documents
-    expect(independent).toHaveLength(2)
-    expect(new Set(independent.map(item => item.id)).size).toBe(2)
-    expect(new Set(independent.map(item => item.sourceId)).size).toBe(2)
-    expect(independent.map(item => item.name)).toEqual([filename, filename])
-    await closeEditor(page, frame)
-    await outputs.nth(0).getByRole('button', { name: filename, exact: true }).click()
-    frame = await visibleEditor(page, '在文档库中保存的编辑，不应被源文件覆盖。')
-    const exported = testInfo.outputPath('saved-library-copy.docx')
-    await app.evaluate(({ dialog }, file) => { dialog.showSaveDialog = async () => ({ canceled: false, filePath: file }) }, exported)
-    await editorAction(frame, '导出')
-    await expect.poll(async () => (await fs.stat(exported).catch(() => null))?.size ?? 0).toBeGreaterThan(1000)
-    const exportedDocx = await JSZip.loadAsync(await fs.readFile(exported))
-    expect(await exportedDocx.file('word/document.xml').async('string')).toContain('在文档库中保存的编辑，不应被源文件覆盖。')
-    for (const [index, folder] of ['first', 'second'].entries()) expect(digest(await fs.readFile(path.join(directory, folder, filename)))).toBe(originalHashes[index])
-    await page.screenshot({ path: testInfo.outputPath('source-opening-edited-copy.png') })
-
-    const referenceDocument = independent.find(item => item.sourceId === otherGrant.resource.sourceId)
-    const originalViewUrl = frame.url()
-    await frame.getByRole('button', { name: '文档库', exact: true }).click()
-    await frame.locator(`tr[data-row-key="${referenceDocument.id}"]`).getByRole('button', { name: '打开', exact: true }).click()
-    frame = await visibleEditor(page, '来源2的原始内容')
-    expect(frame.url()).toBe(originalViewUrl)
-    const body = frame.locator('.tiptap[contenteditable="true"]').first()
-    await body.click()
-    await body.evaluate(element => {
-      const range = document.createRange()
-      range.selectNodeContents(element.querySelector('p'))
-      const selection = window.getSelection()
-      selection.removeAllRanges()
-      selection.addRange(range)
-    })
-    await frame.getByLabel('文档操作', { exact: true }).getByRole('button', { name: '引用', exact: true }).click()
-    const chooseTarget = page.locator('.reference-target-picker')
-    await expect(chooseTarget).toBeVisible()
-    await chooseTarget.getByRole('button', { name: / · Present the prepared files\.$/ }).click()
-    await expect(page.getByText(/^已引用到「/)).toBeVisible()
-    const persistedQuotes = () => {
-      const database = new DatabaseSync(path.join(instance.home, 'buddy/buddy.sqlite3'), { readOnly: true })
-      try {
-        return database.prepare('SELECT content_json FROM composer_drafts').all()
-          .flatMap(row => JSON.parse(row.content_json).resourceQuotes ?? [])
-          .filter(quote => quote.text === '来源2的原始内容')
-      } finally { database.close() }
+    for (const [index, folder] of ['first', 'second'].entries()) {
+      const zip = await JSZip.loadAsync(await fs.readFile(path.join(directory, folder, filename)))
+      expect(await zip.file('word/document.xml').async('text')).toContain(`原件已编辑${index + 1}`)
     }
-    await expect.poll(() => persistedQuotes().length).toBe(1)
-    const [quote] = persistedQuotes()
-    expect(quote.source).toMatchObject({ kind: 'view', provider: `extension:${manifest.id}`, target: { extensionId: manifest.id, source: null } })
-    expect(quote.locator.data.documentId).toBe(referenceDocument.id)
-    expect(quote.locator.data.documentId).not.toBe(saved.id)
+    await outputs.nth(0).getByRole('button', { name: filename, exact: true }).click()
+    const frame = await visibleEditor(page, '原件已编辑1')
+    await expect(frame.locator('.tiptap[contenteditable="true"]').first()).not.toContainText('原件已编辑2')
+    await page.screenshot({ path: testInfo.outputPath('artifact-original-edit.png') })
+    await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
+    await expect(frame.getByRole('heading', { name: '从一份文件开始', exact: true })).toBeVisible()
     await closeEditor(page, frame)
-    await page.locator(`[data-resource-quote-id="${quote.id}"] .chat-reference-card__link`).click()
-    await expect(page.locator('.resource-quote-preview:visible pre')).toHaveText('来源2的原始内容')
-    await page.getByRole('button', { name: '定位来源', exact: true }).click()
-    frame = await visibleEditor(page, '来源2的原始内容')
-    await expect.poll(() => frame.evaluate(() => window.getSelection()?.toString())).toBe('来源2的原始内容')
-    expect((await library()).documents).toHaveLength(2)
-    await page.screenshot({ path: testInfo.outputPath('source-opening-reference-revealed.png') })
-    await fs.writeFile(testInfo.outputPath('source-opening-proof.json'), JSON.stringify({ grants: [firstGrant.resource, secondGrant.resource, otherGrant.resource], library: await library(), originalHashes, quote }, null, 2))
     expect(errors).toEqual([])
   })
 })
