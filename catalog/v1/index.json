@@ -749,7 +749,7 @@
         "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx",
         "name": "Lexora Office",
         "author": "Lexora",
-        "description": "文档、表格、演示文稿与 PDF 的独立工作台，集中管理文件、收藏、历史版本与回收站。",
+        "description": "打开并编辑本地文档、表格、演示文稿与 PDF，支持原生选区引用、任务协作和文档库副本。",
         "icon": "icon.svg",
         "categories": [
           "效率"
@@ -761,10 +761,10 @@
           "演示文稿",
           "PDF"
         ],
-        "version": "1.0.1",
+        "version": "1.1.0",
         "apiVersion": 4,
         "engines": {
-          "lexora": ">=0.16.0"
+          "lexora": ">=0.17.0"
         },
         "format": "compiled",
         "entry": "extension.js",
@@ -777,7 +777,8 @@
           "clipboardRead": true,
           "clipboardWrite": true,
           "localResources": true,
-          "resourceExport": true
+          "resourceExport": true,
+          "fileEditing": true
         },
         "contributes": {
           "skills": [
@@ -802,11 +803,13 @@
               "path": "skills/pdf/SKILL.md"
             }
           ],
+          "mcpConnectors": [],
+          "subagents": [],
           "iconThemes": [],
           "themes": [],
           "conditions": [],
           "agent": {
-            "instructions": "Office 使用当前主 Agent 执行，不调用插件内模型。先用 {{pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.capabilities}} 查询能力；阅读历史引用快照先用宿主 lexora_reference_list，再按 sourceMessageId/kind/referenceId 调用 lexora_reference_read，不依赖文档当前版本；检查或修改当前引用对象用 {{pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.references}} → {{pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.read}}，引用必须配对使用 references 返回的 sourceMessageId/referenceId；库文件用 documents → read(documentId)，新建用 create。读取结果的 targetId/revision 绑定具体文档、任务分支和当前执行，不跨轮次或子 Agent 复用，禁止以当前焦点或同名文件替代。只读请求不修改。edit 只能用公布的操作和参数；自己的编辑后继续 read(targetId)，原引用仍是快照。用户/其他页面修改会触发冲突，需检查后重新打开明确的文档 ID，不能重试旧操作。保存、检查内容/布局、导出才构成交付；export 的产物卡片才是任务输出，saved=true 仅代表文档库已保存。",
+            "instructions": "Office 使用当前主 Agent 执行，不调用插件内模型。先用 {{pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.capabilities}} 查询能力；阅读历史引用快照先用宿主 lexora_reference_list，再按 sourceMessageId/kind/referenceId 调用 lexora_reference_read，不依赖文档当前版本；检查或修改当前引用对象用 {{pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.references}} → {{pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.read}}，引用必须配对使用 references 返回的 sourceMessageId/referenceId；库文件用 documents → read(documentId)，新建用 create。读取结果的 targetId/revision 绑定具体文档、任务分支和当前执行，不跨轮次或子 Agent 复用，禁止以当前焦点或同名文件替代。只读请求不修改。edit 只能用公布的操作和参数；自己的编辑后继续 read(targetId)，原引用仍是快照。用户/其他页面修改会触发冲突，需检查后重新打开明确的文档 ID，不能重试旧操作。保存、检查内容/布局、导出才构成交付；export 的产物卡片才是任务输出，本地文件 edit 默认只应用到编辑缓冲；用户要求保存时使用 edit 的 save 操作。saved=true 表示已保存到当前绑定位置；saved=false 且无 saveError 表示修改已应用但尚未写盘，不能重复修改。export 发布任务产物，不代表原件已保存。",
             "tools": [
               {
                 "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.capabilities",
@@ -871,7 +874,7 @@
               {
                 "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.create",
                 "title": "新建 Office 文件",
-                "description": "创建空白文件并打开编辑器，返回 targetId/revision。接着查询格式能力并写入内容；失败先查询文档库，不重复新建。",
+                "description": "在 Office 文档库中新建文件并打开编辑器，返回 targetId/revision。查询格式能力后写入内容，自动保存到文档库，通过 export 交付任务产物。失败先查询文档库，不重复新建。",
                 "access": "write",
                 "parameters": {
                   "type": "object",
@@ -948,7 +951,7 @@
               {
                 "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.edit",
                 "title": "编辑 Office 文档",
-                "description": "按 capabilities 公布的确定性操作修改绑定文档并保存。input 是操作参数 JSON 对象字符串。必须 targetId + expectedRevision；自身修改后目标可连续读写。冲突、取消或超时后先检查，不盲重试。mutated=true 且 saved=false 时修改已发生，只用新 revision 执行 save，不重复修改。outcome=unknown 时目标撤回，先检查文档实际状态。",
+                "description": "按 capabilities 公布的确定性操作修改绑定文档。input 为操作参数 JSON，必须 targetId + expectedRevision。本地修改保留在缓冲，用户要求写盘时执行 save；文档库自动保存。mutated=true 且 saved=false 不得重复修改；有 saveError 时用新 revision 补保存。outcome=unknown 时先检查实际内容。",
                 "access": "write",
                 "parameters": {
                   "type": "object",
@@ -1057,7 +1060,7 @@
               {
                 "id": "pa99d3189286f4fa191b597bd1a1f227d.genoffice-xlsx.export",
                 "title": "交付 Office 文档产物",
-                "description": "确认最新版本已保存，将文件发布为当前任务可打开/下载的产物。文件保留原格式，不覆盖原导入来源。",
+                "description": "将当前编辑缓冲发布为任务可打开或下载的产物，保留原格式。不会写回原文件，也不会清除未保存状态；需要 targetId 和最新 expectedRevision。",
                 "access": "write",
                 "parameters": {
                   "type": "object",
@@ -1160,9 +1163,9 @@
       "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJsdWUiIHgxPSIxMCIgeTE9IjYiIHgyPSIzMiIgeTI9IjMyIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiM2QjhBRkYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNDI2M0U4Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJncmVlbiIgeDE9IjM4IiB5MT0iNiIgeDI9IjU0IiB5Mj0iMzgiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzRERDVCRiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMxQ0E5OEQiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9Im9yYW5nZSIgeDE9IjQ4IiB5MT0iMzIiIHgyPSIzMiIgeTI9IjU4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiNGRkM4NkEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRjM5QTM4Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJjb3JhbCIgeDE9IjI0IiB5MT0iMjYiIHgyPSIxNCIgeTI9IjU4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiNGRjhFOTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRUU1QTc1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cGF0aCBkPSJNNiAzMlYyMEExNCAxNCAwIDAgMSAyMCA2SDMyTDM4IDIySDI2QTQgNCAwIDAgMCAyMiAyNloiIGZpbGw9InVybCgjYmx1ZSkiLz4KICA8cGF0aCBkPSJNMzIgNkg0NEExNCAxNCAwIDAgMSA1OCAyMFYzMkw0MiAzOFYyNkE0IDQgMCAwIDAgMzggMjJaIiBmaWxsPSJ1cmwoI2dyZWVuKSIvPgogIDxwYXRoIGQ9Ik01OCAzMlY0NEExNCAxNCAwIDAgMSA0NCA1OEgzMkwyNiA0MkgzOEE0IDQgMCAwIDAgNDIgMzhaIiBmaWxsPSJ1cmwoI29yYW5nZSkiLz4KICA8cGF0aCBkPSJNMzIgNThIMjBBMTQgMTQgMCAwIDEgNiA0NFYzMkwyMiAyNlYzOEE0IDQgMCAwIDAgMjYgNDJaIiBmaWxsPSJ1cmwoI2NvcmFsKSIvPgo8L3N2Zz4K",
       "repository": "https://github.com/useLexora/plugins",
       "artifact": {
-        "url": "https://github.com/useLexora/plugins/releases/download/office-v1.0.1/office-1.0.1.lexora-extension",
-        "sha256": "3ccf8886cb135f8d8d7818faa03f343511aaaff178330842d0c3fd28fec0ead6",
-        "size": 32406116
+        "url": "https://github.com/useLexora/plugins/releases/download/office-v1.1.0/office-1.1.0.lexora-extension",
+        "sha256": "c4d0a40b16d74c86bb37fb23633d05d0a981ab77dee44360f1e926db0aaf3289",
+        "size": 32417265
       }
     }
   ]
