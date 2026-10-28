@@ -39,22 +39,22 @@ async function install(app, page, packagePath = archive) {
   await expect(review).toBeHidden()
   await expect.poll(() => page.evaluate(async id => (await window.lexoraDesktop.extensions.list()).some(item => item.manifest.id === id && item.enabled), manifest.id)).toBe(true)
 }
-async function office(page) {
+async function office(page, libraryLabel = '文档库') {
   await page.locator('.desktop-app-sidebar').getByRole('button', { name: 'Office', exact: true }).click()
   await expect.poll(async () => {
     for (const frame of page.frames()) {
-      if (await frame.getByRole('button', { name: '文档库', exact: true }).isVisible().catch(() => false)) return true
+      if (await frame.getByRole('button', { name: libraryLabel, exact: true }).isVisible().catch(() => false)) return true
     }
     return false
   }).toBe(true)
   let frame
   await expect.poll(async () => {
     for (const item of page.frames()) {
-      if (item.url().startsWith('lexora-extension:') && await (await item.frameElement()).isVisible().catch(() => false) && await item.getByRole('button', { name: '文档库', exact: true }).isVisible().catch(() => false)) { frame = item; return true }
+      if (item.url().startsWith('lexora-extension:') && await (await item.frameElement()).isVisible().catch(() => false) && await item.getByRole('button', { name: libraryLabel, exact: true }).isVisible().catch(() => false)) { frame = item; return true }
     }
     return false
   }, { timeout: 40000 }).toBe(true)
-  await expect(frame.getByRole('button', { name: '文档库', exact: true })).toHaveAttribute('aria-current', 'page')
+  await expect(frame.getByRole('button', { name: libraryLabel, exact: true })).toHaveAttribute('aria-current', 'page')
   await expect(page.locator(`[data-extension-page="${manifest.id}"] > header`)).toHaveCount(0)
   return frame
 }
@@ -215,9 +215,9 @@ test('文档工具栏粘贴系统富文本并保存，紧凑文件菜单可用',
   const menu = frame.getByRole('button', { name: '文件菜单', exact: true })
   await menu.focus()
   await menu.press('ArrowDown')
-  await expect.poll(() => frame.getByRole('menuitem', { name: '导出', exact: true }).evaluate(node => ({ focused: document.activeElement === node, active: document.activeElement?.outerHTML, documentFocused: document.hasFocus() }))).toMatchObject({ focused: true, documentFocused: true })
+  await expect.poll(() => frame.getByRole('menuitem', { name: '另存为…', exact: true }).evaluate(node => ({ focused: document.activeElement === node, active: document.activeElement?.outerHTML, documentFocused: document.hasFocus() }))).toMatchObject({ focused: true, documentFocused: true })
   await page.keyboard.press('ArrowDown')
-  await expect(frame.getByRole('menuitem', { name: '另存副本', exact: true })).toBeFocused()
+  await expect(frame.getByRole('menuitem', { name: '保存副本…', exact: true })).toBeFocused()
   await page.screenshot({ path: testInfo.outputPath('02-document-file-menu.png') })
   await page.keyboard.press('Escape')
   await expect(frame.getByRole('menu')).toBeHidden()
@@ -495,7 +495,7 @@ test('保留数据卸载旧包后安装当前包，文档、收藏、版本与�
   await install(app, page, path.resolve(process.env.OFFICE_PREVIOUS_PACKAGE))
   const previousManifest = await page.evaluate(async id => (await window.lexoraDesktop.extensions.list()).find(item => item.manifest.id === id).manifest, manifest.id)
   expect(previousManifest.version !== manifest.version || previousManifest.name !== manifest.name).toBe(true)
-  let frame = await office(page)
+  let frame = await office(page, '全部文件')
   await create(frame, '文档', '迁移保留文档')
   let editor = frame.locator('.tiptap[contenteditable=true]').first()
   await expect(editor).toBeVisible({ timeout: 45000 })
@@ -503,7 +503,7 @@ test('保留数据卸载旧包后安装当前包，文档、收藏、版本与�
   await expect(frame.locator('.office-save-state')).toHaveText('已保存', { timeout: 30000 })
   await editor.fill('迁移前最新内容')
   await expect(frame.locator('.office-save-state')).toHaveText('已保存', { timeout: 30000 })
-  await frame.getByRole('button', { name: 'Office 首页', exact: true }).click()
+  await frame.getByRole('button', { name: '文档库', exact: true }).click()
   let row = frame.getByRole('row').filter({ hasText: '迁移保留文档.docx' })
   await row.getByRole('button', { name: '收藏', exact: true }).click()
   await expect(row.getByRole('button', { name: '取消收藏', exact: true })).toBeVisible()
