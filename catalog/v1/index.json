@@ -1167,6 +1167,75 @@
         "sha256": "c4d0a40b16d74c86bb37fb23633d05d0a981ab77dee44360f1e926db0aaf3289",
         "size": 32417265
       }
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "id": "p9c91161073df402bae9a39873de07dfc.task-status",
+        "name": "DSH 状态栏",
+        "author": "shanyuhai",
+        "description": "借鉴 DSH 的状态展示方式，在任务输入区下方紧凑显示轮数、模型步数、均速、Token 用量与上下文估算。非 DSH 官方插件。",
+        "icon": "icon.svg",
+        "categories": [],
+        "tags": [],
+        "version": "1.0.4",
+        "apiVersion": 4,
+        "engines": {
+          "lexora": ">=0.18.0"
+        },
+        "format": "compiled",
+        "dataVersion": 1,
+        "dependencies": {},
+        "permissions": {
+          "data": [
+            "task.metrics",
+            "context.usage"
+          ]
+        },
+        "contributes": {
+          "skills": [],
+          "mcpConnectors": [],
+          "subagents": [],
+          "iconThemes": [],
+          "themes": [],
+          "conditions": [],
+          "settings": {
+            "modules": [],
+            "groups": [],
+            "items": []
+          },
+          "commands": [],
+          "menus": [],
+          "views": [
+            {
+              "id": "p9c91161073df402bae9a39873de07dfc.task-status.footer",
+              "title": "DSH 状态栏",
+              "entry": "view.js",
+              "stateVersion": 1,
+              "resource": "none",
+              "location": "context"
+            }
+          ],
+          "fileHandlers": [],
+          "launchers": [],
+          "placements": [
+            {
+              "id": "p9c91161073df402bae9a39873de07dfc.task-status.composer-footer",
+              "view": "p9c91161073df402bae9a39873de07dfc.task-status.footer",
+              "kind": "slot",
+              "target": "composer.footer",
+              "height": 28
+            }
+          ]
+        }
+      },
+      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA0OCA0OCIgZmlsbD0ibm9uZSI+CiAgPHJlY3QgeD0iMiIgeT0iMiIgd2lkdGg9IjQ0IiBoZWlnaHQ9IjQ0IiByeD0iMTIiIGZpbGw9IiMyNTYzZWIiLz4KICA8cGF0aCBkPSJtMTMgMTMgNyA2LTcgNm0xNCAwaDgiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIzIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICA8cmVjdCB4PSIxMiIgeT0iMzMiIHdpZHRoPSIxMCIgaGVpZ2h0PSIzIiByeD0iMS41IiBmaWxsPSIjYmFlNmZkIi8+CiAgPHJlY3QgeD0iMjUiIHk9IjMzIiB3aWR0aD0iNSIgaGVpZ2h0PSIzIiByeD0iMS41IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii43Ii8+CiAgPHJlY3QgeD0iMzMiIHk9IjMzIiB3aWR0aD0iMyIgaGVpZ2h0PSIzIiByeD0iMS41IiBmaWxsPSIjZmZmIiBmaWxsLW9wYWNpdHk9Ii40Ii8+Cjwvc3ZnPgo=",
+      "repository": "https://github.com/shanyuhai123/dsh-status",
+      "artifact": {
+        "url": "https://github.com/shanyuhai123/dsh-status/releases/download/v1.0.4/dsh-status-1.0.4.lexora-extension",
+        "sha256": "a01dd5ca04ecb397befc305109958cde4b0a8d31ba4939e63784e827b6656190",
+        "size": 5585
+      }
     }
   ]
 }
