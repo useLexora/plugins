@@ -1236,6 +1236,335 @@
         "sha256": "f035858f01d15c6ad960ce33004c16af8088160a338608cec3085213aa073451",
         "size": 5603
       }
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
+        "format": "compiled",
+        "id": "lexora.local-models",
+        "name": "Lexora Local Models",
+        "author": "Lexora",
+        "description": "下载并运行本地模型，在当前设备完成对话、语音与图像任务。",
+        "version": "1.0.0",
+        "apiVersion": 3,
+        "engines": {
+          "lexora": ">=0.20.0"
+        },
+        "entry": "entry.js",
+        "categories": [
+          "AI"
+        ],
+        "tags": [
+          "本地模型",
+          "离线推理"
+        ],
+        "permissions": {
+          "inference": true,
+          "localResources": true,
+          "inferenceGpu": true,
+          "network": [
+            "https://github.com",
+            "https://release-assets.githubusercontent.com",
+            "https://huggingface.co",
+            "https://cdn-avatars.huggingface.co",
+            "https://us.aws.cdn.hf.co",
+            "https://registry.npmjs.org",
+            "https://raw.githubusercontent.com",
+            "https://cas-bridge.xethub.hf.co"
+          ],
+          "inferenceNetwork": [
+            "http://127.0.0.1:8000",
+            "https://api.openai.com"
+          ]
+        },
+        "contributes": {
+          "commands": [
+            {
+              "id": "lexora.local-models.status",
+              "title": "刷新状态"
+            },
+            {
+              "id": "lexora.local-models.prepare",
+              "title": "下载或导入资源"
+            },
+            {
+              "id": "lexora.local-models.configure",
+              "title": "保存模型参数"
+            },
+            {
+              "id": "lexora.local-models.stop",
+              "title": "停止模型"
+            },
+            {
+              "id": "lexora.local-models.clear",
+              "title": "清理模型资源"
+            },
+            {
+              "id": "lexora.local-models.remove-record",
+              "title": "移除未完成的模型记录"
+            },
+            {
+              "id": "lexora.local-models.cancel-preparation",
+              "title": "取消资源准备"
+            },
+            {
+              "id": "lexora.local-models.configure-service",
+              "title": "保存服务配置"
+            },
+            {
+              "id": "lexora.local-models.remove-credential",
+              "title": "移除服务密钥"
+            },
+            {
+              "id": "lexora.local-models.discover",
+              "title": "查找模型"
+            },
+            {
+              "id": "lexora.local-models.inspect-local",
+              "title": "识别本地模型文件"
+            },
+            {
+              "id": "lexora.local-models.import-local",
+              "title": "导入本地模型"
+            },
+            {
+              "id": "lexora.local-models.inspect-model",
+              "title": "查看模型版本"
+            },
+            {
+              "id": "lexora.local-models.add-model",
+              "title": "添加模型"
+            },
+            {
+              "id": "lexora.local-models.add-compatible-model",
+              "title": "添加兼容版模型"
+            },
+            {
+              "id": "lexora.local-models.activate-model",
+              "title": "使用模型"
+            }
+          ],
+          "views": [
+            {
+              "id": "lexora.local-models.manage",
+              "title": "本地模型",
+              "entry": "view.js",
+              "resource": "none",
+              "location": "page"
+            }
+          ],
+          "inference": {
+            "providerName": "Lexora Local",
+            "runtimes": [
+              {
+                "id": "chat",
+                "entry": "native/chat/chat.mjs",
+                "platforms": [
+                  "linux-x64",
+                  "windows-x64",
+                  "macos-arm64"
+                ],
+                "capacity": 1,
+                "gpu": true,
+                "idleTimeoutMs": 180000
+              },
+              {
+                "id": "asr",
+                "entry": "native/speech/speech.mjs",
+                "platforms": [
+                  "linux-x64",
+                  "windows-x64",
+                  "macos-arm64"
+                ],
+                "capacity": 2,
+                "idleTimeoutMs": 60000
+              },
+              {
+                "id": "tts",
+                "entry": "native/speech/speech.mjs",
+                "platforms": [
+                  "linux-x64",
+                  "windows-x64",
+                  "macos-arm64"
+                ],
+                "capacity": 1,
+                "idleTimeoutMs": 60000
+              },
+              {
+                "id": "ocr",
+                "entry": "native/reading/reading.mjs",
+                "platforms": [
+                  "linux-x64",
+                  "windows-x64",
+                  "macos-arm64"
+                ],
+                "capacity": 1,
+                "idleTimeoutMs": 60000
+              },
+              {
+                "id": "vision",
+                "entry": "native/reading/reading.mjs",
+                "platforms": [
+                  "linux-x64",
+                  "windows-x64",
+                  "macos-arm64"
+                ],
+                "capacity": 1,
+                "gpu": true,
+                "idleTimeoutMs": 180000
+              },
+              {
+                "id": "image",
+                "entry": "native/image/image.mjs",
+                "platforms": [
+                  "linux-x64",
+                  "windows-x64",
+                  "macos-arm64"
+                ],
+                "capacity": 1,
+                "gpu": true,
+                "idleTimeoutMs": 180000
+              },
+              {
+                "id": "speech-api",
+                "entry": "native/speech-api/api.mjs",
+                "platforms": [
+                  "linux-x64",
+                  "windows-x64",
+                  "macos-arm64"
+                ],
+                "capacity": 1,
+                "idleTimeoutMs": 60000
+              },
+              {
+                "id": "image-api",
+                "entry": "native/image-api/api.mjs",
+                "platforms": [
+                  "linux-x64",
+                  "windows-x64",
+                  "macos-arm64"
+                ],
+                "capacity": 1,
+                "idleTimeoutMs": 60000
+              }
+            ],
+            "capabilities": [
+              {
+                "id": "chat",
+                "title": "本地对话",
+                "kind": "chat.completion",
+                "runtime": "chat",
+                "streamingInput": true,
+                "streamingOutput": true
+              },
+              {
+                "id": "transcribe",
+                "title": "本地语音转写",
+                "kind": "speech.transcribe",
+                "runtime": "asr",
+                "streamingInput": true,
+                "streamingOutput": true
+              },
+              {
+                "id": "synthesize",
+                "title": "本地朗读",
+                "kind": "speech.synthesize",
+                "runtime": "tts",
+                "streamingInput": false,
+                "streamingOutput": true
+              },
+              {
+                "id": "ocr",
+                "title": "本地文字提取",
+                "kind": "image.read",
+                "runtime": "ocr",
+                "streamingInput": false,
+                "streamingOutput": false
+              },
+              {
+                "id": "vision-chat",
+                "title": "本地图文对话",
+                "kind": "chat.completion",
+                "runtime": "vision",
+                "streamingInput": true,
+                "streamingOutput": true
+              },
+              {
+                "id": "vision",
+                "title": "本地图像理解",
+                "kind": "image.read",
+                "runtime": "vision",
+                "streamingInput": false,
+                "streamingOutput": false
+              },
+              {
+                "id": "image",
+                "title": "本地图像生成",
+                "kind": "image.generate",
+                "runtime": "image",
+                "streamingInput": false,
+                "streamingOutput": false
+              },
+              {
+                "id": "api-transcribe",
+                "title": "文件转写 API",
+                "kind": "speech.transcribe",
+                "runtime": "speech-api",
+                "streamingInput": false,
+                "streamingOutput": false
+              },
+              {
+                "id": "api-synthesize",
+                "title": "流式朗读 API",
+                "kind": "speech.synthesize",
+                "runtime": "speech-api",
+                "streamingInput": false,
+                "streamingOutput": true
+              },
+              {
+                "id": "api-image",
+                "title": "图像 API",
+                "kind": "image.generate",
+                "runtime": "image-api",
+                "streamingInput": false,
+                "streamingOutput": false
+              }
+            ],
+            "preparation": {
+              "entry": "native/prepare.mjs",
+              "platforms": [
+                "linux-x64",
+                "windows-x64",
+                "macos-arm64"
+              ]
+            }
+          },
+          "settings": {
+            "modules": [
+              {
+                "id": "lexora.local-models.settings",
+                "title": "本地模型",
+                "section": "integrations",
+                "view": "lexora.local-models.manage",
+                "experimental": {
+                  "platforms": [
+                    "darwin",
+                    "win32"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "icon": "icon.svg"
+      },
+      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNWI3ZGE1IiBzdHJva2Utd2lkdGg9IjEuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj4KICA8cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iMTQiIGhlaWdodD0iMTQiIHJ4PSI0Ii8+CiAgPHBhdGggZD0iTTkgMi41VjVtNi0yLjVWNU05IDE5djIuNW02LTIuNVYxOU0yLjUgOUg1bS0yLjUgNkg1bTE0LTZoMi41TTE5IDE1aDIuNSIvPgogIDxwYXRoIGQ9Ik05IDE0LjV2LTVsNiA1di01IiBzdHJva2U9IiMzOThiODQiIHN0cm9rZS13aWR0aD0iMS44Ii8+Cjwvc3ZnPgo=",
+      "repository": "https://github.com/useLexora/plugins",
+      "artifact": {
+        "url": "https://github.com/useLexora/plugins/releases/download/local-models-v1.0.0/local-models-1.0.0.lexora-extension",
+        "sha256": "0109386a97785f59479912d03ccf56c8975acc654f3f37346a1a330255f5c290",
+        "size": 386694
+      }
     }
   ]
 }
