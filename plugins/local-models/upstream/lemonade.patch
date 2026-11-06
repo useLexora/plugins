@@ -1,0 +1,290 @@
+--- a/src/app/src/components/WorkspacePanels.tsx
++++ b/src/app/src/components/WorkspacePanels.tsx
+@@ -1,5 +1,5 @@
+ import React from 'react';
+-import { CapabilityIcon, Icon, type CapabilityIconTarget, type IconName } from './Icon';
++import { capabilityIconName, CapabilityIcon, Icon, type CapabilityIconTarget, type IconName } from './Icon';
+ import { CAPABILITY_TAG_LABELS, type CapabilityTag } from '../modelCapabilities';
+ import { capabilityColor } from '../modelPresentation';
+ 
+@@ -37,14 +37,14 @@
+   const content = <>{icon && <Icon name={icon} size={12} aria-hidden="true" />}{children}</>;
+ 
+   if (href) {
+-    return <a {...dataAttributes} className={chipClassName} href={href} target={target} rel={rel} title={title}>{content}</a>;
++    return <a {...dataAttributes} className={chipClassName} href={href} target={target} rel={rel}>{content}</a>;
+   }
+ 
+   if (buttonProps) {
+-    return <button {...buttonProps} {...dataAttributes} type="button" className={`${chipClassName}${buttonProps.className ? ` ${buttonProps.className}` : ''}`} title={title ?? buttonProps.title}>{content}</button>;
++    return <button {...buttonProps} {...dataAttributes} type="button" className={`${chipClassName}${buttonProps.className ? ` ${buttonProps.className}` : ''}`}>{content}</button>;
+   }
+ 
+-  return <span {...dataAttributes} className={chipClassName} title={title}>{content}</span>;
++  return <span {...dataAttributes} className={chipClassName}>{content}</span>;
+ };
+ 
+ const METADATA_EMPHASIS_RANK: Record<WorkspaceMetadataEmphasis, number> = {
+@@ -520,6 +520,7 @@
+   rowId?: string;
+   /** Primary modality. Tints the lead glyph with the matching --cap-* token. */
+   capability?: CapabilityIconTarget;
++  icon?: IconName;
+   title: React.ReactNode;
+   /** The facts alone — size, counts, metrics. State belongs in `statusText`.
+       Pass the parts, not a joined string: the row owns the separator. */
+@@ -561,6 +562,7 @@
+ export const WorkspaceListRow: React.FC<WorkspaceListRowProps> = ({
+   rowId,
+   capability,
++  icon,
+   title,
+   meta,
+   metaMono = false,
+@@ -598,7 +600,7 @@
+       <span
+         key="status"
+         className={`workspace-list-row__status workspace-list-row__status--${status}`}
+-        title={statusLabel}
++
+       >
+         <span className="workspace-list-row__status-text">{statusWords}</span>
+       </span>,
+@@ -614,7 +616,7 @@
+             .join(', ')}`}
+         >
+           {glyphs.map(glyph => (
+-            <span key={glyph} title={CAPABILITY_TAG_LABELS[glyph as CapabilityTag]} aria-hidden="true">
++            <span key={glyph} aria-hidden="true">
+               <CapabilityIcon capability={glyph} size={12} />
+             </span>
+           ))}
+@@ -646,13 +648,13 @@
+       data-row-id={rowId}
+       {...dataAttributes}
+     >
+-      {capability && (
++      {(icon || capability) && (
+         <span
+           className="workspace-list-row__lead"
+           style={leadColor ? ({ '--workspace-list-row-cap': leadColor } as React.CSSProperties) : undefined}
+           aria-hidden="true"
+         >
+-          <CapabilityIcon capability={capability} size={16} />
++          <Icon name={icon || capabilityIconName(capability)} size={16} />
+         </span>
+       )}
+ 
+@@ -662,7 +664,7 @@
+         <span className="workspace-list-row__meta">
+           {metaParts}
+           {showAnchor && (
+-            <span className="workspace-list-row__anchor" title={anchorTitle}>{anchor}</span>
++            <span className="workspace-list-row__anchor">{anchor}</span>
+           )}
+         </span>
+       )}
+@@ -675,7 +677,7 @@
+           className={`workspace-list-row__action${action.latched ? ' workspace-list-row__action--latched' : ''}${action.active ? ' workspace-list-row__action--active' : ''}`}
+           onClick={event => { event.stopPropagation(); action.onClick(); }}
+           aria-hidden="true"
+-          title={action.label}
++
+         >
+           <Icon name={action.icon} size={16} aria-hidden="true" />
+         </span>
+@@ -685,7 +687,7 @@
+           className={`workspace-list-row__action${action.latched ? ' workspace-list-row__action--latched' : ''}${action.active ? ' workspace-list-row__action--active' : ''}`}
+           onClick={event => { event.stopPropagation(); action.onClick(); }}
+           aria-label={action.label}
+-          title={action.label}
++
+           // A readout's rows are not chosen from, so its button is an ordinary tab
+           // stop. Inside a listbox the option owns the only tab stop, so the button
+           // is reached with ArrowRight instead (see WorkspaceList's key handler).
+--- a/src/app/src/components/ModelListPanel.tsx
++++ b/src/app/src/components/ModelListPanel.tsx
+@@ -5,7 +5,7 @@
+  * Part of the master-detail layout introduced in #2355 Slice 1.
+  */
+ import React, { useCallback, useRef, useMemo, useState } from 'react';
+-import type { ModelInfo, LoadedModel } from '../api';
++import type { ModelInfo } from '../../../../../../src/types';
+ import {
+   isCollectionRecipe,
+   modelStructure,
+@@ -16,7 +16,7 @@
+ import { Icon } from './Icon';
+ import type { IconName } from './Icon';
+ import type { CapabilityIconTarget } from './Icon';
+-import { activeDownloadForModel, type DownloadListItem } from '../features/downloadManager/downloadStore';
++import { activeDownloadForModel, type DownloadListItem } from '../../../../../../src/downloads';
+ import {
+   WorkspaceActionButton,
+   WorkspaceActionGroup,
+@@ -28,7 +28,7 @@
+ } from './WorkspacePanels';
+ import { backendCompactLabel, backendLabel } from '../modelPresentation';
+ import { recipeBackendOptionName } from '../features/backends/recipeMetadata';
+-import { useI18n } from '../i18n';
++import { useI18n } from '../../../../../../src/i18n';
+ 
+ /* ── Helpers ─────────────────────────────────────────────────── */
+ 
+@@ -43,7 +43,7 @@
+ function listFmtSize(gb: number): string {
+   if (!Number.isFinite(gb) || gb <= 0) return '';
+   if (gb >= 1) return `${gb.toFixed(1)} GB`;
+-  if (gb >= 0.01) return `${(gb * 1000).toFixed(0)} MB`;
++  if (gb >= 0.001) return `${(gb * 1000).toFixed(0)} MB`;
+   return '< 1 MB';
+ }
+ 
+@@ -452,6 +452,16 @@
+   registryZoneTop?: React.ReactNode;
+   /** Latest /system-info snapshot used to join model and backend readiness. */
+   systemInfo?: Record<string, unknown> | null;
++  renderSortControl?: (input: {
++    value: SortBy;
++    options: Array<{ value: SortBy; label: string }>;
++    onChange: (value: SortBy) => void;
++  }) => React.ReactNode;
++  getRowPresentation?: (model: ModelInfo) => {
++    status?: WorkspaceListRowStatus;
++    statusText?: string;
++    statusLabel?: string;
++  } | undefined;
+ }
+ 
+ /* ── ModelListPanel ──────────────────────────────────────────── */
+@@ -480,9 +490,15 @@
+   registryZone,
+   registryZoneTop,
+   systemInfo = null,
++  renderSortControl,
++  getRowPresentation,
+ }) => {
+   const { t } = useI18n();
+   const [sortBy, setSortBy] = useState<SortBy>('name');
++  const sortOptions: Array<{ value: SortBy; label: string }> = [
++    { value: 'name', label: t('Name (A–Z)') },
++    { value: 'size', label: t('Size (largest first)') },
++  ];
+   const listRef = useRef<HTMLUListElement>(null);
+   const defaultSearchRef = useRef<HTMLInputElement>(null);
+   const inputRef = (searchInputRef ?? defaultSearchRef) as React.RefObject<HTMLInputElement>;
+@@ -634,6 +650,8 @@
+         : rowStatus === 'live'
+           ? t('Running')
+           : undefined;
++    const presentation = getRowPresentation?.(model) ?? { status: rowStatus, statusText, statusLabel: readinessLabel };
++    const presentationLabel = presentation.statusLabel || presentation.statusText;
+     const meta = model.size != null && model.size > 0 ? listFmtSize(model.size) : undefined;
+     const secondaryTags = capTags.filter(tag => tag !== (primaryCapability as string));
+     const favorited = favoriteNames?.has(mId.toLowerCase()) ?? false;
+@@ -643,6 +661,7 @@
+         key={mId}
+         rowId={mId}
+         capability={primaryCapability}
++        icon={model.icon}
+         title={(
+           <span className="model-list-panel__row-title">
+             <span className="model-list-panel__row-title-text">{displayName}</span>
+@@ -657,19 +676,19 @@
+           </span>
+         )}
+         meta={meta}
+-        glyphs={secondaryTags.map(capabilityTagIconTarget)}
++        glyphs={undefined}
+         anchor={recipe && !neutralCollectionGuide ? displayedBackend : undefined}
+         anchorTitle={recipe ? backendLabel(recipe) : undefined}
+-        status={rowStatus}
+-        statusText={statusText}
+-        statusLabel={readinessLabel}
++        status={presentation.status}
++        statusText={presentation.statusText}
++        statusLabel={presentation.statusLabel}
+         progress={status === 'downloading' ? downloadPct : undefined}
+         selected={isSelected}
+         tabIndex={isSelected ? 0 : -1}
+         dataAttributes={{ 'data-model-id': mId }}
+         className={pinned ? 'workspace-list-row--pinned' : undefined}
+         ariaKeyShortcuts={onToggleFavorite ? 'F' : undefined}
+-        ariaLabel={`${displayName}${pinned ? ', pinned' : ''}${favorited ? ', favorite' : ''}${status === 'running' ? ', running' : status === 'downloading' ? ', downloading' : ''}${displayedBackend ? `, ${displayedBackend}` : ''}${readinessLabel ? `, ${readinessLabel}` : ''}`}
++        ariaLabel={`${displayName}${pinned ? ', pinned' : ''}${favorited ? ', favorite' : ''}${displayedBackend ? `, ${displayedBackend}` : ''}${presentationLabel ? `, ${presentationLabel}` : ''}`}
+         onClick={() => onSelectModel(mId)}
+         onKeyDown={onToggleFavorite ? e => handleItemKeyDown(e, mId) : undefined}
+         action={onToggleFavorite ? {
+@@ -688,6 +707,7 @@
+       className="model-list-panel"
+       headerClassName="manager__title"
+       title={t('Models')}
++
+       subtitle={t('{count} models', { count: flatList.length })}
+       actions={(
+         <WorkspaceActionGroup label={t('Model list actions')}>
+@@ -699,7 +719,7 @@
+               iconOnly
+               onClick={onOpenCustomModels}
+               aria-label={t('Open custom models')}
+-              title={t('Manage custom models')}
++
+             />
+           )}
+           {onOpenRouter && (
+@@ -709,7 +729,7 @@
+               iconOnly
+               onClick={onOpenRouter}
+               aria-label={t('Open router editor')}
+-              title={t('Create or edit a model router')}
++
+             />
+           )}
+           {onUpdateAllModels && (
+@@ -719,7 +739,7 @@
+               iconOnly
+               onClick={onUpdateAllModels}
+               aria-label={t('Update all models')}
+-              title={t('Update all downloaded models')}
++
+             />
+           )}
+ 
+@@ -758,18 +778,17 @@
+       {/* Sort control */}
+       <div className="model-list-panel__sort-row">
+         <label htmlFor="model-list-sort" className="model-list-panel__sort-label">{t('Sort')}</label>
+-        <select
+-          id="model-list-sort"
+-          className="model-list-panel__sort-select"
+-          value={sortBy}
+-          onChange={e => setSortBy(e.target.value as SortBy)}
+-          aria-label={t('Sort models by')}
+-        >
+-          <option value="name">{t('Name (A–Z)')}</option>
+-          <option value="size">{t('Size (largest first)')}</option>
+-          <option value="last-used">{t('Last used')}</option>
+-          <option value="downloads">{t('Download count')}</option>
+-        </select>
++        {renderSortControl ? renderSortControl({ value: sortBy, options: sortOptions, onChange: setSortBy }) : (
++          <select
++            id="model-list-sort"
++            className="model-list-panel__sort-select"
++            value={sortBy}
++            onChange={e => setSortBy(e.target.value as SortBy)}
++            aria-label={t('Sort models by')}
++          >
++            {sortOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
++          </select>
++        )}
+       </div>
+ 
+       <span className="sr-only model-list-panel__count" aria-live="polite" aria-atomic="true">
+--- a/src/app/src/modelCapabilities.ts
++++ b/src/app/src/modelCapabilities.ts
+@@ -1,4 +1,4 @@
+-import type { LoadedModel, ModelInfo } from './api';
++import type { LoadedModel, ModelInfo } from '../../../../../src/types';
+ 
+ /**
+  * Mirrors the server's deployment modes one-for-one — see the "Deployment

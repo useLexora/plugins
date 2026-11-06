@@ -1,0 +1,16 @@
+{
+  "repository": "lemonade-sdk/lemonade",
+  "revision": "d98e62998768199906e68823e33ae482d61e8bb0",
+  "files": {
+    "LICENSE": "dd5babd1918bf0e410747a1a2c4e77ec95273c8a5e128274468e05af26bacd18",
+    "src/app/src/components/WorkspacePanels.tsx": "012f295531e5954630f2b4246ac9777d47aa8fb529e1a1a3f2866c78c2c897da",
+    "src/app/src/components/ModelListPanel.tsx": "f2c02bee264cbb8d438c5197c77b12b8ee0909dc9728383d9e996b12cb4b7e22",
+    "src/app/src/components/Icon.tsx": "bcae44cb8d2c0a77177eafaae2dd4f85d3de3ea4cd2945093f2a1b4d7fa29710",
+    "src/app/src/components/localIcons.tsx": "36e3cf0befec5e42f3e3ec1023f6692ab820ce3d1ae714f8e75105e448fcd7fa",
+    "src/app/src/modelCapabilities.ts": "85ea503a2254a2ebd20a3bccdb5746233af79073e7173269c23b81bc88e30399",
+    "src/app/src/modelPresentation.ts": "17463ec3b0a66282d78947bed5585e0f4c000b3933810657b00a6948053dbf44",
+    "src/app/src/features/backends/recipeMetadata.ts": "187208f35bb40c9403cd2e446d2b573ce9384fc87084ab399a11290ef035464b",
+    "src/app/src/styles/styles.css": "1be44c237897e4a30710775bbb0f64122512c7022263640ac3becdc77510bcc6",
+    "src/app/src/styles/tokens.css": "074dbfe01e2fd5f82ffa076a720ae6e344ab6a17098b0af924ae473f6acb8479"
+  }
+}

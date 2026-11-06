@@ -1,0 +1,17 @@
+Lexora Model Manager
+
+Model-management implementation initially adapted from Lemonade; the current UI uses Mantine.
+Source: https://github.com/lemonade-sdk/lemonade
+Revision: d98e62998768199906e68823e33ae482d61e8bb0
+Licensed under Apache-2.0; see LICENSE.
+
+Changes: host transport adapter, Chinese labels, host theme mapping and a Mantine-based interface.
+Icon geometry from Lucide (ISC) and Simple Icons (CC0), as identified in the source.
+React and React DOM: Copyright (c) Meta Platforms, Inc. and affiliates, MIT.
+
+@noble/hashes: Copyright (c) 2022 Paul Miller, MIT.
+
+Hugging Face brand mark: official full-color asset, used to identify its model catalog.
+Source: https://huggingface.co/datasets/huggingface/brand-assets/blob/main/hf-logo.svg
+SHA-256: 942cad1ccda905ac5a659dfd2d78b344fccfb84a8a3ac3721e08f488205638a0
+Brand assets and trademarks remain the property of their respective owners.

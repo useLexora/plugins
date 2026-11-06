@@ -1,0 +1,35 @@
+{
+  "name": "lexora-local-models",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "package": "node package.mjs",
+    "type-check": "tsc --noEmit && tsc -p tsconfig.native.json",
+    "test": "node --test --test-timeout=10000 __tests__/*.spec.mjs src/__tests__/*.spec.mjs src/preparation/__tests__/*.spec.mjs native/chat/__tests__/*.spec.mjs native/image/__tests__/*.spec.mjs native/reading/__tests__/*.spec.mjs"
+  },
+  "dependencies": {
+    "@mantine/core": "9.7.5",
+    "@mantine/hooks": "9.7.5",
+    "@noble/hashes": "1.8.0",
+    "lucide-react": "1.68.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "tar": "7.5.22",
+    "unbzip2-stream": "1.4.3",
+    "xz-decompress": "0.2.3",
+    "yauzl": "3.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "esbuild": "0.25.12",
+    "fflate": "0.8.3",
+    "semver": "7.8.5",
+    "typescript": "5.9.3",
+    "zod": "4.4.3"
+  },
+  "license": "Apache-2.0"
+}

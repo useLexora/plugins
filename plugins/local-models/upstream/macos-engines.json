@@ -1,0 +1,82 @@
+{
+  "platform": "macos-arm64",
+  "hostPlatform": "darwin/arm64",
+  "hostBaseline": "macOS 15 ARM64; no Intel or universal target",
+  "manifest": "resources.json",
+  "verification": "Downloaded the exact engine archives, verified GitHub SHA256 or npm SHA512 integrity, then streamed selected files through the plugin preparation implementation and checked every manifest SHA256, executable role and alias. Parsed Mach-O ARM64 load commands, relative dylib closure, deployment targets and embedded Metal source data on Linux.",
+  "engines": [
+    {
+      "id": "llama-b11747-macos-arm64",
+      "version": "b11747",
+      "commit": "f711c8f3038020d71f69b8ced09162b014fd7335",
+      "metadata": "https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b11747",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11747/llama-b11747-bin-macos-arm64.tar.gz",
+      "size": 16103571,
+      "upstreamSha256": "a2ac5500723549481b561ea9461447387010c5bb827ecb14fb29e464dda78ee5",
+      "selectedFiles": 37,
+      "machOMinimumOS": "13.3",
+      "layout": "llama-server, all supplied dylibs and LICENSE remain colocated. Versioned aliases are materialized from regular archive entries, not extracted symlinks. @rpath loads resolve via @loader_path; CPU, Accelerate, Metal, RPC, server implementation and mtmd dependencies are retained.",
+      "metal": "libggml-metal.0.27.0.dylib contains the embedded Metal library message and metal_stdlib source; no separate metallib file is supplied or required by this embedded-library build.",
+      "rdma": "/usr/lib/librdma.dylib is LC_LOAD_WEAK_DYLIB (0x80000018), not a mandatory macOS 26.2 dependency. The pinned ggml-rpc CMake file explicitly weak-links this library.",
+      "transport": "127.0.0.1, --port 0, random per-start LLAMA_API_KEY; the pinned server reports the dynamically bound port. Requests carry Bearer authentication; /health itself is public. Linux retains its Unix socket and Windows retains its existing loopback path.",
+      "configuration": "New chat/vision configurations default to CPU: -ngl 0, --device none and --no-mmproj-offload for vision. Metal uses GPU layers with the archive's built-in Metal backend. Existing cpu/gpu values remain unchanged."
+    },
+    {
+      "id": "sherpa-onnx-macos-arm64",
+      "version": "1.13.8",
+      "metadata": "https://registry.npmjs.org/sherpa-onnx-darwin-arm64/1.13.8",
+      "url": "https://registry.npmjs.org/sherpa-onnx-darwin-arm64/-/sherpa-onnx-darwin-arm64-1.13.8.tgz",
+      "size": 10047754,
+      "upstreamIntegrity": "sha512-FPNgJMgnWVl/KhRTIhG3KL3A4Om63Rn4YKXc9/uHY7SzLcvqLJLc/h7UBWJwduXvv7K18t5NpxHR6XgXn4sjWw==",
+      "verifiedSha256": "e1abc1d9676478996574de922e55714d80b4500b860bc4e7349aa01cd0ea4929",
+      "selectedPlatformFiles": 7,
+      "selectedFilesIncludingWrapper": 25,
+      "machOMinimumOS": "14.0 for the Node addon; 11.0 for its dylibs",
+      "layout": "Reuse the unchanged sherpa-onnx-node 1.13.8 wrapper archive. addon.js selects darwin-arm64 and loads the sibling sherpa-onnx-darwin-arm64/sherpa-onnx.node. The addon, ONNX Runtime and sherpa dylibs all have @loader_path RPATHs; they remain together under node_modules without injecting Linux LD_LIBRARY_PATH."
+    },
+    {
+      "id": "image-metal-macos-arm64",
+      "version": "master-977-90e86d1",
+      "metadata": "https://api.github.com/repos/lemonade-sdk/stable-diffusion.cpp/releases/tags/master-977-90e86d1",
+      "url": "https://github.com/lemonade-sdk/stable-diffusion.cpp/releases/download/master-977-90e86d1/sd-master-90e86d1-bin-Darwin-macOS-14.8.9-arm64.zip",
+      "size": 18164780,
+      "upstreamSha256": "b508ac17aacd874cff9f530d300d79d0b9e72c547412b06f30af45593d708e89",
+      "selectedFiles": 4,
+      "machOMinimumOS": "14.0",
+      "buildRepositoryCommit": "90e86d183d6366684a39f1a7c2de2dc8262c1ffa",
+      "embeddedEngineCommit": "b13a48219d5cdf408edcb93da6cd69b612ed03d3",
+      "embeddedGgmlCommit": "dc998771e700d49bbdf9a39cede22bb5b3311767",
+      "layout": "sd-cli and libstable-diffusion.dylib remain colocated with both license texts. @executable_path/@loader_path resolve all non-system dependencies. The dylib contains Metal source and the embedded-library message; the build recipe sets GGML_METAL_EMBED_LIBRARY=ON.",
+      "configuration": "The embedded engine revision resolves the documented metal alias; CPU uses cpu. --flash-attn auto follows this engine's per-module detection. Linux retains CUDA0/on and Windows retains Vulkan0/off,diffusion=on.",
+      "provenance": "The release label refers to the build repository, not the inference source commit. The downloaded binary's b13a482 and dc998771 strings were matched to leejet/stable-diffusion.cpp and its ggml submodule. The macOS 26.6.2 archive is not used."
+    },
+    {
+      "id": "tesseract-wasm",
+      "version": "6.1.2",
+      "metadata": "https://registry.npmjs.org/tesseract.js-core/6.1.2",
+      "url": "https://registry.npmjs.org/tesseract.js-core/-/tesseract.js-core-6.1.2.tgz",
+      "size": 11339835,
+      "upstreamIntegrity": "sha512-pv4GjmramjdObhDyR1q85Td8X60Puu/lGQn7Kw2id05LLgHhAcWgnz6xSdMCSxBMWjQDmMyDXPTC2aqADdpiow==",
+      "verifiedSha256": "1b5863e7d912de9fc639222a38ede7876b2344565f8ad8d9527b242b0d793e24",
+      "selectedFiles": 4,
+      "layout": "Reuse the original four-file resource object and Node worker implementation, with the wasm.js loader resolving the adjacent WASM role. The downloaded WASM header and all existing file digests were checked; native Tesseract remains Linux-only."
+    }
+  ],
+  "implementationReferences": [
+    "https://github.com/lemonade-sdk/lemonade/blob/d98e62998768199906e68823e33ae482d61e8bb0/src/cpp/server/backends/llamacpp/llamacpp_server.cpp",
+    "https://github.com/lemonade-sdk/lemonade/blob/d98e62998768199906e68823e33ae482d61e8bb0/src/cpp/server/backends/sdcpp/sdcpp_server.cpp",
+    "https://github.com/ggml-org/llama.cpp/blob/f711c8f3038020d71f69b8ced09162b014fd7335/tools/server/server-http.cpp",
+    "https://github.com/ggml-org/llama.cpp/blob/f711c8f3038020d71f69b8ced09162b014fd7335/tools/server/server.cpp",
+    "https://github.com/ggml-org/llama.cpp/blob/f711c8f3038020d71f69b8ced09162b014fd7335/common/arg.cpp",
+    "https://github.com/ggml-org/llama.cpp/blob/f711c8f3038020d71f69b8ced09162b014fd7335/ggml/src/ggml-rpc/CMakeLists.txt",
+    "https://github.com/ggml-org/llama.cpp/blob/f711c8f3038020d71f69b8ced09162b014fd7335/ggml/src/ggml-metal/CMakeLists.txt",
+    "https://github.com/lemonade-sdk/stable-diffusion.cpp/blob/90e86d183d6366684a39f1a7c2de2dc8262c1ffa/.github/workflows/build.yml",
+    "https://github.com/leejet/stable-diffusion.cpp/blob/b13a48219d5cdf408edcb93da6cd69b612ed03d3/src/core/ggml_extend_backend.cpp",
+    "https://github.com/leejet/stable-diffusion.cpp/blob/b13a48219d5cdf408edcb93da6cd69b612ed03d3/docs/backend.md"
+  ],
+  "limitations": [
+    "The fixed Lemonade revision supplies platform/layout references, not proof of compatibility for the older engine versions retained here.",
+    "No engine version, existing resource object, plugin identity or persistent configuration was reset. The original 11 Linux/shared and 3 Windows resource objects remain intact; only three macOS engine objects were appended.",
+    "No model weights, system drivers or system libraries are installed by this work. Unsupported engine types and native Tesseract remain unavailable rather than mapping to Linux binaries."
+  ]
+}

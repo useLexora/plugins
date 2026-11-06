@@ -1,0 +1,148 @@
+.resource-dialog {
+  color: var(--text-primary);
+  background: var(--surface-base);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+}
+
+.resource-dialog-header {
+  gap: 12px;
+  padding: 20px 24px 16px;
+  color: var(--text-primary);
+  background: var(--surface-base);
+}
+
+.resource-dialog-title {
+  min-width: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.resource-dialog-body {
+  padding: 0 24px 24px;
+}
+
+.resource-dialog-copy {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.resource-dialog-error {
+  margin: 0;
+  color: var(--danger);
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+
+.resource-dialog-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.resource-dialog-field > label,
+.resource-dialog-input-label {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.resource-dialog-input-label {
+  margin-bottom: 7px;
+}
+
+.resource-dialog-input {
+  color: var(--text-primary);
+  background: var(--surface-base);
+  border-color: var(--border);
+}
+
+.resource-dialog-input:focus {
+  border-color: var(--accent);
+}
+
+.resource-dialog-pickers,
+.resource-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resource-dialog-actions {
+  justify-content: flex-end;
+  padding-top: 8px;
+}
+
+.resource-dialog-files {
+  max-height: 280px;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.resource-dialog-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.resource-dialog-file:first-child {
+  padding-top: 0;
+}
+
+.resource-dialog-file-name {
+  min-width: 0;
+  margin: 0;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.resource-dialog-file-picker {
+  min-width: 104px;
+  max-width: 55%;
+  flex-shrink: 0;
+}
+
+.resource-dialog-file-selection {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.resource-dialog-progress {
+  min-width: 0;
+}
+
+.resource-dialog-progress-track {
+  background: var(--surface-2);
+}
+
+@media (max-width: 480px) {
+  .resource-dialog-header {
+    padding: 16px;
+  }
+
+  .resource-dialog-body {
+    padding: 0 16px 16px;
+  }
+
+  .resource-dialog-file {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .resource-dialog-file-picker {
+    max-width: 100%;
+  }
+}

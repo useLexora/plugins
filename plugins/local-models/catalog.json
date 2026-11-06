@@ -1,0 +1,469 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "qwen3-4b",
+      "title": "Qwen3 4B",
+      "description": "Instruct 2507 · Q4_K_M",
+      "capabilities": [
+        "对话"
+      ],
+      "runtime": "chat",
+      "resources": [
+        "llama-b11747",
+        "qwen3-4b-model"
+      ],
+      "fields": [
+        {
+          "key": "acceleration",
+          "label": "加速方式",
+          "type": "select",
+          "choices": [
+            {
+              "value": "gpu",
+              "title": "Vulkan GPU"
+            },
+            {
+              "value": "cpu",
+              "title": "CPU"
+            }
+          ]
+        },
+        {
+          "key": "threads",
+          "label": "CPU 线程",
+          "type": "number",
+          "min": 1,
+          "max": 16,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "key": "contextWindow",
+          "label": "上下文长度",
+          "type": "number",
+          "min": 4096,
+          "max": 2000000,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "key": "maxTokens",
+          "label": "最大输出",
+          "type": "number",
+          "min": 64,
+          "max": 2000000,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "defaults": {
+        "threads": 4,
+        "acceleration": "gpu",
+        "contextWindow": 32768,
+        "maxTokens": 512
+      },
+      "setupHint": "Linux x64；引擎和权重按需准备，首次使用时加载。",
+      "directoryHint": "选择原插件使用的完整资源目录。仅校验并引用已有文件，清理时保留原文件。"
+    },
+    {
+      "id": "zipformer",
+      "title": "Zipformer",
+      "description": "中英文流式语音转写",
+      "capabilities": [
+        "语音输入"
+      ],
+      "runtime": "asr",
+      "resources": [
+        "sherpa-onnx",
+        "zipformer-model"
+      ],
+      "fields": [
+        {
+          "key": "threads",
+          "label": "推理线程",
+          "type": "number",
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "defaults": {
+        "threads": 2
+      },
+      "setupHint": "Linux x64；引擎和权重按需准备，首次使用时加载。",
+      "directoryHint": "选择原插件使用的完整资源目录。仅校验并引用已有文件，清理时保留原文件。"
+    },
+    {
+      "id": "kokoro",
+      "title": "Kokoro",
+      "description": "v1.0 · 中英文朗读",
+      "capabilities": [
+        "语音输出"
+      ],
+      "runtime": "tts",
+      "resources": [
+        "sherpa-onnx",
+        "kokoro-model"
+      ],
+      "fields": [
+        {
+          "key": "threads",
+          "label": "推理线程",
+          "type": "number",
+          "min": 1,
+          "max": 4,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "key": "speaker",
+          "label": "音色编号",
+          "type": "number",
+          "min": 0,
+          "max": 52,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "key": "speed",
+          "label": "语速",
+          "type": "number",
+          "min": 0.5,
+          "max": 2,
+          "step": 0.1,
+          "integer": false
+        }
+      ],
+      "defaults": {
+        "threads": 2,
+        "speaker": 48,
+        "speed": 1
+      },
+      "setupHint": "Linux x64；引擎和权重按需准备，首次使用时加载。",
+      "directoryHint": "选择原插件使用的完整资源目录。仅校验并引用已有文件，清理时保留原文件。"
+    },
+    {
+      "id": "tesseract",
+      "title": "Tesseract OCR",
+      "description": "提取图片中的中英文文字",
+      "capabilities": [
+        "文字识别"
+      ],
+      "runtime": "ocr",
+      "resources": [
+        "tesseract-wasm",
+        "tesseract-model"
+      ],
+      "fields": [
+        {
+          "key": "threads",
+          "label": "视觉模型 CPU 线程",
+          "type": "number",
+          "min": 1,
+          "max": 16,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "defaults": {
+        "threads": 4
+      },
+      "setupHint": "Linux x64；引擎和权重按需准备，首次使用时加载。",
+      "directoryHint": "已有本地读图目录：engine/tesseract 与 model/ 下的中英文识别文件。也可单独下载 WASM 引擎和识别文件。",
+      "directoryResources": [
+        "tesseract-native",
+        "tesseract-model"
+      ]
+    },
+    {
+      "id": "qwen3-vl",
+      "title": "Qwen3-VL 8B",
+      "description": "Q4_K_M · 对话、图片输入与文档识别",
+      "capabilities": [
+        "对话",
+        "图片输入",
+        "图片理解",
+        "文字识别"
+      ],
+      "runtime": "vision",
+      "resources": [
+        "llama-b11747",
+        "qwen3-vl-model"
+      ],
+      "fields": [
+        {
+          "key": "threads",
+          "label": "视觉模型 CPU 线程",
+          "type": "number",
+          "min": 1,
+          "max": 16,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "key": "contextWindow",
+          "label": "上下文长度",
+          "type": "number",
+          "min": 4096,
+          "max": 2000000,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "key": "maxTokens",
+          "label": "最大输出",
+          "type": "number",
+          "min": 64,
+          "max": 2000000,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "defaults": {
+        "threads": 4,
+        "contextWindow": 4096,
+        "maxTokens": 512
+      },
+      "setupHint": "Linux x64；引擎和权重按需准备，首次使用时加载。",
+      "directoryHint": "选择原插件使用的完整资源目录。仅校验并引用已有文件，清理时保留原文件。"
+    },
+    {
+      "id": "qwen-image",
+      "title": "Qwen-Image 2.1",
+      "description": "Q4_K · 图片生成与编辑",
+      "capabilities": [
+        "生图",
+        "图像编辑"
+      ],
+      "runtime": "image",
+      "resources": [
+        "image-cuda",
+        "qwen-image-model"
+      ],
+      "fields": [
+        {
+          "key": "steps",
+          "label": "采样步数",
+          "type": "number",
+          "min": 1,
+          "max": 60,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "key": "vramGiB",
+          "label": "引擎显存预算（GiB）",
+          "type": "number",
+          "min": 4,
+          "max": 32,
+          "step": 1,
+          "integer": true
+        },
+        {
+          "key": "seed",
+          "label": "随机种子（-1 为随机）",
+          "type": "number",
+          "min": -1,
+          "max": 2147483647,
+          "step": 1,
+          "integer": true
+        }
+      ],
+      "defaults": {
+        "steps": 20,
+        "vramGiB": 10,
+        "seed": -1
+      },
+      "setupHint": "Linux x64 / RTX 50 系列；使用独立 CUDA 引擎，无需 Docker 或 CUDA Toolkit。",
+      "directoryHint": "已有本地图像目录只导入 model/ 下四个权重文件。CUDA 图像引擎需单独导入本页指定的 RTX 50 系列引擎包。",
+      "directoryResources": [
+        "qwen-image-model"
+      ]
+    },
+    {
+      "id": "z-image-turbo",
+      "title": "Z-Image Turbo",
+      "description": "Q4_K · Qwen3-4B Q4_K_M · FLUX VAE · 图片生成",
+      "capabilities": ["生图"],
+      "runtime": "image",
+      "imageArchitecture": "z-image-turbo",
+      "files": {
+        "diffusion": "z_image_turbo-Q4_K.gguf",
+        "llm": "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+        "vae": "ae.safetensors"
+      },
+      "resources": ["image-cuda", "z-image-turbo-model"],
+      "fields": [
+        { "key": "steps", "label": "采样步数", "type": "number", "min": 1, "max": 20, "step": 1, "integer": true },
+        { "key": "vramGiB", "label": "引擎显存预算（GiB）", "type": "number", "min": 4, "max": 32, "step": 1, "integer": true },
+        { "key": "seed", "label": "随机种子（-1 为随机）", "type": "number", "min": -1, "max": 2147483647, "step": 1, "integer": true }
+      ],
+      "defaults": { "steps": 8, "vramGiB": 10, "seed": -1 },
+      "setupHint": "独立三组件配方；Turbo 默认 8 步、CFG 1，仅支持生成。安装校验不代表本机显存足够或已完成推理验收。",
+      "directoryHint": "选择 model/ 下含指定 diffusion GGUF、Qwen3 文本编码器 GGUF 和 FLUX ae.safetensors 的目录；不使用 TorchAO FP8 或 Qwen-Image VAE。",
+      "directoryResources": ["z-image-turbo-model"]
+    }
+  ],
+  "services": [
+    {
+      "id": "speech-api",
+      "title": "语音 API",
+      "description": "文件转写与 PCM 朗读，请求只发送到安装时授权的服务来源。",
+      "capabilities": [
+        "语音输入",
+        "语音输出"
+      ],
+      "runtime": "speech-api",
+      "fields": [
+        {
+          "key": "baseUrl",
+          "label": "API 基础地址",
+          "type": "url",
+          "placeholder": "http://127.0.0.1:8000/v1"
+        },
+        {
+          "key": "auth",
+          "label": "认证方式",
+          "type": "select",
+          "choices": [
+            {
+              "value": "none",
+              "title": "不使用密钥"
+            },
+            {
+              "value": "bearer",
+              "title": "Bearer 密钥"
+            }
+          ]
+        },
+        {
+          "key": "transcribeModel",
+          "label": "输入模型",
+          "type": "text"
+        },
+        {
+          "key": "synthesizeModel",
+          "label": "朗读模型",
+          "type": "text"
+        },
+        {
+          "key": "voice",
+          "label": "音色",
+          "type": "text"
+        },
+        {
+          "key": "speed",
+          "label": "语速",
+          "type": "number",
+          "min": 0.5,
+          "max": 2,
+          "step": 0.1,
+          "integer": false
+        }
+      ],
+      "defaults": {
+        "baseUrl": "http://127.0.0.1:8000/v1",
+        "auth": "none",
+        "transcribeModel": "whisper-1",
+        "synthesizeModel": "tts-1",
+        "voice": "alloy",
+        "speed": 1
+      },
+      "connectionHint": "内置允许 http://127.0.0.1:8000 和 https://api.openai.com。其他来源请修改 extension.json 的 inferenceNetwork 后重新加载目录并审核权限。地址包含 /v1，可保留服务自己的路径前缀。"
+    },
+    {
+      "id": "image-api",
+      "title": "图像 API",
+      "description": "图像生成与编辑，请求只发送到安装时授权的服务来源。",
+      "capabilities": [
+        "生图",
+        "图像编辑"
+      ],
+      "runtime": "image-api",
+      "fields": [
+        {
+          "key": "baseUrl",
+          "label": "API 基础地址",
+          "type": "url",
+          "placeholder": "http://127.0.0.1:8000/v1"
+        },
+        {
+          "key": "auth",
+          "label": "认证方式",
+          "type": "select",
+          "choices": [
+            {
+              "value": "none",
+              "title": "不使用密钥"
+            },
+            {
+              "value": "bearer",
+              "title": "Bearer 密钥"
+            }
+          ]
+        },
+        {
+          "key": "model",
+          "label": "服务模型 ID",
+          "type": "text"
+        },
+        {
+          "key": "operations",
+          "label": "服务能力",
+          "type": "select",
+          "choices": [
+            {
+              "value": "generate",
+              "title": "仅生成"
+            },
+            {
+              "value": "both",
+              "title": "生成与编辑"
+            }
+          ]
+        },
+        {
+          "key": "defaultSize",
+          "label": "默认尺寸",
+          "type": "select",
+          "choices": [
+            {
+              "value": "512x512",
+              "title": "512 × 512"
+            },
+            {
+              "value": "1024x1024",
+              "title": "1024 × 1024"
+            }
+          ]
+        },
+        {
+          "key": "responseMode",
+          "label": "图片响应协议",
+          "type": "select",
+          "choices": [
+            {
+              "value": "b64-json",
+              "title": "response_format: b64_json"
+            },
+            {
+              "value": "png",
+              "title": "output_format: png（GPT Image）"
+            }
+          ]
+        }
+      ],
+      "defaults": {
+        "baseUrl": "http://127.0.0.1:8000/v1",
+        "auth": "none",
+        "model": "sd-cpp-local",
+        "responseMode": "b64-json",
+        "operations": "both",
+        "defaultSize": "1024x1024"
+      },
+      "connectionHint": "内置允许 http://127.0.0.1:8000 和 https://api.openai.com。其他来源请修改 extension.json 的 inferenceNetwork 后重新加载目录并审核权限。地址包含 /v1，可保留服务自己的路径前缀。"
+    }
+  ]
+}

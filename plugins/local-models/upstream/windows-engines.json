@@ -1,0 +1,59 @@
+{
+  "platform": "windows-x64",
+  "manifest": "resources.json",
+  "verification": "Downloaded archives were checked against upstream digests, then selected entries were streamed through the plugin preparation implementation and checked against every file SHA256 in resources.json. No model weights were downloaded.",
+  "engines": [
+    {
+      "id": "llama-b11747-windows-x64",
+      "version": "b11747",
+      "commit": "f711c8f3038020d71f69b8ced09162b014fd7335",
+      "metadata": "https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b11747",
+      "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11747/llama-b11747-bin-win-vulkan-x64.zip",
+      "size": 36751367,
+      "upstreamSha256": "d298dc743c1e6b73b441742efedc40667232b77c0da5484aaf54475470d76198",
+      "selectedFiles": 31,
+      "selectedBytes": 90852352,
+      "layout": "llama-server.exe, all supplied DLLs including CPU variants, libomp.dll, mtmd.dll and ggml-vulkan.dll remain colocated.",
+      "systemDependencies": ["Microsoft Visual C++ x64 runtime", "Vulkan driver for GPU execution; CPU backend is independently loaded"],
+      "transport": "127.0.0.1, --port 0, random per-start LLAMA_API_KEY; pinned server's listening announcement supplies the port. Requests carry Bearer authentication; /health itself is public. Linux keeps its Unix socket."
+    },
+    {
+      "id": "sherpa-onnx-windows-x64",
+      "version": "1.13.8",
+      "metadata": "https://registry.npmjs.org/sherpa-onnx-win-x64/1.13.8",
+      "url": "https://registry.npmjs.org/sherpa-onnx-win-x64/-/sherpa-onnx-win-x64-1.13.8.tgz",
+      "size": 8894875,
+      "upstreamIntegrity": "sha512-oZF1c9VPOKtMwn83Bboc5XSWL+76BRoyB3eUuVnCknBKxwSULZU2Foia9VHWzU+n4I12rPsP6z6H9Rp1hD9o8g==",
+      "verifiedSha256": "fe522f02a5c113c2567a43982107ef41ae517f9a431931e90731e7e4d4341073",
+      "selectedPlatformFiles": 8,
+      "selectedPlatformBytes": 23453246,
+      "layout": "Reuse the unchanged sherpa-onnx-node 1.13.8 wrapper archive; sherpa-onnx-win-x64 keeps its .node addon, ONNX Runtime and sherpa DLLs together under node_modules."
+    },
+    {
+      "id": "image-vulkan-windows-x64",
+      "version": "master-977-90e86d1",
+      "metadata": "https://api.github.com/repos/lemonade-sdk/stable-diffusion.cpp/releases/tags/master-977-90e86d1",
+      "url": "https://github.com/lemonade-sdk/stable-diffusion.cpp/releases/download/master-977-90e86d1/sd-master-90e86d1-bin-win-vulkan-x64.zip",
+      "size": 29371336,
+      "upstreamSha256": "83a9b9b7d60cd4aaa6949b58d30a862637fad541b94355caa1c2363bd19bc385",
+      "selectedFiles": 20,
+      "selectedBytes": 86708869,
+      "layout": "sd-cli.exe and all supplied DLLs, including stable-diffusion, ggml, image codec DLLs and CPU variants, remain colocated; upstream license texts are retained.",
+      "systemDependencies": ["Microsoft Visual C++ x64 runtime", "Vulkan-compatible GPU driver and sufficient device memory"],
+      "configuration": "Vulkan0; --flash-attn off,diffusion=on uses the Vulkan workaround without the deprecated --diffusion-fa spelling. Linux retains CUDA0 and its RTX 50 engine."
+    }
+  ],
+  "implementationReferences": [
+    "https://github.com/lemonade-sdk/lemonade/blob/d98e62998768199906e68823e33ae482d61e8bb0/src/cpp/server/backends/llamacpp/llamacpp_server.cpp",
+    "https://github.com/lemonade-sdk/lemonade/blob/d98e62998768199906e68823e33ae482d61e8bb0/src/cpp/server/backends/sdcpp/sdcpp_server.cpp",
+    "https://github.com/ggml-org/llama.cpp/blob/f711c8f3038020d71f69b8ced09162b014fd7335/tools/server/server-http.cpp",
+    "https://github.com/ggml-org/llama.cpp/blob/f711c8f3038020d71f69b8ced09162b014fd7335/tools/server/server.cpp",
+    "https://github.com/ggml-org/llama.cpp/blob/f711c8f3038020d71f69b8ced09162b014fd7335/common/arg.cpp"
+  ],
+  "limitations": [
+    "The referenced Lemonade revision selects newer llama releases; its platform/layout patterns are references, not proof of b11747 compatibility.",
+    "Archive/digest and Linux-host protocol tests are not Windows execution, GPU compatibility, real-weight inference or output-quality evidence.",
+    "No Windows ARM64, CUDA or ROCm variant is enabled. No VC++ runtime or GPU driver is installed or modified by this plugin.",
+    "External phoneme trees and native engine directory imports must preserve the required relative layout. Model/projector files may remain at independently authorized locations."
+  ]
+}
