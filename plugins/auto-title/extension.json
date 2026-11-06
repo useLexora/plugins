@@ -5,10 +5,10 @@
   "name": "标题自动生成",
   "author": "Lexora",
   "description": "根据首条有效输入自动生成任务标题，保留手动命名，也可随任务目标变化更新。",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "apiVersion": 3,
   "engines": {
-    "lexora": ">=0.12.0 <1.0.0"
+    "lexora": ">=0.12.0"
   },
   "entry": "extension.ts",
   "icon": "icon.svg",

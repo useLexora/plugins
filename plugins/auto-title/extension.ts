@@ -2,7 +2,9 @@ import type { ExtensionContext } from './lexora'
 
 export async function activate(context: ExtensionContext) {
   let configuration = await context.configuration.get()
-  context.configuration.onChange((values) => { configuration = { ...values } })
+  context.configuration.onChange((values) => {
+    configuration = { ...values }
+  })
   context.conditions.register('lexora.auto-title.available', (scope, params) => {
     const values = params.purpose === 'configure' && scope.form.status === 'available' ? scope.form : scope.configuration
     return values.status === 'available' && values.values.enabled === true
@@ -50,7 +52,7 @@ export async function activate(context: ExtensionContext) {
     const title = result.text.trim().replace(/^["“「『`]+|["”」』`]+$/g, '').trim()
     if (!title)
       return { status: 'skipped', message: '任务内容暂不足以命名' }
-    if (title.length > 80 || /[\r\n\u0000-\u001F]/.test(title))
+    if (title.length > 80 || /[\p{Cc}\u2028\u2029]|<\/?think\b/iu.test(title))
       throw new Error('TITLE_INVALID')
     if (title === task.title && task.titleSource === 'generated')
       return { status: 'skipped', message: '当前标题已符合任务内容' }
