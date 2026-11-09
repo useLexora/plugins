@@ -98,6 +98,7 @@ export function createLocalImport(context) {
       if (!anchors.length && !(recipe.id === 'vision' && roles.find(r => r.id === 'projector').choices.length)) continue
       const missing = roles.filter(role => !role.optional && !role.choices.length).map(role => role.title)
       const notes = [...warnings]
+      if (recipe.id === 'chat' && anchors.some(file => file.info.architecture === 'qwen35')) notes.push('Qwen3.5 按 dense qwen35 混合 attention/SSM 结构识别为纯文本对话模型；需支持该架构的 llama.cpp 引擎，未验证视觉投影、MoE 或 MTP。结构识别不等于推理验收。')
       if (recipe.id === 'asr') notes.push('仅支持带流式元数据的 sherpa Zipformer/Zipformer2，配套文件必须同目录且维度一致。')
       if (recipe.id === 'vision') notes.push('仅识别 Qwen2-VL/Qwen3-VL 架构；投影须来自对应模型，结构检查不能证明训练来源相同。')
       let companionFiles
