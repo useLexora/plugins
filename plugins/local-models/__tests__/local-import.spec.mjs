@@ -194,12 +194,16 @@ test('GGUF offline definition has content-stable identity, authorized resource I
   assert.notEqual((await different.importer.resolve(await select(different, 'chat'))).id, resolved.id)
 })
 
-test('GGUF metadata distinguishes vision pairing, shards, adapters and unknown architecture', async () => {
+test('GGUF metadata selects the default without restricting text and vision loading choices', async () => {
   const f = fixture([['weights.gguf', gguf({ architecture: 'qwen3vl' })], ['projector-without-mmproj-name.gguf', gguf({ architecture: 'qwen3vl', projector: true })]])
   const inspection = await f.importer.inspect({ resourceIds: f.ids })
-  assert.deepEqual(inspection.candidates.map(c => c.recipe), ['vision'])
+  assert.deepEqual(inspection.candidates.map(c => c.recipe), ['chat', 'vision', 'asr', 'tts', 'image', 'ocr'])
+  assert.equal(inspection.defaultRecipe, 'vision')
   assert.equal((await f.importer.resolve(await select(f, 'vision'))).recipe, 'vision')
-  for (const options of [{ split: true }, { architecture: 'unsupported' }, { type: 'adapter' }]) {
+  const text = await f.importer.resolve(await select(f, 'chat'))
+  assert.deepEqual(text.files, { model: 'weights.gguf' })
+  assert.equal(text.recipe, 'chat')
+  for (const options of [{ split: true }, { type: 'adapter' }]) {
     const bad = fixture([['normal.gguf', gguf(options)]])
     await assert.rejects(bad.importer.inspect({ resourceIds: bad.ids }), /分片|架构|适配器/)
   }
@@ -210,18 +214,65 @@ test('GGUF metadata distinguishes vision pairing, shards, adapters and unknown a
   await assert.rejects(mismatch.importer.resolve(await select(mismatch, 'vision')), /架构不匹配/)
 })
 
+test('manual vision loading accepts a structurally valid unfamiliar model and projector', async () => {
+  const f = fixture([['model.gguf', gguf({ architecture: 'future' })], ['projector.gguf', gguf({ architecture: 'future', projector: true })]])
+  const result = await f.importer.resolve(await select(f, 'vision'))
+  assert.equal(result.recipe, 'vision')
+  assert.deepEqual(result.files, { model: 'model.gguf', projector: 'projector.gguf' })
+  const text = fixture([['model.gguf', gguf()]])
+  const inspection = await text.importer.inspect({ resourceIds: text.ids })
+  assert.equal(inspection.defaultRecipe, 'chat')
+  await assert.rejects(text.importer.resolve(await select(text, 'vision')), /缺少.*视觉投影/)
+  await assert.rejects(text.importer.resolve(await select(text, 'image')), /缺少.*完整检查点/)
+})
+
 test('Zipformer is identified from metadata and graph interfaces rather than filenames', async () => {
   const f = fixture([['a.onnx', onnx({ family: 'zipformer', role: 'encoder' })], ['b.onnx', onnx({ family: 'zipformer', role: 'decoder' })], ['c.onnx', onnx({ family: 'zipformer', role: 'joiner' })], ['tokens.txt', Buffer.from('<blk> 0\na 1\n')]])
   const result = await f.importer.resolve(await select(f, 'asr'))
   assert.deepEqual(result.files, { encoder: 'a.onnx', decoder: 'b.onnx', joiner: 'c.onnx', tokens: 'tokens.txt' })
   assert.equal(result.specification.files.length, 4)
-  for (const bytes of [onnx({ arbitrary: true }), onnx({ external: true }), Buffer.from('not onnx')]) {
+  assert.equal((await f.importer.inspect({ resourceIds: f.ids })).defaultRecipe, 'asr')
+  for (const bytes of [onnx({ external: true }), Buffer.from('not onnx')]) {
     const bad = fixture([['kokoro.onnx', bytes]])
     await assert.rejects(bad.importer.inspect({ resourceIds: bad.ids }), /未识别/)
   }
   f.records.get(f.ids[3]).bytes = Buffer.from('<blk> 0\na 9\n')
   f.records.get(f.ids[3]).size = f.records.get(f.ids[3]).bytes.length
   await assert.rejects(f.importer.resolve(await select(f, 'asr')), /词表不匹配/)
+})
+
+test('manual ONNX role assignment accepts unclassified graphs without bypassing bundle checks', async () => {
+  const f = fixture(['a.onnx', 'b.onnx', 'c.onnx'].map(path => [path, onnx({ arbitrary: true })]).concat([['tokens.txt', Buffer.from('<blk> 0\na 1\n')]]))
+  const inspection = await f.importer.inspect({ resourceIds: f.ids })
+  const input = { token: inspection.token, recipe: 'asr', selection: { encoder: f.ids[0], decoder: f.ids[1], joiner: f.ids[2], tokens: f.ids[3] } }
+  const result = await f.importer.resolve(input)
+  assert.deepEqual(result.files, { encoder: 'a.onnx', decoder: 'b.onnx', joiner: 'c.onnx', tokens: 'tokens.txt' })
+  await assert.rejects(f.importer.resolve({ ...input, selection: { ...input.selection, decoder: f.ids[0] } }), /重复/)
+  await assert.rejects(f.importer.resolve({ ...input, recipe: 'tts', selection: { model: f.ids[0] } }), /缺少/)
+  const known = fixture(kokoroEntries())
+  assert.equal((await known.importer.inspect({ resourceIds: known.ids })).defaultRecipe, 'tts')
+  await assert.rejects(known.importer.resolve(await select(known, 'asr')), /缺少/)
+})
+
+test('manual choices do not turn contradictory known ONNX interfaces into unclassified graphs', async () => {
+  const cases = [
+    onnx({ metadata: { style_dim: '2,1,128' } }),
+    onnx({ family: 'zipformer', role: 'encoder', metadata: { encoder_dims: '0' } }),
+    onnx({ family: 'zipformer', role: 'decoder', metadata: { context_size: '3' } }),
+    onnx({ family: 'zipformer', role: 'joiner', metadata: { joiner_dim: '8' } }),
+  ]
+  for (const content of cases) {
+    const f = fixture([['broken.onnx', content]])
+    await assert.rejects(f.importer.inspect({ resourceIds: f.ids }), /Kokoro|Zipformer|Transducer/)
+  }
+})
+
+test('manual TTS loading accepts a complete unclassified ONNX bundle', async () => {
+  const f = fixture(kokoroEntries().map(([path, content]) => [path, path.endsWith('.onnx') ? onnx({ arbitrary: true }) : content]))
+  const result = await f.importer.resolve(await select(f, 'tts'))
+  assert.equal(result.recipe, 'tts')
+  assert.equal(result.phonemes, 'tts/espeak-ng-data')
+  assert.equal(result.specification.files.length, 9)
 })
 
 function kokoroEntries() {
@@ -279,7 +330,8 @@ test('SD1 and SDXL inspect only bounded tensor headers, rejecting incomplete che
   for (const arch of ['sd1', 'sdxl']) {
     const f = fixture([['anything.safetensors', checkpoint(arch)]])
     const result = await f.importer.inspect({ resourceIds: f.ids })
-    assert.deepEqual(result.candidates.map(c => c.recipe), ['image'])
+    assert.equal(result.defaultRecipe, 'image')
+    assert.deepEqual(result.candidates.find(c => c.recipe === 'image').missing, [])
     assert.ok(f.reads.reduce((sum, r) => sum + r.length, 0) < 1024 * 1024)
     assert.equal(f.hashes.length, 0)
     f.context.resources.hash = async () => ({ sha256: 'a'.repeat(64), size: f.records.get(f.ids[0]).size })
