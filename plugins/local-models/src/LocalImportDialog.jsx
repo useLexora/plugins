@@ -44,7 +44,7 @@ export function LocalImportDialog({ context, manager, onClose, onCompleted }) {
       if (!files?.length) return
       setInspection(null)
       const result = await manager.run('inspect-local', { resourceIds: files.map(file => file.id) }, '')
-      if (result) { setInspection(result); selectCandidate(result.candidates[0].recipe, result) }
+      if (result) { setInspection(result); selectCandidate(result.defaultRecipe, result) }
     } catch (error) { setError(error.message) }
     finally { setChoosing(false) }
   }

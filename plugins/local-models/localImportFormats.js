@@ -202,20 +202,24 @@ async function gguf(r) {
   const architecture = metadata['general.architecture']
   if (architecture === 'clip') {
     const family = metadata['clip.projector_type']
-    if (metadata['clip.has_vision_encoder'] !== true || !['qwen2vl', 'qwen3vl'].includes(family) || ![...tensors.keys()].some(k => k.startsWith('v.')) || ![...tensors.keys()].some(k => k.startsWith('mm.'))) fail('暂不支持此 GGUF 视觉投影架构')
+    if (metadata['clip.has_vision_encoder'] !== true || typeof family !== 'string' || !family || ![...tensors.keys()].some(k => k.startsWith('v.')) || ![...tensors.keys()].some(k => k.startsWith('mm.'))) fail('GGUF 视觉投影缺少架构或必要张量')
     return { format: 'gguf', role: 'projector', family }
   }
-  const supported = ['llama', 'qwen2', 'qwen3', 'qwen35', 'qwen2vl', 'qwen3vl', 'gemma2', 'gemma3', 'phi3']
-  if (!supported.includes(architecture)) fail(`本地导入器尚未验证 GGUF 架构 ${JSON.stringify(typeof architecture === 'string' ? architecture.slice(0, 80) : '(缺失)')}；请升级本地模型插件或选择已支持的完整模型，不要修改架构标签。引擎支持不等于导入器已支持`)
+  const validated = ['llama', 'qwen2', 'qwen3', 'qwen35', 'qwen2vl', 'qwen3vl', 'gemma2', 'gemma3', 'phi3']
+  if (typeof architecture !== 'string' || !architecture) fail('GGUF 缺少模型架构')
   if (metadata['general.type'] && metadata['general.type'] !== 'model') fail('GGUF 类型不是完整语言模型，请选择 general.type=model 的完整 GGUF')
   const blocks = metadata[`${architecture}.block_count`], width = metadata[`${architecture}.embedding_length`]
   if (!integer(blocks, 256) || !blocks || !integer(width) || !width || !metadata['tokenizer.ggml.tokens']?.length || !metadata['tokenizer.ggml.model'] || tensors.get('token_embd.weight')?.[0] !== width || !tensors.has('output_norm.weight')) fail('GGUF 缺少完整语言模型结构或 tokenizer')
   if (tensors.get('token_embd.weight')?.[1] !== metadata['tokenizer.ggml.tokens'].length) fail('GGUF tokenizer 与 embedding 词表大小不匹配')
   if (architecture === 'qwen35') validateQwen35(metadata, tensors, blocks, width)
-  else for (let i = 0; i < blocks; i++) {
+  else if (validated.includes(architecture)) for (let i = 0; i < blocks; i++) {
     const prefix = `blk.${i}.`
     const required = ['attn_norm.weight', 'attn_output.weight', 'ffn_norm.weight', 'ffn_up.weight', 'ffn_down.weight']
     if (required.some(key => !tensors.has(prefix + key)) || (!tensors.has(`${prefix}attn_qkv.weight`) && ['attn_q.weight', 'attn_k.weight', 'attn_v.weight'].some(key => !tensors.has(prefix + key)))) fail('GGUF 缺少完整模型层，可能是组件或分片')
+  }
+  else {
+    const layers = new Set([...tensors.keys()].map(name => /^blk\.(\d+)\./.exec(name)?.[1]))
+    for (let i = 0; i < blocks; i++) if (!layers.has(String(i))) fail('GGUF 缺少模型层，可能是组件或分片')
   }
   return { format: 'gguf', role: 'model', architecture, vision: ['qwen2vl', 'qwen3vl'].includes(architecture), title: typeof metadata['general.name'] === 'string' ? metadata['general.name'].slice(0, 160) : undefined }
 }
@@ -294,18 +298,25 @@ async function onnx(r) {
     if (!positive('sample_rate') || !positive('n_speakers') || !['0', '1'].includes(metadata.has_espeak) || style.length !== 3 || style[0] < 2 || style[0] > 8192 || style[1] !== 1 || style[2] !== 256 || inputs.length !== 3 || inputs[0].type !== 7 || inputs[0].shape.length !== 2 || inputs[1].type !== 1 || inputs[1].shape.at(-1) !== 256 || inputs[2].type !== 1 || outputs.length !== 1 || outputs[0].type !== 1) fail('Kokoro 元数据或图接口与当前 sherpa 适配不匹配')
     return { format: 'onnx', family: 'kokoro', role: 'model', voicesBytes: style[0] * style[2] * Number(metadata.n_speakers) * 4, espeak: metadata.has_espeak === '1' }
   }
-  if (names.startsWith('x,') && outputs[0].name === 'encoder_out') {
+  if (['zipformer', 'zipformer2'].includes(metadata.model_type) && names.startsWith('x,') && outputs[0].name === 'encoder_out') {
     const family = metadata.model_type
     const vectors = family === 'zipformer' ? ['encoder_dims', 'attention_dims', 'num_encoder_layers', 'cnn_module_kernels', 'left_context_len'] : ['encoder_dims', 'query_head_dims', 'value_head_dims', 'num_heads', 'num_encoder_layers', 'cnn_module_kernels', 'left_context_len']
-    if (!['zipformer', 'zipformer2'].includes(family) || !positive('T') || !positive('decode_chunk_len') || !vectors.every(vector) || inputs[0].type !== 1 || inputs[0].shape.at(-1) !== 80 || outputs[0].type !== 1 || (metadata.feature && metadata.feature !== 'fbank')) fail('仅支持带流式元数据、80 维 fbank 的 Zipformer/Zipformer2')
+    if (!positive('T') || !positive('decode_chunk_len') || !vectors.every(vector) || inputs[0].type !== 1 || inputs[0].shape.at(-1) !== 80 || outputs[0].type !== 1 || (metadata.feature && metadata.feature !== 'fbank')) fail('仅支持带流式元数据、80 维 fbank 的 Zipformer/Zipformer2')
     const count = metadata.encoder_dims.split(',').length, layers = metadata.num_encoder_layers.split(',').map(Number)
     const stateCount = family === 'zipformer' ? count * 7 : layers.reduce((a, b) => a + b, 0) * 6 + 2
     if (vectors.some(key => metadata[key].split(',').length !== count) || inputs.length !== stateCount + 1 || outputs.length !== inputs.length || inputs[0].shape.length !== 3 || outputs[0].shape.length !== 3 || !outputs[0].shape.at(-1) || inputs.slice(1).some((input, i) => outputs[i + 1].name !== `new_${input.name}` || outputs[i + 1].type !== input.type)) fail('Zipformer 流式缓存接口或元数据维度不完整')
     return { format: 'onnx', family, role: 'encoder', width: outputs[0].shape.at(-1) }
   }
-  if (names === 'y' && outputs.length === 1 && outputs[0].name === 'decoder_out' && inputs[0].type === 7 && inputs[0].shape.length === 2 && inputs[0].shape[1] === Number(metadata.context_size) && outputs[0].type === 1 && outputs[0].shape.length === 2 && outputs[0].shape[1] > 0 && positive('vocab_size') && positive('context_size')) return { format: 'onnx', family: 'transducer', role: 'decoder', vocab: Number(metadata.vocab_size), width: outputs[0].shape.at(-1) }
-  if (names === 'encoder_out,decoder_out' && positive('joiner_dim') && outputs.length === 1 && outputs[0].name === 'logit' && inputs.every(i => i.type === 1 && i.shape.length === 2 && i.shape[1] === Number(metadata.joiner_dim)) && outputs[0].type === 1 && outputs[0].shape.length === 2 && outputs[0].shape[1] > 0) return { format: 'onnx', family: 'transducer', role: 'joiner', widths: inputs.map(i => i.shape.at(-1)), vocab: outputs[0].shape.at(-1) }
-  fail('ONNX 不是当前适配的流式 Zipformer 或 sherpa Kokoro；不能按文件名推断架构')
+  if (names === 'y' && outputs[0].name === 'decoder_out') {
+    if (outputs.length !== 1 || inputs[0].type !== 7 || inputs[0].shape.length !== 2 || inputs[0].shape[1] !== Number(metadata.context_size) || outputs[0].type !== 1 || outputs[0].shape.length !== 2 || !(outputs[0].shape[1] > 0) || !positive('vocab_size') || !positive('context_size')) fail('Transducer 解码器元数据或图接口不匹配')
+    return { format: 'onnx', family: 'transducer', role: 'decoder', vocab: Number(metadata.vocab_size), width: outputs[0].shape.at(-1) }
+  }
+  if (names === 'encoder_out,decoder_out' && outputs[0].name === 'logit') {
+    if (!positive('joiner_dim') || outputs.length !== 1 || !inputs.every(i => i.type === 1 && i.shape.length === 2 && i.shape[1] === Number(metadata.joiner_dim)) || outputs[0].type !== 1 || outputs[0].shape.length !== 2 || !(outputs[0].shape[1] > 0)) fail('Transducer 连接器元数据或图接口不匹配')
+    return { format: 'onnx', family: 'transducer', role: 'joiner', widths: inputs.map(i => i.shape.at(-1)), vocab: outputs[0].shape.at(-1) }
+  }
+  if (['zipformer', 'zipformer2'].includes(metadata.model_type)) fail('Zipformer 缺少必要的流式图接口')
+  return { format: 'onnx', family: metadata.model_type }
 }
 
 async function safetensors(r) {

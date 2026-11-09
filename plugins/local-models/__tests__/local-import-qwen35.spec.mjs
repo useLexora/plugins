@@ -71,8 +71,9 @@ test('dense Qwen3.5 hybrid is recognized by structure, routed to chat, and resol
   assert.deepEqual(await parseFile(f.context, f.file), first)
   const importer = createLocalImport(f.context)
   const result = await importer.inspect({ resourceIds: [f.file.id] })
-  assert.deepEqual(result.candidates.map(c => c.recipe), ['chat'])
-  assert.match(result.candidates[0].warnings.join(' '), /纯文本.*llama.cpp.*结构识别不等于推理验收/)
+  assert.equal(result.defaultRecipe, 'chat')
+  assert.deepEqual(result.candidates.map(c => c.recipe), ['chat', 'vision', 'asr', 'tts', 'image', 'ocr'])
+  assert.deepEqual(result.candidates.find(c => c.recipe === 'vision').missing, ['视觉投影'])
   const resolved = await importer.resolve({ token: result.token, recipe: 'chat', selection: { model: f.file.id } })
   assert.equal(resolved.recipe, 'chat'); assert.equal(resolved.specification.files[0].resourceId, f.file.id)
 })
@@ -101,10 +102,13 @@ for (const [key, value] of [
   await assert.rejects(parse({ metadata: { [key]: value } }), /Qwen3.5/)
 })
 
-test('unknown and MoE architectures include actionable feedback, not a generic engine rejection', async () => {
-  for (const architecture of ['qwen35moe', 'invented', undefined]) {
-    await assert.rejects(parse({ metadata: { 'general.architecture': architecture } }), /尚未验证.*升级.*不要修改架构标签/)
+test('unclassified GGUF architectures retain common structural checks without an architecture allowlist', async () => {
+  for (const architecture of ['qwen35moe', 'invented']) {
+    const result = await parse({ metadata: { 'general.architecture': architecture, [`${architecture}.block_count`]: 4, [`${architecture}.embedding_length`]: 4 } })
+    assert.equal(result.architecture, architecture)
+    await assert.rejects(parse({ metadata: { 'general.architecture': architecture } }), /缺少完整语言模型结构/)
   }
+  await assert.rejects(parse({ metadata: { 'general.architecture': undefined } }), /缺少模型架构/)
 })
 
 test('hybrid support retains tokenizer, split, adapter, span and truncation checks', async () => {

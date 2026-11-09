@@ -44,23 +44,26 @@ function espeakMissing(files, model) {
 }
 function matches(recipe, role, file) {
   const info = file.info
-  if (recipe === 'chat') return info.format === 'gguf' && info.role === 'model' && !info.vision
-  if (recipe === 'vision') return info.format === 'gguf' && (role === 'projector' ? info.role === role : info.role === 'model' && info.vision)
-  if (recipe === 'asr') return role === 'tokens' ? info.format === 'tokens' : info.format === 'onnx' && info.role === role && info.family !== 'kokoro'
-  if (recipe === 'tts') return role === 'model' ? info.family === 'kokoro' : info.role === role && ['voices', 'tokens', 'lexicon'].includes(info.format)
+  if (recipe === 'chat') return info.format === 'gguf' && info.role === 'model'
+  if (recipe === 'vision') return info.format === 'gguf' && info.role === role
+  if (recipe === 'asr') return role === 'tokens' ? info.format === 'tokens' : info.format === 'onnx' && (!info.role || info.role === role) && info.family !== 'kokoro'
+  if (recipe === 'tts') return role === 'model' ? info.format === 'onnx' && (!info.role || info.family === 'kokoro') : info.role === role && ['voices', 'tokens', 'lexicon'].includes(info.format)
   if (recipe === 'image') return info.format === 'safetensors'
   return info.format === 'traineddata'
 }
 function validatePairing(recipe, selected, companions) {
   const primary = selected.model ?? selected.encoder ?? selected.language
   if (Object.values(selected).some(file => parent(file.path) !== parent(primary.path))) throw Error('配套文件必须来自同一相对目录，请重新选择完整模型目录')
-  if (recipe === 'vision' && selected.projector.info.family !== selected.model.info.architecture) throw Error('视觉模型与投影架构不匹配')
+  if (recipe === 'vision') {
+    const family = selected.projector.info.family, architecture = selected.model.info.architecture
+    if ([family, architecture].every(value => ['qwen2vl', 'qwen3vl'].includes(value)) && family !== architecture) throw Error('视觉模型与投影架构不匹配')
+  }
   if (recipe === 'asr') {
     const { encoder, decoder, joiner, tokens } = selected
-    if (decoder.info.vocab !== tokens.info.vocab || tokens.info.maxId !== tokens.info.vocab - 1 || (joiner.info.vocab && joiner.info.vocab !== decoder.info.vocab) || [encoder.info.width, decoder.info.width].some((width, i) => width && joiner.info.widths[i] && width !== joiner.info.widths[i])) throw Error('Zipformer 编解码器、连接器维度或词表不匹配')
+    if (tokens.info.maxId !== tokens.info.vocab - 1 || [decoder.info.vocab, joiner.info.vocab].some(vocab => vocab && vocab !== tokens.info.vocab) || [encoder.info.width, decoder.info.width].some((width, i) => width && joiner.info.widths?.[i] && width !== joiner.info.widths[i])) throw Error('Zipformer 编解码器、连接器维度或词表不匹配')
   }
   if (recipe === 'tts') {
-    if (selected.voices.bytes !== selected.model.info.voicesBytes) throw Error('Kokoro 音色文件大小与模型 style_dim/n_speakers 不匹配')
+    if (selected.model.info.voicesBytes && selected.voices.bytes !== selected.model.info.voicesBytes) throw Error('Kokoro 音色文件大小与模型 style_dim/n_speakers 不匹配')
     const missing = espeakMissing(companions, selected.model)
     if (missing.length) throw Error(`Kokoro 配套数据不完整：${missing.join('、')}`)
   }
@@ -89,18 +92,17 @@ export function createLocalImport(context) {
       }
       if (budget.bytes > 64 * 1024 ** 2) throw Error('所选文件元数据总量超过 64 MiB 解析上限，请缩小选择范围')
     }
+    if (!parsed.length) throw Error(`未识别到可用的本地模型。${warnings.slice(0, 8).join('；') || '请选择支持的完整模型文件。'}`)
     const candidates = []
     for (const recipe of recipes) {
       const roleDefinitions = recipe.id === 'image' ? [{ id: 'model', title: '完整检查点', optional: false }] : recipe.roles
       const roles = roleDefinitions.map(role => ({ id: role.id, title: role.title, optional: role.optional, choices: parsed.filter(file => matches(recipe.id, role.id, file)).map(choice) }))
       const anchor = recipe.id === 'asr' ? 'encoder' : recipe.id === 'ocr' ? 'language' : 'model'
       const anchors = parsed.filter(file => matches(recipe.id, anchor, file))
-      if (!anchors.length && !(recipe.id === 'vision' && roles.find(r => r.id === 'projector').choices.length)) continue
       const missing = roles.filter(role => !role.optional && !role.choices.length).map(role => role.title)
       const notes = [...warnings]
-      if (recipe.id === 'chat' && anchors.some(file => file.info.architecture === 'qwen35')) notes.push('Qwen3.5 按 dense qwen35 混合 attention/SSM 结构识别为纯文本对话模型；需支持该架构的 llama.cpp 引擎，未验证视觉投影、MoE 或 MTP。结构识别不等于推理验收。')
-      if (recipe.id === 'asr') notes.push('仅支持带流式元数据的 sherpa Zipformer/Zipformer2，配套文件必须同目录且维度一致。')
-      if (recipe.id === 'vision') notes.push('仅识别 Qwen2-VL/Qwen3-VL 架构；投影须来自对应模型，结构检查不能证明训练来源相同。')
+      if (recipe.id === 'asr') notes.push('当前转写引擎使用流式 Zipformer/Zipformer2，配套文件必须同目录且维度一致。')
+      if (recipe.id === 'vision') notes.push('视觉投影须与所选模型配套。')
       let companionFiles
       if (recipe.id === 'tts') {
         companionFiles = [...new Map(anchors.flatMap(model => companionsFor(parsed, model)).map(file => [file.id, choice(file)])).values()]
@@ -111,12 +113,14 @@ export function createLocalImport(context) {
       const candidate = { recipe: recipe.id, title: anchors.length === 1 ? localTitle(anchors[0]) : `本地${recipe.title}模型`, roles, ...(companionFiles ? { companionFiles } : {}), missing, ...(notes.length ? { warnings: notes } : {}) }
       candidates.push(candidate)
     }
-    if (!candidates.length) throw Error(`未识别到可用的本地模型。${warnings.slice(0, 8).join('；') || '请选择支持的完整模型文件。'}`)
+    const vision = parsed.some(file => file.info.format === 'gguf' && (file.info.vision || file.info.role === 'projector'))
+    const detected = vision ? 'vision' : parsed.some(file => file.info.family === 'kokoro') ? 'tts' : parsed.some(file => file.info.format === 'onnx' && file.info.role) ? 'asr' : null
+    const defaultRecipe = detected ?? candidates.find(item => !item.missing.length)?.recipe ?? candidates.find(item => item.roles.some(role => role.choices.length))?.recipe ?? 'chat'
     checkAbort(signal)
     const token = globalThis.crypto.randomUUID()
     snapshots.set(token, { files: parsed, candidates, created: Date.now() })
     while (snapshots.size > 4) snapshots.delete(snapshots.keys().next().value)
-    return JSON.parse(JSON.stringify({ token, candidates }))
+    return JSON.parse(JSON.stringify({ token, defaultRecipe, candidates }))
   }
   async function resolve(input, { signal = context.signal, onProgress = undefined } = {}) {
     const { token, recipe, selection, title } = input ?? {}
