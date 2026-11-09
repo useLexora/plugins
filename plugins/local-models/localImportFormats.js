@@ -8,12 +8,14 @@ const fail = message => { throw Error(message) }
 export const safePath = value => typeof value === 'string' && value.length <= 1024 && value.split('/').length <= 16 && value.split('/').every(part => part && !['.', '..'].includes(part) && !/[\\<>:"|?*\x00-\x1f\x7f]/.test(part) && !/[. ]$/.test(part))
 export const checkAbort = signal => signal?.throwIfAborted()
 
-class Reader {
-  constructor(context, file, signal, budget) {
+// Exported for bounded-read regression tests; parsing still goes through parseFile.
+export class Reader {
+  constructor(context, file, signal, budget, readAhead = 1024) {
     this.context = context
     this.file = file
     this.signal = signal
     this.budget = budget
+    this.readAhead = readAhead
     this.offset = 0
     this.used = 0
     this.start = -1
@@ -32,7 +34,17 @@ class Reader {
     for (let done = 0; done < length;) {
       checkAbort(this.signal)
       const position = offset + done
-      const size = Math.min(Math.max(length - done, 1024), 128 * 1024, this.file.bytes - position)
+      // A field can straddle a cached block: consume its tail before fetching
+      // the next block, otherwise small fields repeatedly reread the same bytes.
+      if (position >= this.start && position < this.start + this.cache.length) {
+        const from = position - this.start, take = Math.min(this.cache.length - from, length - done)
+        result.set(this.cache.subarray(from, from + take), done); done += take
+        continue
+      }
+      // Keep sparse formats (e.g. ONNX skipping raw_data) at 1 KiB. Only
+      // sequential GGUF metadata opts into larger prefetch across the bridge.
+      // All formats retain the API's 128 KiB per-call cap and read budgets.
+      const size = Math.min(Math.max(length - done, this.readAhead), 128 * 1024, this.file.bytes - position)
       this.used += size; this.budget.bytes += size
       if (this.used > 16 * MiB || this.budget.bytes > 64 * MiB) fail('格式元数据超过解析上限，请缩小选择范围')
       const chunk = await this.context.resources.readBytes({ id: this.file.id }, { offset: position, length: size })
@@ -84,19 +96,77 @@ class Reader {
   fingerprint() { return bytesToHex(this.proof.digest()) }
 }
 
+function validateQwen35(metadata, tensors, blocks, width) {
+  // Dense Qwen3.5: llama.cpp src/models/qwen35.cpp load_arch_hparams/tensors.
+  // This is NOT the qwen35moe layout, nor a claim of multimodal runtime support.
+  const invalid = detail => fail(`Qwen3.5 GGUF 结构不匹配：${detail}；请选择完整的 dense qwen35 GGUF，或升级插件后重试`)
+  const positive = key => {
+    const value = metadata[`qwen35.${key}`]
+    if (!integer(value) || !value) invalid(`qwen35.${key} 缺失或不合法`)
+    return value
+  }
+  const shape = (name, expected) => {
+    const actual = tensors.get(name)
+    if (!actual || actual.length !== expected.length || actual.some((n, i) => n !== expected[i])) invalid(`${name} 缺失或维度错误`)
+  }
+  if ((metadata['qwen35.nextn_predict_layers'] ?? 0) !== 0) invalid('暂未验证带 MTP/NextN 层的模型')
+  const ff = positive('feed_forward_length'), heads = positive('attention.head_count'), kvHeads = positive('attention.head_count_kv')
+  const keyLength = positive('attention.key_length'), valueLength = positive('attention.value_length')
+  const conv = positive('ssm.conv_kernel'), state = positive('ssm.state_size'), groups = positive('ssm.group_count')
+  const rank = positive('ssm.time_step_rank'), inner = positive('ssm.inner_size')
+  if (heads % kvHeads || keyLength !== valueLength || rank % groups || inner !== state * rank) invalid('attention/SSM 维度不一致')
+  const recurrent = metadata['qwen35.attention.recurrent_layers']
+  const interval = metadata['qwen35.full_attention_interval'] ?? 4
+  if (recurrent === undefined) {
+    if (!integer(interval, 256) || !interval) invalid('full_attention_interval 不合法')
+  } else if (typeof recurrent !== 'boolean' && (!Array.isArray(recurrent) || recurrent.length !== blocks || recurrent.some(v => typeof v !== 'boolean'))) invalid('attention.recurrent_layers 必须是布尔值或逐层布尔数组')
+  shape('token_embd.weight', [width, metadata['tokenizer.ggml.tokens'].length])
+  shape('output_norm.weight', [width])
+  if (tensors.has('output.weight')) shape('output.weight', [width, metadata['tokenizer.ggml.tokens'].length])
+  for (let i = 0; i < blocks; i++) {
+    const prefix = `blk.${i}.`, require = (name, dimensions) => shape(prefix + name, dimensions)
+    require('attn_norm.weight', [width]); require('post_attention_norm.weight', [width])
+    require('ffn_gate.weight', [width, ff]); require('ffn_up.weight', [width, ff]); require('ffn_down.weight', [ff, width])
+    const isRecurrent = recurrent === undefined ? (i + 1) % interval !== 0 : typeof recurrent === 'boolean' ? recurrent : recurrent[i]
+    if (isRecurrent) {
+      const channels = 2 * state * groups + inner
+      require('attn_qkv.weight', [width, channels]); require('attn_gate.weight', [width, inner])
+      require('ssm_conv1d.weight', [conv, channels]); require('ssm_dt.bias', [rank]); require('ssm_a', [rank])
+      require('ssm_beta.weight', [width, rank]); require('ssm_alpha.weight', [width, rank])
+      require('ssm_norm.weight', [state]); require('ssm_out.weight', [inner, width])
+    } else {
+      if (tensors.has(`${prefix}attn_qkv.weight`)) require('attn_qkv.weight', [width, 2 * keyLength * (heads + kvHeads)])
+      else {
+        require('attn_q.weight', [width, 2 * keyLength * heads])
+        require('attn_k.weight', [width, keyLength * kvHeads]); require('attn_v.weight', [width, valueLength * kvHeads])
+      }
+      require('attn_output.weight', [keyLength * heads, width])
+      require('attn_q_norm.weight', [keyLength]); require('attn_k_norm.weight', [keyLength])
+    }
+  }
+}
+
 async function gguf(r) {
+  r.readAhead = 64 * 1024
   if (await r.text(4) !== 'GGUF' || ![2, 3].includes(await r.number(4))) fail('不支持的 GGUF 版本')
   const count = await r.number(8), entries = await r.number(8)
   if (!count || count > 100000 || entries > 100000) fail('GGUF 张量或元数据数量不合法')
   const metadata = Object.create(null)
-  async function value(type, depth = 0, retain = true) {
+  async function value(type, depth = 0, retain = true, retainArray = false) {
     if (depth > 1) fail('不支持的 GGUF 嵌套数组')
     if (type === 8) { const v = await r.string(); return retain ? v : undefined }
     if (type === 9) {
       const subtype = await r.number(4), size = await r.number(8)
       if (size > 1000000 || subtype === 9) fail('GGUF 数组超过解析上限')
-      for (let i = 0; i < size; i++) await value(subtype, depth + 1, false)
-      return { length: size }
+      // Only retain the bounded layer schedule; large tokenizer arrays remain
+      // streamed and validated rather than materialized in memory.
+      if (retainArray && (size > 256 || subtype !== 7)) fail('Qwen3.5 attention.recurrent_layers 必须是最多 256 项的布尔数组')
+      const values = retainArray ? [] : undefined
+      for (let i = 0; i < size; i++) {
+        const item = await value(subtype, depth + 1, false)
+        if (values) values.push(item)
+      }
+      return values ?? { length: size }
     }
     const size = ({ 0: 1, 1: 1, 2: 2, 3: 2, 4: 4, 5: 4, 6: 4, 7: 1, 10: 8, 11: 8, 12: 8 })[type]
     if (!size) fail('未知 GGUF 元数据类型')
@@ -108,7 +178,7 @@ async function gguf(r) {
   for (let i = 0; i < entries; i++) {
     const key = await r.string()
     if (Object.hasOwn(metadata, key)) fail('GGUF 元数据重复')
-    metadata[key] = await value(await r.number(4))
+    metadata[key] = await value(await r.number(4), 0, true, key === 'qwen35.attention.recurrent_layers')
   }
   if ((metadata['split.count'] ?? 1) !== 1 || (metadata['split.no'] ?? 0) !== 0 || metadata['general.type'] === 'adapter' || Object.keys(metadata).some(key => key.startsWith('adapter.'))) fail('不支持 GGUF 分片或适配器，请选择完整模型')
   const alignment = metadata['general.alignment'] ?? 32
@@ -135,12 +205,14 @@ async function gguf(r) {
     if (metadata['clip.has_vision_encoder'] !== true || !['qwen2vl', 'qwen3vl'].includes(family) || ![...tensors.keys()].some(k => k.startsWith('v.')) || ![...tensors.keys()].some(k => k.startsWith('mm.'))) fail('暂不支持此 GGUF 视觉投影架构')
     return { format: 'gguf', role: 'projector', family }
   }
-  const supported = ['llama', 'qwen2', 'qwen3', 'qwen2vl', 'qwen3vl', 'gemma2', 'gemma3', 'phi3']
-  if (!supported.includes(architecture) || (metadata['general.type'] && metadata['general.type'] !== 'model')) fail('暂不支持此 GGUF 模型架构或类型')
+  const supported = ['llama', 'qwen2', 'qwen3', 'qwen35', 'qwen2vl', 'qwen3vl', 'gemma2', 'gemma3', 'phi3']
+  if (!supported.includes(architecture)) fail(`本地导入器尚未验证 GGUF 架构 ${JSON.stringify(typeof architecture === 'string' ? architecture.slice(0, 80) : '(缺失)')}；请升级本地模型插件或选择已支持的完整模型，不要修改架构标签。引擎支持不等于导入器已支持`)
+  if (metadata['general.type'] && metadata['general.type'] !== 'model') fail('GGUF 类型不是完整语言模型，请选择 general.type=model 的完整 GGUF')
   const blocks = metadata[`${architecture}.block_count`], width = metadata[`${architecture}.embedding_length`]
   if (!integer(blocks, 256) || !blocks || !integer(width) || !width || !metadata['tokenizer.ggml.tokens']?.length || !metadata['tokenizer.ggml.model'] || tensors.get('token_embd.weight')?.[0] !== width || !tensors.has('output_norm.weight')) fail('GGUF 缺少完整语言模型结构或 tokenizer')
   if (tensors.get('token_embd.weight')?.[1] !== metadata['tokenizer.ggml.tokens'].length) fail('GGUF tokenizer 与 embedding 词表大小不匹配')
-  for (let i = 0; i < blocks; i++) {
+  if (architecture === 'qwen35') validateQwen35(metadata, tensors, blocks, width)
+  else for (let i = 0; i < blocks; i++) {
     const prefix = `blk.${i}.`
     const required = ['attn_norm.weight', 'attn_output.weight', 'ffn_norm.weight', 'ffn_up.weight', 'ffn_down.weight']
     if (required.some(key => !tensors.has(prefix + key)) || (!tensors.has(`${prefix}attn_qkv.weight`) && ['attn_q.weight', 'attn_k.weight', 'attn_v.weight'].some(key => !tensors.has(prefix + key)))) fail('GGUF 缺少完整模型层，可能是组件或分片')

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
 import test from 'node:test'
 import { createLocalImport } from '../localImport.js'
+import { parseFile } from '../localImportFormats.js'
 
 const u32 = n => { const b = Buffer.alloc(4); b.writeUInt32LE(n); return b }
 const u64 = n => { const b = Buffer.alloc(8); b.writeBigInt64LE(BigInt(n)); return b }
@@ -38,7 +39,7 @@ const varint = n => {
 const p = (id, value) => typeof value === 'number' ? Buffer.concat([varint(id * 8), varint(value)]) : Buffer.concat([varint(id * 8 + 2), varint(Buffer.byteLength(value)), Buffer.from(value)])
 const msg = (...parts) => Buffer.concat(parts)
 const valueInfo = ([name, type, shape]) => msg(p(1, name), p(2, p(1, msg(p(1, type), p(2, msg(...shape.map(dim => p(1, dim === null ? p(2, 'N') : p(1, dim)))))))))
-function onnx({ role = 'model', family = 'kokoro', metadata: overrides = {}, external = false, arbitrary = false } = {}) {
+function onnx({ role = 'model', family = 'kokoro', metadata: overrides = {}, external = false, arbitrary = false, initializerCount = 1, rawBytes = 4 } = {}) {
   let metadata, inputs, outputs
   if (family === 'kokoro') {
     metadata = { model_type: 'kokoro', sample_rate: '24000', n_speakers: '1', style_dim: '2,1,256', has_espeak: '1' }
@@ -58,8 +59,8 @@ function onnx({ role = 'model', family = 'kokoro', metadata: overrides = {}, ext
   }
   metadata = arbitrary ? {} : { ...metadata, ...overrides }
   const node = msg(p(1, inputs[0][0]), p(2, outputs[0][0]), p(4, 'Identity'))
-  const initializer = msg(p(1, 1), p(2, 1), p(8, 'weight'), p(9, Buffer.alloc(4)), ...(external ? [p(13, msg(p(1, 'location'), p(2, '../weights.bin'))), p(14, 1)] : []))
-  return msg(p(1, 9), p(8, msg(p(1, ''), p(2, 17))), p(7, msg(p(1, node), p(5, initializer), ...inputs.map(i => p(11, valueInfo(i))), ...outputs.map(i => p(12, valueInfo(i))))), ...Object.entries(metadata).map(([k, v]) => p(14, msg(p(1, k), p(2, String(v))))))
+  const initializers = Array.from({ length: initializerCount }, (_, i) => p(5, msg(p(1, rawBytes / 4), p(2, 1), p(8, initializerCount === 1 ? 'weight' : `weight-${i}`), p(9, Buffer.alloc(rawBytes)), ...(external ? [p(13, msg(p(1, 'location'), p(2, '../weights.bin'))), p(14, 1)] : []))))
+  return msg(p(1, 9), p(8, msg(p(1, ''), p(2, 17))), p(7, msg(p(1, node), ...initializers, ...inputs.map(i => p(11, valueInfo(i))), ...outputs.map(i => p(12, valueInfo(i))))), ...Object.entries(metadata).map(([k, v]) => p(14, msg(p(1, k), p(2, String(v))))))
 }
 function traineddata() {
   const count = 24, head = 4 + count * 8
@@ -226,6 +227,19 @@ test('Zipformer is identified from metadata and graph interfaces rather than fil
 function kokoroEntries() {
   return [['tts/model.onnx', onnx()], ['tts/voices.bin', Buffer.alloc(2 * 256 * 4)], ['tts/tokens.txt', Buffer.from('_ 0\na 1\n')], ...['phontab', 'phonindex', 'phondata', 'intonations', 'en_dict', 'lang/en'].map(name => [`tts/espeak-ng-data/${name}`, Buffer.from([1, 2, 3, 4])])]
 }
+test('sparse ONNX initializer traversal retains small prefetch instead of spending the metadata budget on skipped raw_data', async t => {
+  const data = onnx({ initializerCount: 300, rawBytes: 128 * 1024 })
+  const f = fixture([['sparse.onnx', data]]), budget = { bytes: 0 }
+  const result = await parseFile(f.context, { id: f.ids[0], path: 'sparse.onnx', name: 'sparse.onnx', bytes: data.length }, f.controller.signal, budget)
+  assert.equal(result.family, 'kokoro')
+  assert.ok(data.length > 32 * 1024 ** 2)
+  assert.ok(f.reads.length > 256 && f.reads.length <= 302)
+  assert.ok(f.reads.every(read => read.length <= 1024), 'large GGUF prefetch must not affect ONNX skips')
+  assert.equal(budget.bytes, f.reads.reduce((sum, read) => sum + read.length, 0))
+  assert.ok(budget.bytes < 512 * 1024, '300 large embedded tensors must not consume the 16 MiB metadata budget')
+  t.diagnostic(JSON.stringify({ fileBytes: data.length, reads: f.reads.length, readBytes: budget.bytes, family: result.family }))
+})
+
 test('Kokoro validates companion data and voices dimensions before local resolution', async () => {
   const f = fixture(kokoroEntries()), result = await f.importer.resolve(await select(f, 'tts'))
   assert.equal(result.phonemes, 'tts/espeak-ng-data')
