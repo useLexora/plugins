@@ -1,5 +1,6 @@
 {
   "platform": "macos-arm64",
+  "scope": "Historical b11747 verification; current llama versions and CUDA provenance are in llama-engines.json.",
   "hostPlatform": "darwin/arm64",
   "hostBaseline": "macOS 15 ARM64; no Intel or universal target",
   "manifest": "resources.json",
@@ -7,6 +8,7 @@
   "engines": [
     {
       "id": "llama-b11747-macos-arm64",
+      "legacy": true,
       "version": "b11747",
       "commit": "f711c8f3038020d71f69b8ced09162b014fd7335",
       "metadata": "https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b11747",

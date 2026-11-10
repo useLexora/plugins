@@ -1,10 +1,12 @@
 {
   "platform": "windows-x64",
+  "scope": "Historical b11747 verification; current llama versions and CUDA provenance are in llama-engines.json.",
   "manifest": "resources.json",
   "verification": "Downloaded archives were checked against upstream digests, then selected entries were streamed through the plugin preparation implementation and checked against every file SHA256 in resources.json. No model weights were downloaded.",
   "engines": [
     {
       "id": "llama-b11747-windows-x64",
+      "legacy": true,
       "version": "b11747",
       "commit": "f711c8f3038020d71f69b8ced09162b014fd7335",
       "metadata": "https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b11747",
@@ -53,7 +55,7 @@
   "limitations": [
     "The referenced Lemonade revision selects newer llama releases; its platform/layout patterns are references, not proof of b11747 compatibility.",
     "Archive/digest and Linux-host protocol tests are not Windows execution, GPU compatibility, real-weight inference or output-quality evidence.",
-    "No Windows ARM64, CUDA or ROCm variant is enabled. No VC++ runtime or GPU driver is installed or modified by this plugin.",
+    "This historical verification covered Windows x64 Vulkan, not ARM64, CUDA or ROCm. Current CUDA resources are documented in llama-engines.json. No VC++ runtime or GPU driver is installed or modified by this plugin.",
     "External phoneme trees and native engine directory imports must preserve the required relative layout. Model/projector files may remain at independently authorized locations."
   ]
 }

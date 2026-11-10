@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { zImageTurbo } from '../../native/image/recipes.mjs'
-import { modelGuidance, modelInLibrary } from '../modelPresentation.js'
+import { engineGroups, engineIdentity, engineMutationBlocked, modelGuidance, modelInLibrary } from '../modelPresentation.js'
 
 const specification = id => ({ id, kind: 'model', files: zImageTurbo.files.map(file => ({ ...file })) })
 const specifications = [{ id: 'engine', kind: 'engine' }, specification('weights')]
@@ -115,6 +115,72 @@ test('preparation exposes cancellation only for the current model job', () => {
     assert.match(guidance.description, /不会自动切换当前模型/)
     assert.equal(modelGuidance(ready, stateFor(ready, available, { ...job, modelId: 'other' }), specifications).action, 'activate')
   }
+})
+
+test('known compatibility failures direct users to the engine without hiding file repair', () => {
+  const compatibilityWarning = '此模型要求 llama.cpp b9000 或更新版本；当前引擎较旧。'
+  for (const { current, resources, expected } of [
+    { current: { ...ready, compatibilityWarning }, resources: available, expected: 'engine' },
+    { current: { ...ready, active: true, bound: true, compatibilityWarning }, resources: available, expected: 'engine' },
+    { current: { ...model, filesRegistered: true, compatibilityWarning }, resources: [{ id: 'weights', authorized: false }], expected: 'import' },
+    { current: { ...ready, prepared: false, compatibilityWarning }, resources: [authorized('weights')], expected: 'engine' },
+  ]) {
+    const guidance = modelGuidance(current, stateFor(current, resources), specifications)
+    assert.equal(guidance.action, expected)
+    assert.ok((guidance.description + guidance.warning).includes(compatibilityWarning))
+    assert.equal(guidance.tone, 'attention')
+    assert.doesNotMatch(guidance.label + guidance.description, /已验证|兼容性已确认/)
+  }
+})
+
+test('committing preserves busy state without offering cancellation or a second mutation', () => {
+  const guidance = modelGuidance(ready, stateFor(ready, available, { modelId: ready.id, state: 'committing' }), specifications)
+  assert.equal(guidance.tone, 'busy')
+  assert.equal(guidance.label, '正在保存')
+  assert.equal(guidance.action, '')
+})
+
+const engineSpecs = [
+  { id: 'old', kind: 'engine', engineId: 'llama.cpp', title: 'llama.cpp', version: 'b100', backend: 'vulkan', legacy: true },
+  { id: 'new', kind: 'engine', engineId: 'llama.cpp', title: 'llama.cpp', version: 'b200', backend: 'vulkan' },
+  { id: 'cuda', kind: 'engine', engineId: 'llama.cpp', title: 'llama.cpp', version: 'b200', backend: 'cuda' },
+  { id: 'mac', kind: 'engine', engineId: 'llama.cpp', title: 'llama.cpp', version: 'b200', backend: 'metal' },
+  { id: 'speech', kind: 'engine', engineId: 'sherpa-onnx', title: 'sherpa-onnx' },
+]
+const engineState = {
+  supported: true, models: [], resources: [authorized('old'), authorized('new')],
+  engines: engineSpecs.filter(spec => spec.id !== 'mac').map(spec => ({
+    id: spec.id, engineId: spec.engineId, version: spec.version, backend: spec.backend,
+    installed: ['old', 'new'].includes(spec.id), selected: spec.id === 'new', capabilities: spec.id === 'speech' ? ['语音转写'] : ['对话'],
+  })),
+}
+
+test('engine families group builds by backend using platform-filtered manager candidates', () => {
+  const groups = engineGroups(engineState, engineSpecs)
+  assert.deepEqual(groups.map(group => [group.title, group.backend]), [['llama.cpp', 'Vulkan'], ['llama.cpp', 'CUDA'], ['sherpa-onnx', '']])
+  assert.deepEqual(groups[0].versions.map(version => [version.id, version.installed, version.selected]), [['old', true, false], ['new', true, true]])
+  assert.deepEqual(groups[0].capabilities, ['对话'])
+  assert.deepEqual(engineIdentity(engineSpecs[1]), { title: 'llama.cpp', backend: 'Vulkan', version: 'b200' })
+  assert.equal(engineIdentity({ engineId: 'llama.cpp', custom: true }).version, '')
+})
+
+test('legacy registrations remain recoverable after authorization loss without exposing absent old builds', () => {
+  const state = { ...engineState, engines: engineState.engines.map(engine => ({ ...engine, installed: false })), resources: [{ id: 'old', authorized: false }] }
+  assert.deepEqual(engineGroups(state, engineSpecs)[0].versions.map(version => version.id), ['old', 'new'])
+  assert.equal(engineGroups(state, engineSpecs)[0].versions[0].installed, false)
+  assert.deepEqual(engineGroups({ ...state, resources: [] }, engineSpecs)[0].versions.map(version => version.id), ['new'])
+})
+
+test('engine mutations are blocked across builds and backends while a family runtime is busy', () => {
+  const group = engineGroups(engineState, engineSpecs)[0]
+  for (const resources of [{ activeResources: ['old'] }, { resources: ['new'] }, { directoryResources: ['cuda'] }]) {
+    assert.equal(engineMutationBlocked(group, { ...engineState, models: [{ ...resources, runtimeBusy: true }] }, engineSpecs, false), true)
+  }
+  assert.equal(engineMutationBlocked(group, { ...engineState, models: [{ activeResources: ['speech'], runtimeBusy: true }] }, engineSpecs, false), false)
+  assert.equal(engineMutationBlocked(group, engineState, engineSpecs, true), true)
+  assert.equal(engineMutationBlocked(group, { ...engineState, supported: false }, engineSpecs, false), true)
+  for (const state of ['preparing', 'cancelling', 'committing']) assert.equal(engineMutationBlocked(group, { ...engineState, job: { state } }, engineSpecs, false), true)
+  assert.equal(engineMutationBlocked(group, { ...engineState, job: { state: 'failed' } }, engineSpecs, false), false)
 })
 
 test('library membership remains based on prepared models or registered model resources', () => {

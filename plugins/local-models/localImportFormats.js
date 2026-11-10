@@ -146,6 +146,34 @@ function validateQwen35(metadata, tensors, blocks, width) {
   }
 }
 
+function ggufInference(metadata, tensors, spans) {
+  const architecture = metadata['general.architecture'], prefix = `${architecture}.`
+  const positive = value => integer(value) && value > 0
+  const contextWindow = metadata[`${prefix}context_length`]
+  const inference = {
+    ...(positive(contextWindow) ? { contextWindow } : {}),
+    weightBytes: spans.reduce((sum, [start, end]) => sum + end - start, 0),
+    limitations: ['权重大小来自全部张量的数据跨度，不含文件对齐、运行时缓冲和加载副本。'],
+  }
+  const mixed = Object.entries(metadata).some(([key, value]) => key.startsWith(prefix) && /sliding_window|recurrent|ssm\.|expert_count|full_attention_interval/.test(key) && value !== 0 && value !== false)
+    || [...tensors.keys()].some(key => /ssm_|_exps\./.test(key))
+  if (!['llama', 'qwen2', 'qwen3'].includes(architecture) || mixed) {
+    inference.limitations.push('KV 未知：此架构或混合/滑窗注意力尚无完整缓存估算；循环状态及其他额外内存未计入。')
+    return inference
+  }
+  const layers = metadata[`${prefix}block_count`], heads = metadata[`${prefix}attention.head_count`]
+  const kvHeads = metadata[`${prefix}attention.head_count_kv`] ?? heads
+  const headLength = metadata[`${prefix}attention.head_length`] ?? (positive(heads) ? metadata[`${prefix}embedding_length`] / heads : null)
+  const keyLength = metadata[`${prefix}attention.key_length`] ?? headLength
+  const valueLength = metadata[`${prefix}attention.value_length`] ?? headLength
+  const kvBytesPerToken = layers * kvHeads * (keyLength + valueLength) * 2
+  if (![layers, heads, kvHeads, keyLength, valueLength, kvBytesPerToken].every(positive) || heads % kvHeads) {
+    inference.limitations.push('KV 未知：缺少有效的注意力层数、头数或 head/key/value 维度元数据。')
+    return inference
+  }
+  return { ...inference, kvBytesPerToken, kvEstimate: 'full-context-f16' }
+}
+
 async function gguf(r) {
   r.readAhead = 64 * 1024
   if (await r.text(4) !== 'GGUF' || ![2, 3].includes(await r.number(4))) fail('不支持的 GGUF 版本')
@@ -203,7 +231,7 @@ async function gguf(r) {
   if (architecture === 'clip') {
     const family = metadata['clip.projector_type']
     if (metadata['clip.has_vision_encoder'] !== true || typeof family !== 'string' || !family || ![...tensors.keys()].some(k => k.startsWith('v.')) || ![...tensors.keys()].some(k => k.startsWith('mm.'))) fail('GGUF 视觉投影缺少架构或必要张量')
-    return { format: 'gguf', role: 'projector', family }
+    return { format: 'gguf', role: 'projector', family, inference: ggufInference(metadata, tensors, spans) }
   }
   const validated = ['llama', 'qwen2', 'qwen3', 'qwen35', 'qwen2vl', 'qwen3vl', 'gemma2', 'gemma3', 'phi3']
   if (typeof architecture !== 'string' || !architecture) fail('GGUF 缺少模型架构')
@@ -221,7 +249,7 @@ async function gguf(r) {
     const layers = new Set([...tensors.keys()].map(name => /^blk\.(\d+)\./.exec(name)?.[1]))
     for (let i = 0; i < blocks; i++) if (!layers.has(String(i))) fail('GGUF 缺少模型层，可能是组件或分片')
   }
-  return { format: 'gguf', role: 'model', architecture, vision: ['qwen2vl', 'qwen3vl'].includes(architecture), title: typeof metadata['general.name'] === 'string' ? metadata['general.name'].slice(0, 160) : undefined }
+  return { format: 'gguf', role: 'model', architecture, inference: ggufInference(metadata, tensors, spans), vision: ['qwen2vl', 'qwen3vl'].includes(architecture), title: typeof metadata['general.name'] === 'string' ? metadata['general.name'].slice(0, 160) : undefined }
 }
 
 async function protobuf(r, end, visitor) {

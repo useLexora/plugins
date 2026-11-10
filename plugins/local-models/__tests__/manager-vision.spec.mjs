@@ -8,6 +8,7 @@ const specifications = JSON.parse(await readFile(new URL('../resources.json', im
 const manifest = JSON.parse(await readFile(new URL('../extension.json', import.meta.url)))
 const vision = catalog.models.find(model => model.runtime === 'vision')
 const resource = id => ({ id, authorized: true, revision: 'existing-revision' })
+const linuxConfiguration = values => ({ acceleration: 'gpu', ...values })
 
 async function open({ stored = null, resources = vision.resources.map(resource), chatImageInput = true, chatToolMatching = true, chatReasoning = 'absent' } = {}) {
   let saved = structuredClone(stored)
@@ -26,6 +27,7 @@ async function open({ stored = null, resources = vision.resources.map(resource),
       status: async () => [...bindings.keys()].map(runtime => ({ runtime, configured: true, instances: [] })),
       credentials: { has: async () => false },
       bind: async binding => bindings.set(binding.runtime, binding),
+      unbind: async ({ runtime }) => bindings.delete(runtime),
     },
   }, { manifest, catalog: structuredClone(catalog), specifications: structuredClone(specifications) })
   assert.equal(saves, 0)
@@ -40,7 +42,7 @@ test('vision registers chat image input and the original image reader on one run
   assert.deepEqual(binding.models, [{ id: vision.id, title: vision.title, capability: 'vision-chat', input: ['text', 'image'], contextWindow: 4096, maxTokens: 512, tools: 'auto', catalogModels: [] }])
   assert.deepEqual(binding.imageReaders, [{ id: vision.id, title: vision.title, capability: 'vision', support: { operations: ['understand', 'extract', 'document'] } }])
   assert.deepEqual(binding.resources, vision.resources.map((id, index) => ({ mount: index === 0 ? 'engine' : 'model', id, revision: 'existing-revision' })))
-  assert.deepEqual(binding.configuration, { threads: 7, contextWindow: 4096, maxTokens: 512, chatReasoning: false, backend: 'vision' })
+  assert.deepEqual(binding.configuration, { threads: 7, contextWindow: 4096, maxTokens: 512, acceleration: 'gpu', chatReasoning: false, backend: 'vision', engineVersion: 'b11747', engineBackend: 'vulkan' })
   assert.equal(f.bindings.size, 1)
   assert.equal((await f.execute('status')).models[0].bindingWarning, '')
 })
@@ -54,8 +56,8 @@ for (const [runtime, chatReasoning] of [['chat', 'absent'], ['chat', true], ['vi
   const f = await open({ stored, resources: model.resources.map(resource), chatReasoning })
   const binding = f.bindings.get(runtime)
   assert.deepEqual(binding.models, [{ id: model.id, title: model.title, capability: runtime === 'vision' ? 'vision-chat' : 'chat', ...(runtime === 'vision' ? { input: ['text', 'image'] } : {}), contextWindow: 65536, maxTokens: 4096, tools: 'auto', ...(chatReasoning === true ? { reasoning: 'auto' } : {}), catalogModels: [{ providerId: 'huggingface', modelId: 'Qwen/Qwen3.5-9B' }] }])
-  assert.deepEqual(binding.configuration, { ...configuration, chatReasoning: chatReasoning === true, ...(runtime === 'vision' ? { backend: 'vision' } : {}) })
-  assert.deepEqual((await f.execute('status')).models.find(item => item.id === model.id).configuration, configuration)
+  assert.deepEqual(binding.configuration, { ...linuxConfiguration(configuration), chatReasoning: chatReasoning === true, ...(runtime === 'vision' ? { backend: 'vision' } : {}), engineVersion: 'b11747', engineBackend: 'vulkan' })
+  assert.deepEqual((await f.execute('status')).models.find(item => item.id === model.id).configuration, linuxConfiguration(configuration))
   assert.deepEqual(binding.resources, model.resources.map((id, index) => ({ mount: index === 0 ? 'engine' : 'model', id, revision: 'existing-revision' })))
   assert.deepEqual(f.saved(), stored)
 })
@@ -71,7 +73,7 @@ for (const runtime of ['chat', 'vision']) test(`${runtime} activation shares rea
   assert.equal(f.bindings.get(runtime).configuration.chatReasoning, true)
   assert.match((await f.execute('status')).models.find(item => item.id === model.id).bindingWarning, /工具能力匹配.*升级/)
   assert.deepEqual(f.saved().custom, stored.custom)
-  assert.deepEqual(f.saved().models[model.id], stored.models[model.id])
+  assert.deepEqual(f.saved().models[model.id], linuxConfiguration(stored.models[model.id]))
   assert.deepEqual(f.saved().active, { [runtime]: model.id })
 })
 
@@ -103,10 +105,11 @@ test('legacy custom fields gain chat settings without replacing identity, defaul
   const stored = { custom: [{ model, specification }], active, models: { [model.id]: { threads: 9, contextWindow: 16384, maxTokens: 1024 }, 'other-model': { threads: 3 } } }
   const f = await open({ stored, resources: model.directoryResources.map(resource) })
   const current = (await f.execute('status')).models[0]
-  assert.deepEqual(current.configuration, { threads: 9, contextWindow: 16384, maxTokens: 1024 })
-  assert.deepEqual(current.defaults, { threads: 5, contextWindow: 4096, maxTokens: 512 })
+  assert.deepEqual(current.configuration, { threads: 9, contextWindow: 16384, maxTokens: 1024, acceleration: 'gpu' })
+  assert.deepEqual(current.defaults, { threads: 5, contextWindow: 4096, maxTokens: 512, acceleration: 'gpu' })
   assert.equal(current.fields[0].max, 12)
-  assert.deepEqual(current.fields.map(field => field.key), ['threads', 'contextWindow', 'maxTokens'])
+  assert.deepEqual(current.fields.map(field => field.key), ['threads', 'contextWindow', 'maxTokens', 'acceleration'])
+  assert.deepEqual(current.fields.find(field => field.key === 'acceleration').choices.map(choice => choice.value), ['cpu', 'gpu', 'cuda'])
   assert.deepEqual(current.files, model.files)
   assert.deepEqual(current.resources, model.resources)
   assert.deepEqual(current.directoryResources, model.directoryResources)
@@ -118,10 +121,10 @@ test('legacy custom fields gain chat settings without replacing identity, defaul
   assert.deepEqual(saved.active, active)
   assert.deepEqual(saved.custom[0].specification, specification)
   assert.deepEqual(saved.custom[0].model, model)
-  assert.deepEqual(saved.models[model.id], { threads: 9, contextWindow: 16384, maxTokens: 768 })
+  assert.deepEqual(saved.models[model.id], { threads: 9, contextWindow: 16384, maxTokens: 768, acceleration: 'gpu' })
   assert.deepEqual(saved.models['other-model'], { threads: 3 })
   const reopened = await open({ stored: saved, resources: model.directoryResources.map(resource) })
-  assert.deepEqual((await reopened.execute('status')).models[0].configuration, { threads: 9, contextWindow: 16384, maxTokens: 768 })
+  assert.deepEqual((await reopened.execute('status')).models[0].configuration, { threads: 9, contextWindow: 16384, maxTokens: 768, acceleration: 'gpu' })
 })
 
 for (const runtime of ['chat', 'vision']) test(`legacy ${runtime} token fields refresh without resetting stored 64K context or custom thread limits`, async () => {
@@ -131,20 +134,20 @@ for (const runtime of ['chat', 'vision']) test(`legacy ${runtime} token fields r
   const stored = { custom: [{ model, specification: { id: 'unchanged', kind: 'model', files: [] } }], active: { [runtime]: model.id }, models: { [model.id]: configuration } }
   const f = await open({ stored, resources: model.resources.map(resource) })
   const current = (await f.execute('status')).models.find(item => item.id === model.id)
-  assert.deepEqual(current.configuration, configuration)
+  assert.deepEqual(current.configuration, linuxConfiguration(configuration))
   assert.equal(current.fields.find(field => field.key === 'contextWindow').max, 2000000)
   assert.equal(current.fields.find(field => field.key === 'threads').max, 12)
   assert.equal(f.bindings.get(runtime).configuration.contextWindow, 65536)
   assert.equal(f.bindings.get(runtime).models[0].contextWindow, 65536)
   for (const invalid of [{ contextWindow: 2000001 }, { contextWindow: 65536.5 }, { contextWindow: 4096, maxTokens: 8192 }]) {
-    assert.ok((await f.execute('configure', { modelId: model.id, configuration: { ...configuration, ...invalid } })).error)
+    assert.ok((await f.execute('configure', { modelId: model.id, configuration: { ...current.configuration, ...invalid } })).error)
     assert.deepEqual(f.saved(), stored)
   }
-  assert.equal((await f.execute('configure', { modelId: model.id, configuration: { ...configuration, maxTokens: 8192 } })).ok, true)
+  assert.equal((await f.execute('configure', { modelId: model.id, configuration: { ...current.configuration, maxTokens: 8192 } })).ok, true)
   const reopened = await open({ stored: f.saved(), resources: model.resources.map(resource) })
-  assert.deepEqual((await reopened.execute('status')).models.find(item => item.id === model.id).configuration, { ...configuration, maxTokens: 8192 })
+  assert.deepEqual((await reopened.execute('status')).models.find(item => item.id === model.id).configuration, { ...linuxConfiguration(configuration), maxTokens: 8192 })
   const inactive = await open({ stored: { ...stored, active: {} }, resources: model.resources.map(resource) })
-  assert.ok((await inactive.execute('configure', { modelId: model.id, configuration: { ...configuration, maxTokens: 65537 } })).error)
+  assert.ok((await inactive.execute('configure', { modelId: model.id, configuration: { ...linuxConfiguration(configuration), maxTokens: 65537 } })).error)
 })
 
 test('text chat and OCR keep their existing capabilities; metadata cannot create chat image support', async () => {

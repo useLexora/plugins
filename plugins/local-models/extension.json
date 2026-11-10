@@ -5,10 +5,10 @@
   "name": "Lexora Local Models",
   "author": "Lexora",
   "description": "下载并运行本地模型，在当前设备完成对话、语音与图像任务。",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "apiVersion": 3,
   "engines": {
-    "lexora": ">=0.21.0"
+    "lexora": ">=0.22.0"
   },
   "entry": "entry.js",
   "categories": [
@@ -50,6 +50,18 @@
       {
         "id": "lexora.local-models.configure",
         "title": "保存模型参数"
+      },
+      {
+        "id": "lexora.local-models.use-engine",
+        "title": "切换引擎版本"
+      },
+      {
+        "id": "lexora.local-models.import-engine",
+        "title": "使用已有引擎"
+      },
+      {
+        "id": "lexora.local-models.check-engine-updates",
+        "title": "检查引擎更新"
       },
       {
         "id": "lexora.local-models.stop",

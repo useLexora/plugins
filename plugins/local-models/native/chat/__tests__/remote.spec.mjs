@@ -23,6 +23,24 @@ for (const error of [
 ]) test('classifies context rejection without reporting a network failure', async () => {
   await assert.rejects(invoke(Response.json({ error }, { status: 400 })), /EXTENSION_INFERENCE_CONTEXT_TOO_LARGE/)
 })
+for (const usage of [
+  { prompt_tokens: 2, completion_tokens: 'private-output' },
+  { prompt_tokens: -1, completion_tokens: 2 },
+  { prompt_tokens: 2, completion_tokens: 1, prompt_tokens_details: { cached_tokens: 3 } },
+]) test('invalid token usage cannot reach output or diagnostics as arbitrary content', async () => {
+  const response = new Response(`data: ${JSON.stringify({ choices: [{ finish_reason: 'stop' }], usage })}\n\ndata: [DONE]\n\n`)
+  const events = []
+  await assert.rejects(invoke(response, { emit: event => { events.push(event); return true } }), /^Error: EXTENSION_INFERENCE_OUTPUT_INVALID$/)
+  assert.deepEqual(events, [])
+})
+
+test('in-stream engine errors keep partial output but never produce a successful terminal', async () => {
+  const response = new Response('data: {"choices":[{"delta":{"content":"partial"}}]}\n\ndata: {"error":{"message":"out of memory /private/path secret"}}\n\n')
+  const events = []
+  await assert.rejects(invoke(response, { emit: event => { events.push(event); return true } }), /^Error: EXTENSION_INFERENCE_RESOURCE_EXHAUSTED$/)
+  assert.deepEqual(events, [{ type: 'text', text: 'partial' }])
+})
+
 test('bounds rejected response bodies without reflecting backend content', async () => {
   await assert.rejects(invoke(new Response('private'.repeat(10000), { status: 400 })), /^Error: EXTENSION_INFERENCE_REQUEST_REJECTED$/)
 })

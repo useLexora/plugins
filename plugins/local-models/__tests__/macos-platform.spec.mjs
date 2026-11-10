@@ -47,8 +47,8 @@ test('macOS binds verified ARM64 engines, CPU chat/shared vision, WASM OCR and M
   assert.equal(f.saves(), 0)
   const state = await f.execute('status')
   assert.deepEqual(state.environment, mac)
-  assert.deepEqual(state.engines.map(item => item.id).sort(), ['image-metal-macos-arm64', 'llama-b11747-macos-arm64', 'sherpa-onnx-macos-arm64', 'tesseract-wasm'])
-  for (const [runtime, engine] of [['chat', 'llama-b11747-macos-arm64'], ['vision', 'llama-b11747-macos-arm64'], ['asr', 'sherpa-onnx-macos-arm64'], ['tts', 'sherpa-onnx-macos-arm64'], ['image', 'image-metal-macos-arm64'], ['ocr', 'tesseract-wasm']]) {
+  assert.deepEqual(state.engines.map(item => item.id).sort(), ['image-metal-macos-arm64', 'llama-b11747-macos-arm64', 'llama-metal-macos-arm64-b12211', 'sherpa-onnx-macos-arm64', 'tesseract-wasm'])
+  for (const [runtime, engine] of [['chat', 'llama-metal-macos-arm64-b12211'], ['vision', 'llama-metal-macos-arm64-b12211'], ['asr', 'sherpa-onnx-macos-arm64'], ['tts', 'sherpa-onnx-macos-arm64'], ['image', 'image-metal-macos-arm64'], ['ocr', 'tesseract-wasm']]) {
     const binding = f.bindings.get(runtime)
     assert.equal(binding.resources[0].id, engine)
     assert.equal(binding.libraryPaths, undefined)
@@ -59,20 +59,24 @@ test('macOS binds verified ARM64 engines, CPU chat/shared vision, WASM OCR and M
   assert.equal(f.bindings.get('ocr').configuration.ocrEngine, 'wasm')
   assert.equal(f.bindings.get('image').configuration.backend, 'metal')
   for (const model of state.models.filter(model => ['chat', 'vision', 'image'].includes(model.runtime))) {
-    assert.deepEqual(model.fields.find(field => field.key === 'acceleration').choices, [{ value: 'cpu', title: 'CPU' }, { value: 'gpu', title: 'Metal GPU' }])
+    assert.deepEqual(model.fields.find(field => field.key === 'acceleration').choices, [{ value: 'cpu', title: 'CPU' }, { value: 'gpu', title: 'Metal' }])
   }
   const image = state.models.find(model => model.runtime === 'image')
   assert.equal((await f.execute('configure', { modelId: image.id, configuration: { ...image.configuration, acceleration: 'cpu' } })).ok, true)
   assert.equal(f.bindings.get('image').configuration.backend, 'cpu')
   assert.ok((await f.execute('prepare', { resourceId: 'llama-b11747', mode: 'download' })).error)
-  assert.equal((await f.execute('prepare', { resourceId: 'llama-b11747-macos-arm64', mode: 'download' })).ok, true)
-  assert.match(f.prepared[0].preparation.inputs[0].source.url, /b11747-bin-macos-arm64\.tar\.gz$/)
+  assert.ok((await f.execute('prepare', { resourceId: 'llama-b11747-macos-arm64', mode: 'download' })).error)
+  assert.equal((await f.execute('prepare', { resourceId: 'llama-metal-macos-arm64-b12211', mode: 'download' })).ok, true)
+  assert.match(f.prepared[0].preparation.inputs[0].source.url, /b12211-bin-macos-arm64\.tar\.gz$/)
+  assert.equal((await f.execute('use-engine', { resourceId: 'llama-b11747-macos-arm64' })).ok, true)
+  assert.equal(f.bindings.get('chat').resources[0].id, 'llama-b11747-macos-arm64')
 })
 
 test('macOS preserves custom identity, stored choices and existing API connections without migration', async () => {
   const model = { ...catalog.models[0], id: 'existing', custom: true }
   const stored = { custom: [{ model, specification: specifications.find(item => item.id === model.resources[1]) }], active: { chat: model.id }, models: { [model.id]: { ...model.defaults, threads: 7, contextWindow: 65536 } }, services: { 'speech-api': { enabled: true, configuration: catalog.services[0].defaults }, 'image-api': { enabled: true, configuration: catalog.services[1].defaults } } }
-  const f = await open({ stored })
+  const resources = specifications.filter(spec => spec.version !== 'b12211').map(spec => registered(spec.id))
+  const f = await open({ stored, resources })
   assert.deepEqual(f.saved(), stored)
   assert.equal(f.saves(), 0)
   assert.equal(f.bindings.get('chat').resources[0].id, 'llama-b11747-macos-arm64')
@@ -82,6 +86,9 @@ test('macOS preserves custom identity, stored choices and existing API connectio
   assert.equal((await f.execute('configure', { modelId: model.id, configuration: { ...stored.models[model.id], threads: 5 } })).ok, true)
   assert.deepEqual(f.saved().custom[0].model.resources, model.resources)
   assert.equal(f.saved().active.chat, 'existing')
+  const upgradedInstallation = await open({ stored: f.saved() })
+  assert.equal(upgradedInstallation.bindings.get('chat').resources[0].id, 'llama-b11747-macos-arm64')
+  assert.equal(upgradedInstallation.bindings.get('chat').configuration.threads, 5)
 })
 
 test('macOS selections survive Linux saves and Linux resources never satisfy macOS bindings', async () => {
@@ -94,7 +101,8 @@ test('macOS selections survive Linux saves and Linux resources never satisfy mac
   const state = await linux.execute('status')
   for (const runtime of ['vision', 'image']) {
     const model = state.models.find(model => model.runtime === runtime)
-    assert.equal(model.fields.some(field => field.key === 'acceleration'), false)
+    assert.equal(model.fields.some(field => field.key === 'acceleration'), runtime === 'vision')
+    if (runtime === 'vision') assert.deepEqual(model.fields.find(field => field.key === 'acceleration').choices.map(choice => choice.value), ['cpu', 'gpu', 'cuda'])
     assert.equal((await linux.execute('configure', { modelId: model.id, configuration: { ...model.configuration, [runtime === 'vision' ? 'threads' : 'steps']: 6 } })).ok, true)
     assert.equal(linux.saved().models[model.id].acceleration, 'cpu')
   }
@@ -121,12 +129,15 @@ const linux = { platform: 'linux-x64', executionMode: 'isolated' }
 const windows = { platform: 'windows-x64', executionMode: 'supervised' }
 
 function assertAcceleration(model, binding, platform, value) {
-  const selectable = model.runtime === 'chat' || platform === 'macos-arm64' || model.runtime === 'vision' && platform === 'windows-x64'
+  const selectable = ['chat', 'vision'].includes(model.runtime) || platform === 'macos-arm64'
   const field = model.fields.find(field => field.key === 'acceleration')
   assert.equal(Boolean(field), selectable)
   assert.equal(model.configuration.acceleration, selectable ? value : undefined)
   assert.equal(binding.configuration.acceleration, selectable ? value : undefined)
-  if (selectable) assert.equal(field.choices.find(choice => choice.value === 'gpu').title, platform === 'macos-arm64' ? 'Metal GPU' : 'Vulkan GPU')
+  if (selectable) {
+    assert.equal(field.choices.find(choice => choice.value === 'gpu').title, platform === 'macos-arm64' ? 'Metal' : 'Vulkan')
+    assert.equal(field.choices.some(choice => choice.value === 'cuda'), platform !== 'macos-arm64' && ['chat', 'vision'].includes(model.runtime))
+  }
   else assert.equal(model.defaults.acceleration, undefined)
   if (model.runtime === 'image') assert.equal(binding.configuration.backend, platform === 'macos-arm64' ? (value === 'cpu' ? 'cpu' : 'metal') : platform === 'windows-x64' ? 'Vulkan0' : 'CUDA0')
 }

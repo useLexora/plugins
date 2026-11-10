@@ -5,6 +5,7 @@ import { Button, Icon, InterfaceProvider } from './ui'
 import { Fields } from './Configuration'
 import { ModelDetail } from './ModelDetail'
 import { Engines } from './Engines'
+import { EngineImportDialog } from './EngineImportDialog'
 import { ImportDialog, ClearDialog, RemoveCredentialDialog } from './ResourceDialogs'
 import './view.css'
 import { Discovery } from './discovery'
@@ -40,7 +41,7 @@ function useManager(context) {
     try {
       const result = await command(name, input)
       if (!result?.ok) throw new Error(result?.error || result?.message || '操作未完成，请重试。')
-      if (active.current && (result.warning || success)) setNotice({ text: result.warning || success, error: !!result.warning, scope })
+      if (active.current && (result.warning || result.message || success)) setNotice({ text: result.warning || result.message || success, error: !!result.warning, scope })
       return result
     } catch (error) { if (active.current) setNotice({ error: true, text: error.message, scope }); return false }
     finally {
@@ -147,8 +148,9 @@ function App({ context, specifications }) {
     {manager.isPending('add-model') && <div className="background-job" role="status"><Loader size={16} /><span>正在校验模型目录和文件信息…</span><Button size="small" disabled={manager.isPending('cancel-preparation')} onClick={() => manager.run('cancel-preparation', {}, '已请求取消添加')}>取消添加</Button></div>}
     <div className="manager-page" id="discover-page" role="tabpanel" aria-labelledby="discover-tab" hidden={tab !== 'discover'}><Discovery context={context} manager={manager} onAdded={showModel} onImport={() => setModal({ kind: 'local-import' })} /></div>
     <div className="manager-page" id="models-page" role="tabpanel" aria-labelledby="models-tab" hidden={!['models', 'transfers'].includes(tab)}><Library key={`library-${libraryEpoch}-${tab === 'transfers'}`} visible={['models', 'transfers'].includes(tab)} onAction={modelAction} manager={manager} state={state} specifications={specifications} selected={selected} onSelect={setSelected} onDiscover={discover} onImport={() => setModal({ kind: 'local-import' })} onBack={() => { setSelected(''); setTab('models') }} renderDetail={(model, backButton) => <ModelDetail key={model.id} backButton={backButton} model={model} state={state} specifications={specifications} manager={manager} onImport={importModel} onAction={modelAction} onClear={model => setModal({ kind: 'clear', model })} onRemove={async model => { if (await manager.run('remove-record', { modelId: model.id }, '未完成的记录已移除')) setSelected('') }} onEngine={id => { setEngineReturn({ tab, selected: model.id }); setEngine(id); setTab('engines') }} />} /></div>
-    {tab === 'engines' && <Engines state={state} specifications={specifications} manager={manager} selected={engine} onImport={importModel} onBack={() => { setSelected(engineReturn.selected); setTab(engineReturn.tab) }} />}
+    {tab === 'engines' && <Engines state={state} specifications={specifications} manager={manager} selected={engine} onImport={importModel} onImportCustom={backend => { manager.setNotice(null); setModal({ kind: 'engine-import', backend }) }} onBack={() => { setSelected(engineReturn.selected); setTab(engineReturn.tab) }} />}
     {tab === 'services' && service && <section className="services-page page-content" aria-label="已有 API 连接"><h2>已有 API 连接</h2><p className="page-description">新增连接请到「模型服务」。</p><Tabs value={service.id} onChange={setServiceId}><Tabs.List aria-label="服务列表">{legacyServices.map(item => <Tabs.Tab key={item.id} value={item.id}>{item.title}</Tabs.Tab>)}</Tabs.List></Tabs><ServiceForm key={service.id} service={service} manager={manager} /></section>}
+    {modal?.kind === 'engine-import' && <EngineImportDialog context={context} manager={manager} initialBackend={modal.backend} onClose={() => setModal(null)} onCompleted={id => { setModal(null); setEngine(id); setTab('engines') }} />}
     {modal?.kind === 'local-import' && <LocalImportDialog context={context} manager={manager} onClose={() => setModal(null)} onCompleted={id => { setModal(null); setSelected(id); setLibraryEpoch(value => value + 1); setTab('models') }} />}
     {modal?.kind === 'import' && <ImportDialog {...modal} specifications={specifications} context={context} manager={manager} onClose={() => setModal(null)} />}
     {modal?.kind === 'clear' && <ClearDialog model={modal.model} manager={manager} onClose={() => setModal(null)} />}

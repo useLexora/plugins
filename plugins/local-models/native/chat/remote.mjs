@@ -1,3 +1,7 @@
+import { classifyEngineFailure } from './errors.mjs'
+import { createReasoningStream } from './reasoning.mjs'
+import { safeTimings } from './diagnostics.mjs'
+
 const maxRequestBytes = 32 * 1024 * 1024
 const imageMimeTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 const base64 = /^[A-Za-z0-9+/]*={0,2}$/
@@ -36,7 +40,7 @@ async function rejectResponse(response) {
   try { error = JSON.parse(text).error } catch {}
   if (response.status === 413 || error?.type === 'exceed_context_size_error' || error?.code === 'context_length_exceeded' || /(?:exceeds?|exceeded|too (?:large|long)|maximum).{0,80}context|context.{0,80}(?:exceeds?|exceeded|too (?:large|long)|maximum)/i.test(error?.message ?? ''))
     throw Error('EXTENSION_INFERENCE_CONTEXT_TOO_LARGE')
-  throw Error('EXTENSION_INFERENCE_REQUEST_REJECTED')
+  throw Error(classifyEngineFailure(error?.message ?? '', 'EXTENSION_INFERENCE_REQUEST_REJECTED'))
 }
 
 export async function initialize({ configuration }) {
@@ -58,7 +62,7 @@ export async function initialize({ configuration }) {
             model: configuration.model,
             messages: request.messages.map(remoteMessage),
             max_tokens: request.maxTokens,
-            temperature: request.temperature ?? 0,
+            ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
             stream: true,
             stream_options: { include_usage: true },
             ...(configuration.chatTemplateReasoning && request.reasoning !== undefined ? { chat_template_kwargs: { enable_thinking: request.reasoning !== 'off' } } : {}),
@@ -73,6 +77,7 @@ export async function initialize({ configuration }) {
           const decoder = new TextDecoder()
           let pending = '', reason, usage, ended = false
           const calls = new Map()
+          const reasoning = createReasoningStream({ emit: call.emit, tagged: configuration.chatTemplateReasoning === true, enabled: configuration.chatReasoning === true && request.reasoning !== undefined && request.reasoning !== 'off' })
           for await (const bytes of response.body) {
             call.signal.throwIfAborted()
             pending += decoder.decode(bytes, { stream: true })
@@ -85,10 +90,14 @@ export async function initialize({ configuration }) {
               const data = line.slice(5).trim()
               if (data === '[DONE]') { ended = true; continue }
               const item = JSON.parse(data), choice = item.choices?.[0]
-              if (item.usage) usage = { input: item.usage.prompt_tokens - (item.usage.prompt_tokens_details?.cached_tokens ?? 0), output: item.usage.completion_tokens, cacheRead: item.usage.prompt_tokens_details?.cached_tokens ?? 0 }
-              const thinking = choice?.delta?.reasoning_content
-              if (configuration.chatReasoning === true && request.reasoning !== undefined && request.reasoning !== 'off' && typeof thinking === 'string' && thinking && !call.emit({ type: 'thinking', text: thinking })) throw Error('EXTENSION_INFERENCE_CHANNEL_FULL')
-              if (choice?.delta?.content && !call.emit({ type: 'text', text: choice.delta.content })) throw Error('EXTENSION_INFERENCE_CHANNEL_FULL')
+              if (item.usage) {
+                const input = item.usage.prompt_tokens, output = item.usage.completion_tokens, cacheRead = item.usage.prompt_tokens_details?.cached_tokens ?? 0
+                if (![input, output, cacheRead].every(value => Number.isSafeInteger(value) && value >= 0) || cacheRead > input) throw Error('EXTENSION_INFERENCE_OUTPUT_INVALID')
+                usage = { input: input - cacheRead, output, cacheRead }
+              }
+              if (item.error) throw Error(classifyEngineFailure(item.error.message ?? '', 'EXTENSION_INFERENCE_REQUEST_REJECTED'))
+              if (item.timings) call.diagnostics?.(safeTimings(item.timings))
+              reasoning.push(choice?.delta)
               for (const tool of choice?.delta?.tool_calls ?? []) {
                 const current = calls.get(tool.index) ?? { id: '', name: '', arguments: '' }
                 current.id += tool.id ?? ''
@@ -102,6 +111,7 @@ export async function initialize({ configuration }) {
           }
           call.signal.throwIfAborted()
           if (!ended || !usage || !['stop', 'length', 'tool_calls'].includes(reason)) throw Error('EXTENSION_INFERENCE_OUTPUT_INCOMPLETE')
+          reasoning.finish()
           for (const tool of calls.values()) if (!call.emit({ type: 'tool', call: { ...tool, arguments: JSON.parse(tool.arguments) } })) throw Error('EXTENSION_INFERENCE_CHANNEL_FULL')
           if (!call.emit({ type: 'done', reason: reason === 'tool_calls' ? 'toolUse' : reason, usage })) throw Error('EXTENSION_INFERENCE_CHANNEL_FULL')
         },
