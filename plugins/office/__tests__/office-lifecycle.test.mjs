@@ -90,6 +90,47 @@ async function harness({ empty = false, rejectMount = false } = {}) {
   return { page, open, errors, close: async () => { await browser.close(); await new Promise(resolve => server.close(resolve)) } }
 }
 
+test('未修改文档加载期间立即允许离页，销毁时取消编辑器且不写入文档', { timeout: 90000 }, async () => {
+  const run = await harness()
+  try {
+    await run.open()
+    const { page } = run
+    const original = await page.evaluate(() => window.librarySnapshot())
+    await page.evaluate(() => { void window.closeGuard.request('loading-close') })
+    await expect.poll(() => page.evaluate(() => window.closeReplies), { timeout: 2000 }).toEqual([{ id: 'loading-close', allowed: true }])
+    await page.evaluate(() => window.viewAbort.abort())
+    await page.evaluate(() => window.starting)
+    await expect(page.locator('.pdf-page')).toHaveCount(0)
+    await page.evaluate(() => window.finishMount())
+    assert.deepEqual(await page.evaluate(() => window.librarySnapshot()), original)
+    assert.equal(await page.evaluate(() => window.saveCount), 0)
+    assert.equal(await page.evaluate(() => window.openedCount), 0)
+    assert.deepEqual(run.errors, [])
+  } finally { await run.close() }
+})
+
+test('返回文档库取消未完成加载，旧结果不能覆盖再次打开的文档', { timeout: 90000 }, async () => {
+  const run = await harness()
+  try {
+    await run.open()
+    const { page } = run
+    await page.getByRole('button', { name: 'Office 首页', exact: true }).click()
+    await expect(page.getByRole('button', { name: '打开本地文件', exact: true })).toBeVisible({ timeout: 2000 })
+    await expect(page.locator('.pdf-page')).toHaveCount(0)
+    await page.evaluate(() => window.starting)
+    assert.equal(await page.evaluate(() => window.openedCount), 0)
+    await page.evaluate(() => { window.mountGate = Promise.resolve() })
+    await page.getByRole('button', { name: '生命周期.pdf', exact: true }).click()
+    await expect(page.locator('.office-save-state')).toHaveText('已保存')
+    await page.evaluate(() => window.finishMount())
+    await expect(page.locator('.pdf-page')).toHaveCount(1)
+    await expect.poll(() => page.evaluate(() => window.openedCount)).toBe(1)
+    assert.equal(await page.evaluate(() => window.saveCount), 0)
+    assert.equal(await page.evaluate(() => window.mountAttempts), 2)
+    assert.deepEqual(run.errors, [])
+  } finally { await run.close() }
+})
+
 test('关闭请求在真实PDF的延迟mount期间可取消，已取消请求不能迟到关闭或丢失修改', { timeout: 90000 }, async () => {
   const run = await harness()
   try {

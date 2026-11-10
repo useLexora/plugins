@@ -76,7 +76,7 @@ function EditorChrome({ state, actions }: { state: EditorChromeState; actions: E
   return <header className="office-document-bar" aria-label="文档操作" onKeyDownCapture={event => {
     if (event.key === 'Escape' && menuOpen) onMenuKeyDown(event)
   }}>
-    <Tooltip title={'Office 首页'}><Button type="text" className="office-chrome-icon" icon={<ArrowLeftOutlined aria-hidden="true" />} aria-label={'Office 首页'} disabled={disabled} onClick={() => void perform('back', actions.back)} /></Tooltip>
+    <Tooltip title={'Office 首页'}><Button type="text" className="office-chrome-icon" icon={<ArrowLeftOutlined aria-hidden="true" />} aria-label={'Office 首页'} disabled={!!pending} onClick={() => void perform('back', actions.back)} /></Tooltip>
     <span className="office-document-separator" aria-hidden="true" />
     <Dropdown trigger={['click']} destroyOnHidden popupRender={menu => <div ref={menuPopupRef}>{menu}</div>} open={menuOpen} disabled={disabled} menu={{ items, onClick: () => setMenuOpen(false), onKeyDown: onMenuKeyDown }} onOpenChange={(open, info) => {
       setMenuOpen(open)

@@ -30,6 +30,7 @@ export async function startOffice(context: ViewContext, root: HTMLElement, persi
   let current: OfficeOpenDocument | undefined
   let editor: OfficeEditor | undefined
   let mounting: Promise<OfficeEditor> | undefined
+  let editorLifetime: AbortController | undefined
   let documents: OfficeDocument[] = []
   let dirty = false; let recoveredDirty = false; let changed = 0; let generation = 0
   let disposed = false; let opening = false; let ready = false; let failed = false; let saving = false
@@ -150,6 +151,7 @@ export async function startOffice(context: ViewContext, root: HTMLElement, persi
   }
   const prepareLeave = async (signal?: AbortSignal) => {
     if (signal?.aborted) return false
+    if (!ready && !dirty) return true
     clearTimeout(timer)
     await mounting
     if (signal?.aborted) return false
@@ -197,6 +199,7 @@ export async function startOffice(context: ViewContext, root: HTMLElement, persi
   })
   const clear = async () => {
     agent.close(); generation++; clearTimeout(timer)
+    editorLifetime?.abort(); editorLifetime = undefined; mounting = undefined
     if (current?.local) await context.documents.close(current.local).catch(() => {})
     editor?.dispose(); editor = undefined; current = undefined; dirty = false; ready = false; failed = false
     chrome?.dispose(); chrome = undefined; editorHost.replaceChildren()
@@ -210,14 +213,17 @@ export async function startOffice(context: ViewContext, root: HTMLElement, persi
   const mount = async (document: OfficeOpenDocument, bytes: Uint8Array) => {
     if (disposed) return false
     await clear()
+    const sessionGeneration = generation
+    const lifetime = new AbortController()
+    editorLifetime = lifetime
+    const signal = AbortSignal.any([context.signal, lifetime.signal])
     if (document.local) {
       document = localDocument(await context.documents.resume(document.local))
-      bytes = await context.documents.read(document.local!, { signal: context.signal })
+      bytes = await context.documents.read(document.local!, { signal })
     }
-    if (disposed) return false
+    if (signal.aborted || sessionGeneration !== generation) return false
     current = document; dirty = document.local?.recovery ?? false; recoveredDirty = dirty
     libraryHost.hidden = true; editorHost.hidden = false
-    const sessionGeneration = generation
     const page = element('section', 'office-editor-page')
     const toolbar = element('div', 'office-chrome-host')
     const canvas = element('div', 'office-editor-canvas')
@@ -229,7 +235,7 @@ export async function startOffice(context: ViewContext, root: HTMLElement, persi
     })
     const recovered = document.local?.recovery ?? false
     const options: OfficeEditorOptions = {
-      context, container: canvas, bytes, name: document.name,
+      context: Object.create(context, { signal: { value: signal } }) as ViewContext, container: canvas, bytes, name: document.name,
       captureReference: reference => agent.capture(reference),
       onSaveRequest: () => {
         if (disposed || sessionGeneration !== generation) return Promise.reject(new Error('文档会话已失效。'))
@@ -249,19 +255,35 @@ export async function startOffice(context: ViewContext, root: HTMLElement, persi
         })
       },
     }
-    const mountEditor = await editorMount(document.kind)
-    if (disposed || sessionGeneration !== generation) return false
-    const task = mountEditor(options)
-    mounting = task
+    const task = (async () => {
+      const mountEditor = await editorMount(document.kind)
+      signal.throwIfAborted()
+      return mountEditor(options)
+    })()
+    const cancel = () => rejectMount(signal.reason)
+    let rejectMount!: (error: unknown) => void
+    const pending = new Promise<OfficeEditor>((resolve, reject) => {
+      rejectMount = reject
+      signal.addEventListener('abort', cancel, { once: true })
+      task.then(mounted => {
+        if (signal.aborted || sessionGeneration !== generation) { mounted.dispose(); reject(signal.reason); return }
+        resolve(mounted)
+      }, reject)
+      if (signal.aborted) cancel()
+    })
+    mounting = pending
     try {
-      const mounted = await task
-      if (disposed || sessionGeneration !== generation) { mounted.dispose(); return false }
+      const mounted = await pending
+      if (signal.aborted || sessionGeneration !== generation) { mounted.dispose(); return false }
       editor = mounted; ready = true; update()
     } catch (error) {
-      if (disposed || sessionGeneration !== generation) return false
+      if (signal.aborted || sessionGeneration !== generation) return false
       await clear(); libraryHost.hidden = false; editorHost.hidden = true
       update(); await refresh(); throw error
-    } finally { if (mounting === task) mounting = undefined }
+    } finally {
+      signal.removeEventListener('abort', cancel)
+      if (mounting === pending) mounting = undefined
+    }
     if (dirty) timer = setTimeout(() => run(current?.local ? backup : save), current?.local ? 1800 : 1200)
     if (persistState) await context.setState({ documentId: document.id })
     const session = requestedAgentSession ?? crypto.randomUUID(); requestedAgentSession = undefined
@@ -351,7 +373,7 @@ export async function startOffice(context: ViewContext, root: HTMLElement, persi
   root.ownerDocument.defaultView?.addEventListener('focus', checkExternal)
   const stop = context.onMessage(message => { if (message && typeof message === 'object' && !Array.isArray(message) && message.type === 'office-library-changed') run(refresh) })
   context.signal.addEventListener('abort', () => {
-    disposed = true; root.ownerDocument.defaultView?.removeEventListener('focus', checkExternal); clearTimeout(timer); stop.dispose(); closeGuard.dispose(); root.ownerDocument.removeEventListener('keydown', keydown, true)
+    disposed = true; editorLifetime?.abort(); root.ownerDocument.defaultView?.removeEventListener('focus', checkExternal); clearTimeout(timer); stop.dispose(); closeGuard.dispose(); root.ownerDocument.removeEventListener('keydown', keydown, true)
     agent.close(); editor?.dispose(); chrome?.dispose(); library?.dispose(); notices.dispose()
   }, { once: true })
   if (!context.documents) { notice('请使用支持本地文件编辑的新版 Lexora。已有文档库会保留。', true); return }
