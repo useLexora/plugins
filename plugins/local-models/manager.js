@@ -1,6 +1,10 @@
 import { inferenceEnvironment, platformModel, resourceSupported } from './platform.js'
+import { engineSpecification, engineKey, initialEngineSelections, selectModelEngine, modelEngineRequirement, engineCompatibility } from './enginePolicy.js'
+import { importEngine } from './engineImport.js'
+import { checkEngineUpdates, validateEngineUpdates } from './engineUpdates.js'
 import { createDiscovery } from './discovery.js'
 import { createLocalImport } from './localImport.js'
+import { recommendConfiguration } from './runtimeGuidance.js'
 import { imageModelWarning, zImageTurbo } from './native/image/recipes.mjs'
 import { compatibleImageModel, compatibleImageRecipe } from './imageRecovery.js'
 import { modelToolBinding } from './modelToolSupport.js'
@@ -93,7 +97,7 @@ function serviceBinding(service, configuration) {
 }
 
 export async function activateManager(context, { manifest, catalog, specifications }) {
-  const environment = await inferenceEnvironment(context.inference)
+  let environment = await inferenceEnvironment(context.inference)
   const supported = environment.executionMode !== 'unsupported'
   const platform = environment.platform
   const chatImageInput = context.inference?.capabilities?.chatImageInput === true
@@ -109,8 +113,17 @@ export async function activateManager(context, { manifest, catalog, specificatio
   let historyWarning = ''
   let jobSequence = 0
   const definitions = catalog.models
+  const cachedEngines = Array.isArray(stored?.engineCatalog) ? stored.engineCatalog : []
+  const engineCatalog = validateEngineUpdates(cachedEngines, [...specifications, ...cachedEngines.filter(spec => !specifications.some(current => current.id === spec?.id))])
+  specifications = [...new Map([...specifications, ...engineCatalog, ...(Array.isArray(stored?.customEngines) ? stored.customEngines : [])].map(spec => [spec.id, engineSpecification(spec)])).values()]
   const resourceDefinitions = specifications
-  const templates = definitions.map(model => platformModel(model, platform))
+  const availableBackends = [...new Set(resourceDefinitions.filter(spec => spec.engineId === 'llama.cpp' && resourceSupported(spec, platform)).map(spec => spec.backend))]
+  const recommendationFor = model => recommendConfiguration(model, environment.hardware, platform, availableBackends)
+  const projectModel = model => {
+    const projected = platformModel(model, platform)
+    return { ...projected, defaults: { ...projected.defaults, ...recommendationFor(projected).configuration } }
+  }
+  const templates = definitions.map(projectModel)
   const custom = Array.isArray(stored?.custom) ? stored.custom : []
   const projectCustom = (model) => {
     if (['chat', 'vision'].includes(model.runtime)) {
@@ -125,7 +138,7 @@ export async function activateManager(context, { manifest, catalog, specificatio
         capabilities: [...new Set([...template.capabilities, ...model.capabilities])],
       }
     }
-    return platformModel(model, platform)
+    return projectModel(model)
   }
   const existingResources = supported ? await context.inference.resources.list() : []
   const retainedModels = templates.filter(model => model.resources.some(id => specifications.find(spec => spec.id === id)?.kind === 'model' && existingResources.some(resource => resource.id === id)))
@@ -135,7 +148,10 @@ export async function activateManager(context, { manifest, catalog, specificatio
   const platformWarning = model => ['windows-x64', 'macos-arm64'].includes(platform) && !specifications.some(spec => spec.id === model.resources[0] && spec.kind === 'engine') ? `此模型的原生引擎尚无 ${platformName} 适配；文件和配置已保留。` : ''
   const localImport = createLocalImport(context)
   let settings = {
-    version: 2,
+    version: 3,
+    customEngines: Array.isArray(stored?.customEngines) ? stored.customEngines : [],
+    engineCatalog,
+    engineSelections: initialEngineSelections(specifications, existingResources, stored?.engineSelections?.[platform]),
     ...(stored?.discoveryCache ? { discoveryCache: stored.discoveryCache } : {}),
     ...(stored?.downloadHistory ? { downloadHistory: stored.downloadHistory } : {}),
     custom,
@@ -144,9 +160,24 @@ export async function activateManager(context, { manifest, catalog, specificatio
     models: { ...stored?.models, ...Object.fromEntries(catalog.models.map(model => [model.id, { ...stored?.models?.[model.id], ...configurationFor(model, stored?.models?.[model.id]) }])) },
     services: Object.fromEntries(catalog.services.map(service => [service.id, { enabled: stored?.services?.[service.id]?.enabled === true, credentialPending: stored?.services?.[service.id]?.credentialPending === true, configuration: configurationFor(service, stored?.services?.[service.id]?.configuration) }])),
   }
+  const currentModel = (model, configuration = model && settings.models[model.id]) => selectModelEngine(model, configuration, specifications, settings.engineSelections, platform)
+  const compatibility = model => engineCompatibility(model, specifications.find(spec => spec.id === model.resources[0]))
+  const bindingFor = (model, configuration, resources) => {
+    model = currentModel(model, configuration)
+    if (compatibility(model)) return null
+    const binding = modelBinding(model, configuration, resources, chatImageInput, chatToolMatching, chatReasoning, platform, settings.resourceRevisions)
+    const engine = specifications.find(spec => spec.id === model.resources[0])
+    if (binding && engine?.engineId === 'llama.cpp') Object.assign(binding.configuration, {
+      ...(engine.version ? { engineVersion: engine.version } : {}),
+      engineBackend: configuration?.acceleration === 'cpu' ? 'cpu' : engine.backend,
+      ...(model.metadata?.architecture ? { architecture: model.metadata.architecture } : {}),
+      ...modelEngineRequirement(model),
+    })
+    return binding
+  }
   const bindings = new Map()
   const activationMessages = new Map()
-  let mutating = false
+  let mutating = false, mutationRevision = 0
   let preparation
   let resolution
   let job = null
@@ -158,8 +189,9 @@ export async function activateManager(context, { manifest, catalog, specificatio
   const mutate = handler => async (input) => {
     if (mutating) return failure('请先完成当前操作，或取消正在进行的资源准备')
     mutating = true
+    mutationRevision++
     try { return await handler(input) }
-    finally { mutating = false }
+    finally { mutating = false; mutationRevision++ }
   }
   let writing = Promise.resolve()
   let persisted = stored
@@ -177,13 +209,13 @@ export async function activateManager(context, { manifest, catalog, specificatio
     return commit
   }
   const save = next => enqueueSave(current => {
-    const value = { ...next }
+    const value = { ...persisted, ...next, engineSelections: { ...persisted?.engineSelections, [platform]: next.engineSelections } }
     if (current.discoveryCache) value.discoveryCache = current.discoveryCache
     else delete value.discoveryCache
     if (current.downloadHistory) value.downloadHistory = current.downloadHistory
     else delete value.downloadHistory
     const fitted = fitStorage(value)
-    return { ...fitted, settings: fitted.value }
+    return { ...fitted, settings: { ...fitted.value, engineSelections: next.engineSelections } }
   })
   const saveHistory = async () => {
     const snapshot = downloadHistory.map(record => ({ ...record }))
@@ -219,12 +251,89 @@ export async function activateManager(context, { manifest, catalog, specificatio
   }
   const imageWarning = model => imageModelWarning(model, specifications.find(spec => spec.id === model.resources[1]))
   const applyModel = async (model, configuration = settings.models[model.id]) => {
-    if (platformWarning(model) || imageWarning(model) || settings.active[model.runtime] !== model.id) return
-    const binding = modelBinding(model, configuration, await context.inference.resources.list(), chatImageInput, chatToolMatching, chatReasoning, platform, settings.resourceRevisions)
-    if (!binding || bindings.get(model.runtime) === JSON.stringify(binding)) return
-    if (runtimeBusy((await context.inference.status()).find(runtime => runtime.runtime === model.runtime))) throw Error('当前模型正在使用，请等待任务结束后重新启用')
-    await bind(binding)
+    model = currentModel(model, configuration)
+    if (settings.active[model.runtime] !== model.id) return
+    const binding = platformWarning(model) || imageWarning(model) || compatibility(model) ? null : bindingFor(model, configuration, await context.inference.resources.list())
+    const runtime = (await context.inference.status()).find(runtime => runtime.runtime === model.runtime)
+    if (!runtime || runtime.configured === false) bindings.delete(model.runtime)
+    if ((!binding && !bindings.has(model.runtime)) || (binding && bindings.get(model.runtime) === JSON.stringify(binding))) return
+    if (runtimeBusy(runtime)) throw Error('当前模型正在使用，请等待任务结束后重新启用')
+    if (binding) await bind(binding)
+    else {
+      await context.inference.unbind({ runtime: model.runtime })
+      bindings.delete(model.runtime)
+    }
   }
+
+  register('check-engine-updates', mutate(async () => {
+    const known = [...new Map([...resourceDefinitions, ...settings.engineCatalog].map(spec => [spec.id, spec])).values()]
+    const updates = await checkEngineUpdates(context, known)
+    const added = updates.filter(spec => !known.some(current => current.id === spec.id)).length
+    const engineCatalog = [...new Map([...settings.engineCatalog, ...updates].map(spec => [spec.id, spec])).values()]
+    await save({ ...settings, engineCatalog })
+    specifications = [...new Map([...specifications, ...updates.filter(spec => resourceSupported(spec, platform))].map(spec => [spec.id, spec])).values()]
+    return { ok: true, added, message: added ? `发现 ${added} 个引擎构建；安装后可手动切换，当前运行不受影响` : '未发现新的引擎版本，当前选择保持不变' }
+  }))
+
+  register('use-engine', mutate(async ({ resourceId }) => {
+    const engine = specifications.find(spec => spec.id === resourceId && spec.engineId && resourceSupported(spec, platform))
+    if (!engine) return failure('请选择当前平台可用的引擎')
+    const resources = await context.inference.resources.list()
+    if (!authorized(resources, engine.id, settings.resourceRevisions[engine.id])) return failure('请先安装或重新授权此引擎')
+    const previous = settings
+    const previousBindings = new Map(bindings)
+    const selections = { ...settings.engineSelections, [engineKey(engine)]: engine.id }
+    const affected = catalog.models.filter(model => {
+      if (settings.active[model.runtime] !== model.id) return false
+      const before = currentModel(model)
+      const after = selectModelEngine(model, settings.models[model.id], specifications, selections, platform)
+      return after.resources[0] === engine.id || before.resources[0] !== after.resources[0] || !!before.engineSelectionMissing !== !!after.engineSelectionMissing
+    })
+    const runtimes = await context.inference.status()
+    if (affected.some(model => runtimeBusy(runtimes.find(runtime => runtime.runtime === model.runtime)))) return failure('模型正在使用，请等待任务结束后切换引擎')
+    const incompatible = affected.map(model => selectModelEngine(model, settings.models[model.id], specifications, selections, platform)).find(model => compatibility(model))
+    if (incompatible) return failure(compatibility(incompatible))
+    settings = { ...settings, engineSelections: selections }
+    try {
+      for (const model of affected) await applyModel(model)
+      await save(settings)
+    } catch (error) {
+      settings = previous
+      try {
+        for (const model of affected) {
+          const before = previousBindings.get(model.runtime)
+          if (before) await bind(JSON.parse(before))
+          else { await context.inference.unbind({ runtime: model.runtime }); bindings.delete(model.runtime) }
+        }
+      } catch {
+        throw Error('引擎切换未保存，运行绑定恢复失败；请停止模型后重新启用', { cause: error })
+      }
+      throw error
+    }
+    return success()
+  }))
+
+  register('import-engine', mutate(async input => {
+    const controller = new AbortController()
+    preparation = controller
+    const signal = AbortSignal.any([controller.signal, context.signal])
+    const target = { kind: 'engine-import', title: 'llama.cpp', mode: 'file' }
+    publish({ ...target, state: 'preparing', progress: null })
+    try {
+      const { specification, prepared } = await importEngine(context, input, platform, { signal })
+      signal.throwIfAborted()
+      publish({ ...target, resourceId: specification.id, state: 'committing', progress: null })
+      const customEngines = [...settings.customEngines.filter(spec => spec.id !== specification.id), specification]
+      await save({ ...settings, customEngines, resourceRevisions: { ...settings.resourceRevisions, [specification.id]: prepared.revision } })
+      specifications = [...specifications.filter(spec => spec.id !== specification.id), specification]
+      publish({ ...target, resourceId: specification.id, state: 'completed', progress: null })
+      return { ok: true, resourceId: specification.id }
+    } catch (error) {
+      const message = signal.aborted ? '已取消，原文件和已准备资源保留' : error.message || '引擎导入失败，请重新选择文件'
+      publish({ ...target, state: signal.aborted ? 'cancelled' : 'failed', message, progress: null })
+      return failure(message)
+    } finally { preparation = undefined }
+  }))
 
   const createModel = (resolved, acquisition) => {
     const template = definitions.find(model => model.runtime === resolved.recipe && model.imageArchitecture === resolved.imageArchitecture) ?? definitions.find(model => model.runtime === resolved.recipe)
@@ -269,9 +378,12 @@ export async function activateManager(context, { manifest, catalog, specificatio
         catalog.models.push(projected); specifications.push(specification)
       } else {
         const specification = { ...persisted, files: persisted.files.map(file => ({ ...file, source: files.find(current => current.path === file.path)?.source ?? file.source })) }
-        const validatedImage = resolved.recipe === 'image' ? { imageValidation: resolved.imageValidation } : {}
-        await save({ ...settings, resourceRevisions, custom: settings.custom.map(item => item.model.id === existing.id ? { ...item, model: { ...item.model, ...validatedImage }, specification } : item) })
-        Object.assign(existing, validatedImage)
+        const validatedMetadata = {
+          ...(resolved.recipe === 'image' ? { imageValidation: resolved.imageValidation } : {}),
+          ...(resolved.metadata?.inference ? { metadata: { ...existing.metadata, ...resolved.metadata } } : {}),
+        }
+        await save({ ...settings, resourceRevisions, custom: settings.custom.map(item => item.model.id === existing.id ? { ...item, model: { ...item.model, ...validatedMetadata }, specification } : item) })
+        Object.assign(existing, validatedMetadata)
         specifications = specifications.map(item => item.id === specification.id ? specification : item)
       }
       committed = true
@@ -362,7 +474,8 @@ export async function activateManager(context, { manifest, catalog, specificatio
     if (!model) return failure('模型不存在')
     if (platformWarning(model)) return failure(platformWarning(model))
     if (imageWarning(model)) return failure(imageWarning(model))
-    const binding = modelBinding(model, settings.models[model.id], await context.inference.resources.list(), chatImageInput, chatToolMatching, chatReasoning, platform, settings.resourceRevisions)
+    if (compatibility(currentModel(model))) return failure(compatibility(currentModel(model)))
+    const binding = bindingFor(model, settings.models[model.id], await context.inference.resources.list())
     if (!binding) return failure('请先准备模型及引擎资源')
     const runtime = (await context.inference.status()).find(item => item.runtime === model.runtime)
     if (runtimeBusy(runtime)) return failure('当前模型正在使用，请等待任务结束后再切换')
@@ -411,20 +524,28 @@ export async function activateManager(context, { manifest, catalog, specificatio
   }
 
   register('status', async () => {
-    const [resources, runtimes] = supported ? await Promise.all([context.inference.resources.list(), context.inference.status()]) : [[], []]
+    const revision = mutationRevision
+    const [resources, runtimes, refreshed] = supported ? await Promise.all([context.inference.resources.list(), context.inference.status(), inferenceEnvironment(context.inference).catch(() => null)]) : [[], [], null]
+    if (refreshed?.platform === platform && refreshed.executionMode === environment.executionMode) environment = refreshed
     return {
       supported, environment, compatibilityMessage, resumableDownloads, specifications,
-      engines: specifications.filter(spec => spec.kind === 'engine').map(spec => ({ id: spec.id, capabilities: [...new Set(templates.filter(model => [...model.resources, ...(model.directoryResources ?? [])].includes(spec.id)).flatMap(model => model.capabilities))] })),
-      models: catalog.models.map((model) => {
+      engines: specifications.filter(spec => spec.kind === 'engine').map(spec => ({ id: spec.id, ...(spec.engineId ? { engineId: spec.engineId } : {}), ...(spec.title ? { title: spec.title } : {}), ...(spec.version ? { version: spec.version } : {}), ...(spec.backend ? { backend: spec.backend } : {}), custom: spec.custom === true, installed: !!authorized(resources, spec.id, settings.resourceRevisions[spec.id]), selected: spec.engineId ? settings.engineSelections[engineKey(spec)] === spec.id : true, capabilities: spec.engineId === 'llama.cpp' ? ['对话', '图片理解'] : [...new Set(templates.filter(model => [...model.resources, ...(model.directoryResources ?? [])].includes(spec.id)).flatMap(model => model.capabilities))] })),
+      models: catalog.models.map((original) => {
+        const model = currentModel(original)
+        const compatibilityWarning = compatibility(model)
         const active = settings.active[model.runtime] === model.id
         const sharedRuntime = runtimes.find(item => item.runtime === model.runtime)
-        const runtime = active ? sharedRuntime : undefined
+        const expectedBinding = bindingFor(original, settings.models[original.id], resources)
+        const runtime = active && revision % 2 === 0 && revision === mutationRevision && expectedBinding && bindings.get(model.runtime) === JSON.stringify(expectedBinding) ? sharedRuntime : undefined
         const activeResources = modelResources(model, resources, settings.resourceRevisions)
         const missingResources = activeResources.filter(id => !authorized(resources, id, settings.resourceRevisions[id]))
         const fileIds = activeResources.filter(id => specifications.find(spec => spec.id === id)?.kind === 'model')
         const filesReady = fileIds.length > 0 && fileIds.every(id => authorized(resources, id, settings.resourceRevisions[id]))
         const filesRegistered = fileIds.some(id => resources.some(resource => resource.id === id))
-        return { ...model, capabilities: visionWarning(model) ? model.capabilities.filter(capability => !['对话', '图片输入'].includes(capability)) : model.capabilities, filesReady, filesRegistered, activationWarning: activationMessages.get(model.id) || '', bindingWarning: [platformWarning(model), imageWarning(model), activationMessages.get(model.id), visionWarning(model), active ? toolWarning(model) : ''].filter(Boolean).join(' '), active, runtimeBusy: runtimeBusy(sharedRuntime), configuration: configurationFor(model, settings.models[model.id]), prepared: supported && !platformWarning(model) && !imageWarning(model) && missingResources.length === 0, bound: supported && !platformWarning(model) && !imageWarning(model) && (runtime?.configured ?? false), state: !supported || platformWarning(model) ? 'unsupported' : imageWarning(model) ? 'unverified' : runtimeState(runtime, missingResources.length === 0), instances: runtime?.instances ?? [], activeResources, missingResources }
+        const instances = runtime?.instances ?? []
+        const observation = instances.filter(instance => instance.observation).sort((a, b) => b.observation.observedAt - a.observation.observedAt)[0]?.observation
+        const recommendation = recommendationFor({ ...model, instances })
+        return { ...model, recommendation, ...(observation ? { runtimeObservation: observation } : {}), compatibilityWarning, capabilities: visionWarning(model) ? model.capabilities.filter(capability => !['对话', '图片输入'].includes(capability)) : model.capabilities, filesReady, filesRegistered, activationWarning: activationMessages.get(model.id) || '', bindingWarning: [platformWarning(model), imageWarning(model), activationMessages.get(model.id), visionWarning(model), active ? toolWarning(model) : ''].filter(Boolean).join(' '), active, runtimeBusy: runtimeBusy(sharedRuntime), configuration: configurationFor(model, settings.models[model.id]), prepared: supported && !compatibilityWarning && !platformWarning(model) && !imageWarning(model) && missingResources.length === 0, bound: supported && !compatibilityWarning && !platformWarning(model) && !imageWarning(model) && (runtime?.configured ?? false), state: !supported || platformWarning(model) ? 'unsupported' : imageWarning(model) ? 'unverified' : runtimeState(runtime, missingResources.length === 0), instances: runtime?.instances ?? [], activeResources, missingResources }
       }),
       services: await Promise.all(catalog.services.map(async (service) => {
         const runtime = runtimes.find(item => item.runtime === service.runtime)
@@ -511,7 +632,7 @@ export async function activateManager(context, { manifest, catalog, specificatio
   })
 
   register('prepare', mutate(async (input) => {
-    const model = catalog.models.find(model => model.id === input.modelId)
+    const model = currentModel(catalog.models.find(model => model.id === input.modelId))
     const mode = input.mode ?? 'download'
     const scope = input.scope ?? 'all'
     const allowedIds = new Set(model ? [...model.resources, ...(model.directoryResources ?? [])] : specifications.filter(spec => spec.kind === 'engine').map(spec => spec.id))
@@ -543,6 +664,7 @@ export async function activateManager(context, { manifest, catalog, specificatio
       const existing = await context.inference.resources.list()
       const ids = target ? [target.id] : mode === 'directory' ? model.directoryResources ?? model.resources : model.resources
       const selected = ids.map(id => specifications.find(resource => resource.id === id)).filter(resource => resource && (target || scope === 'all' || resource.kind === 'model') && (target || !authorized(existing, resource.id, settings.resourceRevisions[resource.id])))
+      if (selected.some(resource => resource.kind === 'engine') && JSON.stringify(persisted?.engineSelections?.[platform]) !== JSON.stringify(settings.engineSelections)) await save(settings)
       metrics = createDownloadProgress(selected, mode, startedAt)
       publish({ ...jobTarget, ...metrics.snapshot(), state: signal.aborted ? 'cancelling' : 'preparing', progress: null })
       for (const resource of selected) {
@@ -595,7 +717,7 @@ export async function activateManager(context, { manifest, catalog, specificatio
           })
         } catch { warnings.push('资源已准备，但修订信息未能保存；请检查存储空间并重新准备，当前会话仍使用本次修订') }
       }
-      for (const candidate of model ? [model] : catalog.models.filter(candidate => candidate.resources.includes(target.id))) {
+      for (const candidate of model ? [model] : catalog.models.filter(candidate => currentModel(candidate).resources.includes(target.id))) {
         try { await applyModel(candidate); activationMessages.delete(candidate.id) }
         catch {
           const warning = '资源已准备，当前运行绑定未切换；请在任务结束后重新启用此模型'

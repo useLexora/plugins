@@ -1,0 +1,90 @@
+{
+  "engineId": "llama.cpp",
+  "version": "b12211",
+  "commit": "7d7f0287530bc8981690f361d8c1627dbae1c99a",
+  "prerelease": true,
+  "publishedAt": "2026-11-08T16:48:49Z",
+  "metadata": "https://api.github.com/repos/ggml-org/llama.cpp/releases/tags/b12211",
+  "release": "https://github.com/ggml-org/llama.cpp/releases/tag/b12211",
+  "manifest": "resources.json",
+  "verification": "Downloaded all seven exact official assets, checked byte counts and GitHub SHA256 digests, hashed selected regular entries, resolved versioned library aliases, then streamed all 189 manifest files through the unchanged plugin preparation implementation and independently checked emitted bytes and aliases. No engine or model service was started.",
+  "reproduce": {
+    "requirements": "Node 22+ and the existing local-models package dependencies; no additional archiver or CUDA toolkit. Run from plugins/local-models. Default command only reads release metadata and prints the plan.",
+    "inspect": "node scripts/llama-resources.mjs --release b12211",
+    "verifyAndGenerate": "node scripts/llama-resources.mjs --release b12211 --cache /tmp/lexora-llama-b12211-verify --download --output /tmp/llama-resources.json",
+    "review": "diff -u resources.json /tmp/llama-resources.json",
+    "tests": "node --test scripts/__tests__/llama-resources.spec.mjs src/preparation/__tests__/*.spec.mjs",
+    "update": "Choose a fixed published tag; the maintenance entry requires all five variants and CUDA 13.5 assets. Review upstream build/dependency/driver changes and generated diffs before replacing resources.json. Existing models, non-llama resources and old llama file/archive definitions are retained. Changed upstream assets are rejected against cached sizes/digests rather than silently reused."
+  },
+  "engines": [
+    {
+      "id": "llama-vulkan-linux-x64-b12211",
+      "backend": "vulkan",
+      "platform": "linux-x64",
+      "selectedFiles": 41,
+      "downloadBytes": 35924677,
+      "systemDependencies": ["glibc >= 2.34", "libstdc++ with GLIBCXX_3.4.30", "libgomp.so.1", "OpenSSL 3 libssl.so.3/libcrypto.so.3", "Vulkan loader libvulkan.so.1 and a compatible GPU driver for GPU execution"],
+      "evidence": "readelf NEEDED and version requirements inspected for every selected ELF entry; private llama/ggml/mtmd dependencies resolve to colocated manifest files via $ORIGIN. CPU backend variants remain included."
+    },
+    {
+      "id": "llama-vulkan-windows-x64-b12211",
+      "backend": "vulkan",
+      "platform": "windows-x64",
+      "selectedFiles": 32,
+      "downloadBytes": 37845757,
+      "systemDependencies": ["Microsoft Visual C++ x64 runtime", "Vulkan driver exposing vulkan-1.dll for GPU execution"],
+      "evidence": "PE imports inspected for every selected DLL/executable; all supplied DLLs, CPU variants and LICENSE-LLVM-OpenMP remain colocated."
+    },
+    {
+      "id": "llama-metal-macos-arm64-b12211",
+      "backend": "metal",
+      "platform": "macos-arm64",
+      "selectedFiles": 37,
+      "downloadBytes": 16711245,
+      "machOMinimumOS": "13.3",
+      "hostBaseline": "The plugin host retains its macOS 15 ARM64 baseline; the binary deployment target does not lower host support requirements.",
+      "evidence": "Every selected Mach-O is ARM64 with deployment target 13.3. Non-system dylib loads resolve to selected files. /usr/lib/librdma.dylib remains weak-linked, not a mandatory macOS 26 dependency. Metal dylib contains the embedded-library message and metal_stdlib source. Versioned aliases are materialized from regular entries."
+    },
+    {
+      "id": "llama-cuda-linux-x64-b12211",
+      "backend": "cuda",
+      "platform": "linux-x64",
+      "selectedFiles": 44,
+      "downloadBytes": 613915098,
+      "cudaRuntimeVersion": "13.5",
+      "runtimeFiles": ["libcudart.so.13", "libcublas.so.13", "libcublasLt.so.13"],
+      "systemDependencies": ["glibc >= 2.38", "libstdc++ with GLIBCXX_3.4.32", "libgomp.so.1", "OpenSSL 3 libssl.so.3/libcrypto.so.3", "NVIDIA driver exposing libcuda.so.1; CUDA 13.5-compatible driver recommended"],
+      "evidence": "readelf NEEDED/version requirements inspected for every selected ELF including runtime libraries. libggml-cuda.so needs libcudart.so.13, libcublas.so.13 and the driver-provided libcuda.so.1. The official cudart archive supplies all three colocated CUDA runtime libraries; no toolkit or driver is bundled."
+    },
+    {
+      "id": "llama-cuda-windows-x64-b12211",
+      "backend": "cuda",
+      "platform": "windows-x64",
+      "selectedFiles": 35,
+      "downloadBytes": 597262282,
+      "cudaRuntimeVersion": "13.5",
+      "runtimeFiles": ["cudart64_13.dll", "cublas64_13.dll", "cublasLt64_13.dll"],
+      "systemDependencies": ["Microsoft Visual C++ x64 runtime", "CUDA 13.5-compatible NVIDIA driver"],
+      "evidence": "PE imports inspected for every selected DLL/executable including runtime libraries. ggml-cuda.dll imports cublas64_13.dll; the separate official cudart ZIP supplies cudart/cuBLAS/cuBLASLt alongside the server. No system driver or toolkit is installed."
+    }
+  ],
+  "cudaSupport": {
+    "recommendedDriverBranch": "R620",
+    "minorCompatibilityDriverBranch": "R580",
+    "driverSource": "https://docs.nvidia.com/cuda/cuda-toolkit-release-notes/index.html#cuda-driver",
+    "driverBoundary": "NVIDIA documents CUDA 13.5 with R620, and CUDA 13.x minor-version compatibility from R580. R580 is not a sufficient guarantee: PTX JIT and new features can require the matching newer driver. Use a CUDA 13.5-compatible R620+ driver for the recommended configuration; this plugin never installs drivers.",
+    "architectureSource": "https://github.com/ggml-org/llama.cpp/blob/7d7f0287530bc8981690f361d8c1627dbae1c99a/ggml/src/ggml-cuda/CMakeLists.txt",
+    "buildSources": [
+      "https://github.com/ggml-org/llama.cpp/blob/7d7f0287530bc8981690f361d8c1627dbae1c99a/.github/workflows/release.yml",
+      "https://github.com/ggml-org/llama.cpp/blob/7d7f0287530bc8981690f361d8c1627dbae1c99a/.github/workflows/build-cuda-windows.yml"
+    ],
+    "architectureBoundary": "The fixed release build uses GGML_NATIVE=OFF and the default architecture set. CUDA 13.5 selects 75-virtual, 80-virtual, 86-real, 89-real, 90-virtual, 120a-real and 121a-real. Blackwell/RTX 50 is covered by the explicit 120a-real build target, not an assumed CUDA 12.4 PTX fallback. This is source/build evidence, not an RTX 5070 Ti hardware acceptance result. The CUDA 13 variant does not cover pre-Turing GPUs; use an applicable Vulkan resource or CPU execution instead."
+  },
+  "limitations": [
+    "Upstream marks b12211 as prerelease. It is a pinned published and checksum-verified recommendation, not an upstream stable release claim.",
+    "No Windows or macOS native execution, CUDA/Vulkan/Metal GPU inference, real model weights, multimodal projection, tool-call quality or performance acceptance was performed. RTX 5070 Ti and other GPU hardware remain unverified.",
+    "Digest and static dependency checks cannot prove GPU/driver compatibility. Linux CUDA and Vulkan builds have different libc/libstdc++ baselines; availability in the host runtime must be checked separately.",
+    "All previous model and non-llama resource objects remain unchanged. The three b11747 llama resources retain their exact files/archives/bytes and gain legacy identity metadata; installed profiles and user bindings are not migrated or reset by the manifest generator.",
+    "The existing windows-engines.json and macos-engines.json entries describe their historical b11747 verification. Current llama provenance and CUDA support are defined here."
+  ]
+}

@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
 import { initialize as initializeProtocol } from './remote.mjs'
 import { createTransport } from './transport.mjs'
+import { checkEngineVersion } from './errors.mjs'
+import { createEngineDiagnostics } from './diagnostics.mjs'
 import { engineEnvironment, resourceDirectory, resourceFile } from '../resources.mjs'
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -13,20 +15,26 @@ const record = value => process.stderr.write(JSON.stringify({ ...value, at: Date
 export function launchConfiguration(input, transport, platform = process.platform) {
   const { configuration } = input
   const model = role => resourceFile(input, 'model', role)
-  const args = ['-m', model(configuration.files?.model ?? (configuration.backend === 'vision' ? 'Qwen3VL-8B-Instruct-Q4_K_M.gguf' : 'model.gguf')), ...transport.args, '--alias', 'local', '-c', String(configuration.contextWindow), '-t', String(configuration.threads), '-ngl', configuration.acceleration === 'cpu' ? '0' : 'all', '-fa', 'on', '--fit', 'off', '--parallel', '1', '--jinja', '--no-context-shift', '--cache-ram', '0', '--no-webui']
-  if (configuration.acceleration === 'cpu') args.push('--device', 'none')
+  checkEngineVersion(configuration)
+  const cpu = configuration.acceleration === 'cpu' || configuration.engineBackend === 'cpu'
+  const args = ['-m', model(configuration.files?.model ?? (configuration.backend === 'vision' ? 'Qwen3VL-8B-Instruct-Q4_K_M.gguf' : 'model.gguf')), ...transport.args, '--alias', 'local', '--parallel', '1', '--jinja', '--no-context-shift', '--cache-ram', '0', '--no-webui']
+  if (/^b\d+$/.test(configuration.engineVersion ?? '') && Number(configuration.engineVersion.slice(1)) >= 12211) args.push('-lv', '4')
+  if (configuration.contextWindow !== undefined) args.push('-c', String(configuration.contextWindow))
+  if (configuration.threads !== undefined) args.push('-t', String(configuration.threads))
+  if (cpu) args.push('-ngl', '0', '--device', 'none')
   if (configuration.backend === 'vision') {
     args.push('--mmproj', model(configuration.files?.projector ?? 'mmproj-Qwen3VL-8B-Instruct-F16.gguf'))
-    if (configuration.acceleration === 'cpu') args.push('--no-mmproj-offload')
+    if (cpu) args.push('--no-mmproj-offload')
   }
   const directory = resourceDirectory(input, 'engine')
   const env = engineEnvironment(directory, platform)
-  if (platform === 'win32' || platform === 'darwin') for (const key of Object.keys(env)) if (/^(?:LLAMA_|AIP_)/i.test(key)) delete env[key]
-  return { executable: resourceFile(input, 'engine', platform === 'win32' ? 'llama-server.exe' : 'llama-server'), args, options: { cwd: directory, env: { ...env, ...transport.environment }, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] } }
+  for (const key of Object.keys(env)) if (/^(?:LLAMA_|AIP_)/i.test(key)) delete env[key]
+  return { executable: resourceFile(input, 'engine', platform === 'win32' ? 'llama-server.exe' : 'llama-server'), args, options: { cwd: directory, env: { ...env, ...transport.environment }, windowsHide: true, stdio: /** @type {['ignore', 'pipe', 'pipe']} */ (['ignore', 'pipe', 'pipe']) } }
 }
 
 export async function initialize(input) {
   const { configuration } = input
+  checkEngineVersion(configuration)
   const directory = await mkdtemp(join(tmpdir(), 'chat-'))
   const socketPath = join(directory, 'model.sock')
   let server, stopping, disposed = false
@@ -51,23 +59,29 @@ export async function initialize(input) {
     const transport = createTransport(socketPath)
     const launch = launchConfiguration(input, transport)
     const child = spawn(launch.executable, launch.args, launch.options)
-    const current = { child, transport, exited: false, closed: undefined, errors: '' }
-    current.closed = new Promise((resolve, reject) => {
-      child.once('error', error => { current.exited = true; reject(error) })
-      child.once('close', (code, signal) => { current.exited = true; record({ event: 'chat.gpu.exit', pid: child.pid, code, signal }); resolve() })
+    const diagnostics = createEngineDiagnostics(configuration)
+    const current = { child, transport, diagnostics, exited: false, closed: undefined, exitFailure: undefined }
+    current.closed = new Promise(resolve => {
+      child.once('error', () => { current.exited = true })
+      child.once('close', (code, signal) => {
+        current.exited = true
+        diagnostics.flush()
+        if (signal === 'SIGILL' || code === -1073741795 || code === 3221225501) current.exitFailure = 'EXTENSION_INFERENCE_DRIVER_INCOMPATIBLE'
+        if (code === -1073741515 || code === 3221225781) current.exitFailure = 'EXTENSION_INFERENCE_BACKEND_UNAVAILABLE'
+        record({ event: 'chat.gpu.exit', pid: child.pid, code, signal, ...diagnostics.snapshot(), ...(current.exitFailure ? { error: current.exitFailure } : {}) })
+        resolve()
+      })
     })
-    void current.closed.catch(() => {})
     server = current
-    for (const stream of [child.stdout, child.stderr]) {
-      stream.on('data', bytes => { current.errors = (current.errors + bytes).slice(-16000); transport.observe(bytes) })
-      stream.pipe(process.stderr, { end: false })
+    for (const [channel, stream] of Object.entries({ stdout: child.stdout, stderr: child.stderr })) {
+      stream.on('data', bytes => { diagnostics.observe(bytes, channel); transport.observe(bytes) })
     }
-    record({ event: 'chat.gpu.start', pid: child.pid, configuration })
+    record({ event: 'chat.gpu.start', pid: child.pid, ...diagnostics.snapshot() })
     try {
       const deadline = Date.now() + 110000
       for (;;) {
         signal?.throwIfAborted()
-        if (current.exited) throw Error(/bad_alloc|Cannot allocate memory|failed to allocate|out of (?:device |host )?memory|ErrorOutOf(?:Device|Host)Memory/i.test(current.errors) ? 'EXTENSION_INFERENCE_RESOURCE_EXHAUSTED' : 'EXTENSION_INFERENCE_LOAD_FAILED')
+        if (current.exited) { await current.closed; throw Error(diagnostics.failure(current.exitFailure)) }
         try {
           const response = await transport.request('/health', undefined, signal)
           for await (const _ of response.body) {}
@@ -76,7 +90,7 @@ export async function initialize(input) {
         if (Date.now() >= deadline) throw Error('EXTENSION_INFERENCE_LOAD_TIMEOUT')
         await pause(50)
       }
-      record({ event: 'chat.gpu.ready', pid: child.pid, loadMs: Date.now() - started })
+      record({ event: 'chat.gpu.ready', pid: child.pid, loadMs: Date.now() - started, ...diagnostics.snapshot() })
     } catch (error) { await stop(true); throw error }
   }
   try { await ready() } catch (error) { await rm(directory, { recursive: true, force: true }); throw error }
@@ -89,9 +103,10 @@ export async function initialize(input) {
       const session = protocol.start(capability, input, {
         ...call,
         network: { async post(_endpoint, body) { return server.transport.request('/v1/chat/completions', body, call.signal) } },
+        diagnostics: timings => record({ event: 'chat.gpu.timings', id, ...timings }),
         emit(event) {
-          if (first && (event.type === 'text' || event.type === 'tool')) { first = false; record({ event: 'chat.gpu.first', id, ms: Date.now() - started, kind: event.type }) }
-          if (event.type === 'done') record({ event: 'chat.gpu.done', id, ms: Date.now() - started, reason: event.reason, usage: event.usage })
+          if (first && (event.type === 'thinking' || event.type === 'text' || event.type === 'tool')) { first = false; record({ event: 'chat.gpu.first', id, ms: Date.now() - started, kind: event.type }) }
+          if (event.type === 'done') record({ event: 'chat.gpu.done', id, ms: Date.now() - started, reason: event.reason, usage: event.usage, ...server?.diagnostics.snapshot() })
           return call.emit(event)
         },
       })
@@ -102,8 +117,18 @@ export async function initialize(input) {
           record({ event: 'chat.gpu.invoke', id })
           const cancel = () => { void stop(true).catch(() => {}) }
           call.signal.addEventListener('abort', cancel, { once: true })
-          try { await ready(call.signal); await session.finish(); call.signal.throwIfAborted() }
-          finally {
+          try {
+            await ready(call.signal)
+            server.diagnostics.beginRequest()
+            await session.finish()
+            call.signal.throwIfAborted()
+          } catch (error) {
+            call.signal.throwIfAborted()
+            let code = /^EXTENSION_INFERENCE_[A-Z_]+$/.test(error.message) ? error.message : 'EXTENSION_INFERENCE_REQUEST_REJECTED'
+            if (['EXTENSION_INFERENCE_REQUEST_REJECTED', 'EXTENSION_INFERENCE_OUTPUT_INCOMPLETE', 'EXTENSION_INFERENCE_PROCESS_EXITED'].includes(code)) code = server?.diagnostics.failure(server.exitFailure ?? code) ?? code
+            record({ event: 'chat.gpu.error', id, code, ...server?.diagnostics.snapshot() })
+            throw Error(code)
+          } finally {
             call.signal.removeEventListener('abort', cancel)
             if (call.signal.aborted) await stop(true)
             record({ event: 'chat.gpu.drain', id, cancelled: call.signal.aborted, ms: Date.now() - started })

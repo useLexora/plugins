@@ -141,7 +141,7 @@ for (const [chatReasoning, reasoning] of [[undefined, 'medium'], [false, 'medium
   ])
   assert.deepEqual(f.payload().chat_template_kwargs, reasoning === undefined ? undefined : { enable_thinking: reasoning !== 'off' })
   assert.equal(f.payload().max_tokens, 64)
-  assert.equal(f.payload().temperature, 0)
+  assert.equal(Object.hasOwn(f.payload(), 'temperature'), false)
   assert.equal(f.posts(), 1)
 })
 

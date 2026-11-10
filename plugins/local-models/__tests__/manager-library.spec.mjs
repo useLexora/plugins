@@ -5,8 +5,9 @@ import { activateManager } from '../manager.js'
 
 const catalog = JSON.parse(await fs.readFile(new URL('../catalog.json', import.meta.url)))
 const specifications = JSON.parse(await fs.readFile(new URL('../resources.json', import.meta.url)))
+const recommendedEngine = specifications.filter(spec => spec.engineId === 'llama.cpp' && spec.backend === 'vulkan' && spec.platforms.includes('linux-x64') && !spec.legacy).sort((a, b) => Number(b.version.slice(1)) - Number(a.version.slice(1)))[0]
 
-async function openManager(resources, stored = null, onSave = async () => { throw Error('Opening the library must not rewrite saved data') }, prepareResource = async (spec) => { resources.push({ id: spec.id, kind: spec.kind, authorized: true, revision: 'test' }) }, ports = {}) {
+async function openManager(resources, stored = null, onSave = async () => { throw Error('Opening the library must not rewrite saved data') }, prepareResource = async (spec) => { const resource = { id: spec.id, kind: spec.kind, authorized: true, revision: 'test' }; resources.push(resource); return resource }, ports = {}) {
   const commands = new Map()
   const context = {
     ...ports,
@@ -22,6 +23,7 @@ async function openManager(resources, stored = null, onSave = async () => { thro
       status: async () => [],
       credentials: { has: async () => false },
       bind: async () => {},
+      unbind: async () => {},
     },
   }
   await activateManager(context, { manifest: { id: 'lexora.local-models' }, catalog: structuredClone(catalog), specifications: structuredClone(specifications) })
@@ -59,32 +61,38 @@ test('saving a resource-less custom model retains its record and settings for un
 
 test('an engine installs without registering a model or downloading model weights', async () => {
   const resources = []
-  const manager = await openManager(resources)
-  assert.deepEqual(await manager.execute('prepare', { resourceId: 'llama-b11747', mode: 'download' }), { ok: true })
+  let saved
+  const manager = await openManager(resources, null, async value => { saved = value })
+  const engineId = recommendedEngine.id
+  assert.deepEqual(await manager.execute('prepare', { resourceId: engineId, mode: 'download' }), { ok: true })
   const state = await manager.execute('status')
   assert.deepEqual(state.models, [])
-  assert.deepEqual(resources.map(({ id, kind }) => ({ id, kind })), [{ id: 'llama-b11747', kind: 'engine' }])
-  assert.equal(state.job.resourceId, 'llama-b11747')
+  assert.deepEqual(resources.map(({ id, kind }) => ({ id, kind })), [{ id: engineId, kind: 'engine' }])
+  assert.equal(state.job.resourceId, engineId)
+  assert.equal(saved.engineSelections['linux-x64']['llama.cpp:vulkan'], engineId)
   assert.equal(state.job.state, 'completed')
   assert.deepEqual(state.downloadHistory, [])
-  assert.ok(state.engines.find(engine => engine.id === 'llama-b11747').capabilities.length)
+  assert.ok(state.engines.find(engine => engine.id === engineId).capabilities.length)
   assert.ok((await manager.execute('prepare', { resourceId: 'qwen3-4b-model', mode: 'download' })).error)
 })
 
 test('model-only acquisition leaves engines untouched and clearing model files retains an installed engine', async () => {
   const model = { ...catalog.models[0], id: 'custom-example', custom: true, resources: ['llama-b11747', 'custom-example-model'] }
   const resources = []
-  const manager = await openManager(resources, { custom: [{ model, specification: { id: 'custom-example-model', kind: 'model', files: [{ path: 'model.gguf', sha256: 'a'.repeat(64), url: 'https://example.com/model.gguf' }] } }] })
+  let saved
+  const manager = await openManager(resources, { custom: [{ model, specification: { id: 'custom-example-model', kind: 'model', files: [{ path: 'model.gguf', sha256: 'a'.repeat(64), url: 'https://example.com/model.gguf' }] } }] }, async value => { saved = value })
   assert.equal((await manager.execute('prepare', { modelId: model.id, scope: 'model', mode: 'download' })).ok, true)
   let state = await manager.execute('status')
   assert.equal(state.models[0].filesReady, true)
   assert.equal(state.models[0].prepared, false)
   assert.deepEqual(resources.map(resource => resource.id), ['custom-example-model'])
-  assert.equal((await manager.execute('prepare', { resourceId: 'llama-b11747', mode: 'download' })).ok, true)
+  const engineId = state.models[0].resources[0]
+  assert.equal((await manager.execute('prepare', { resourceId: engineId, mode: 'download' })).ok, true)
+  assert.equal(saved.engineSelections['linux-x64']['llama.cpp:vulkan'], engineId)
   state = await manager.execute('status')
   assert.equal(state.models[0].prepared, true)
   await manager.execute('clear', { modelId: model.id })
-  assert.deepEqual(resources.map(resource => resource.id), ['llama-b11747'])
+  assert.deepEqual(resources.map(resource => resource.id), [engineId])
 })
 
 test('only empty custom records can be removed; restored references and saved configurations remain protected', async () => {
@@ -106,16 +114,18 @@ test('independent engine preparation can be cancelled without creating models', 
   const resources = []
   let entered
   const started = new Promise(resolve => { entered = resolve })
-  const manager = await openManager(resources, null, undefined, async (_spec, { signal }) => {
+  let saved
+  const manager = await openManager(resources, null, async value => { saved = value }, async (_spec, { signal }) => {
     entered()
     await new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true }))
   })
-  const preparation = manager.execute('prepare', { resourceId: 'llama-b11747', mode: 'download' })
+  const preparation = manager.execute('prepare', { resourceId: recommendedEngine.id, mode: 'download' })
   await started
   await manager.execute('cancel-preparation')
   assert.ok((await preparation).error)
   const state = await manager.execute('status')
   assert.equal(state.job.state, 'cancelled')
+  assert.equal(saved.engineSelections['linux-x64']['llama.cpp:vulkan'], recommendedEngine.id)
   assert.deepEqual(state.models, [])
   assert.deepEqual(resources, [])
 })

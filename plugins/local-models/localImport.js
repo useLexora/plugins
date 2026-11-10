@@ -184,7 +184,7 @@ export function createLocalImport(context) {
       ...(recipe === 'tts' ? { phonemes: join(parent(selected.model.path), 'espeak-ng-data') } : {}),
       ...(recipe === 'image' ? { imageArchitecture: 'checkpoint', imageValidation: { version: 1, kind: 'ldm-header', architecture: selected.model.info.architecture, sha256: hashes.get(selected.model.id) } } : {}),
       ...(recipe === 'ocr' ? { languages: selected.language.name.slice(0, -'.traineddata'.length) } : {}),
-      metadata: { source: 'local', tags }, origin: { source: 'local' },
+      metadata: { source: 'local', tags, ...(selected.model?.info.architecture ? { architecture: selected.model.info.architecture } : {}), ...(selected.model?.info.inference ? { inference: selected.model.info.inference } : {}) }, origin: { source: 'local' },
       specification: { id: `${id}-model`, kind: 'model', title: name || '本地模型', bytes: totalBytes, files: files.map(file => ({ path: pathFor(file), source: file.path, sha256: hashes.get(file.id), resourceId: file.id })) },
     }
     if (recipe === 'ocr' && !/^[a-zA-Z0-9_-]{1,80}$/.test(result.languages)) throw Error('OCR 语言文件名不受当前引擎支持，请使用 eng、chi_sim 等语言名')

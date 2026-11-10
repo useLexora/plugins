@@ -285,7 +285,7 @@
         "archive": "llama"
       }
     ],
-    "title": "llama.cpp b11747 引擎",
+    "title": "llama.cpp",
     "archives": [
       {
         "id": "llama",
@@ -298,7 +298,14 @@
         "name": "llama-b11747-bin-ubuntu-vulkan-x64.tar.gz"
       }
     ],
-    "bytes": 34877845
+    "bytes": 34877845,
+    "engineId": "llama.cpp",
+    "version": "b11747",
+    "backend": "vulkan",
+    "platforms": [
+      "linux-x64"
+    ],
+    "legacy": true
   },
   {
     "id": "qwen3-4b-model",
@@ -3369,7 +3376,7 @@
     "platforms": [
       "windows-x64"
     ],
-    "title": "llama.cpp b11747 · Windows x64 CPU / Vulkan 引擎",
+    "title": "llama.cpp",
     "bytes": 36751367,
     "files": [
       {
@@ -3602,7 +3609,11 @@
           "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11747/llama-b11747-bin-win-vulkan-x64.zip"
         }
       }
-    ]
+    ],
+    "engineId": "llama.cpp",
+    "version": "b11747",
+    "backend": "vulkan",
+    "legacy": true
   },
   {
     "id": "image-vulkan-windows-x64",
@@ -3989,7 +4000,7 @@
     "platforms": [
       "macos-arm64"
     ],
-    "title": "llama.cpp b11747 · macOS ARM64 CPU / Metal 引擎",
+    "title": "llama.cpp",
     "bytes": 16103571,
     "files": [
       {
@@ -4264,7 +4275,11 @@
           "url": "https://github.com/ggml-org/llama.cpp/releases/download/b11747/llama-b11747-bin-macos-arm64.tar.gz"
         }
       }
-    ]
+    ],
+    "engineId": "llama.cpp",
+    "version": "b11747",
+    "backend": "metal",
+    "legacy": true
   },
   {
     "id": "image-metal-macos-arm64",
@@ -4525,5 +4540,1517 @@
         }
       }
     ]
+  },
+  {
+    "id": "llama-vulkan-linux-x64-b12211",
+    "kind": "engine",
+    "engineId": "llama.cpp",
+    "version": "b12211",
+    "backend": "vulkan",
+    "platforms": [
+      "linux-x64"
+    ],
+    "title": "llama.cpp",
+    "prerelease": true,
+    "requirements": [
+      "glibc >= 2.34；libstdc++ 提供 GLIBCXX_3.4.30",
+      "OpenSSL 3、libgomp.so.1；GPU 模式需要 Vulkan loader 与兼容驱动"
+    ],
+    "files": [
+      {
+        "path": "LICENSE",
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+        "source": "engine/LICENSE",
+        "archivePath": "llama-b12211/LICENSE",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-base.so",
+        "sha256": "618aae472f7b041d2efab58d86c6471263d503bf7c4cc5ea40dd6b91ff5fc2a4",
+        "source": "engine/libggml-base.so",
+        "archivePath": "llama-b12211/libggml-base.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-base.so.0",
+        "sha256": "618aae472f7b041d2efab58d86c6471263d503bf7c4cc5ea40dd6b91ff5fc2a4",
+        "source": "engine/libggml-base.so.0",
+        "archivePath": "llama-b12211/libggml-base.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-base.so.0.29.0",
+        "sha256": "618aae472f7b041d2efab58d86c6471263d503bf7c4cc5ea40dd6b91ff5fc2a4",
+        "source": "engine/libggml-base.so.0.29.0",
+        "archivePath": "llama-b12211/libggml-base.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-alderlake.so",
+        "sha256": "ae990ef0ac6f28a4b13a89e613c551b77694db16bf01332baf82619c107700b5",
+        "source": "engine/libggml-cpu-alderlake.so",
+        "archivePath": "llama-b12211/libggml-cpu-alderlake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-cannonlake.so",
+        "sha256": "777d4395e2a4ad70059d7c06f77856e8552e4d6b12dcd7d15919a52498729fea",
+        "source": "engine/libggml-cpu-cannonlake.so",
+        "archivePath": "llama-b12211/libggml-cpu-cannonlake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-cascadelake.so",
+        "sha256": "2fe006a3e958e0ce01e611f10e76066db7bcede4e25eebcddbaa871527ca2232",
+        "source": "engine/libggml-cpu-cascadelake.so",
+        "archivePath": "llama-b12211/libggml-cpu-cascadelake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-cooperlake.so",
+        "sha256": "bb9ae0899202ca1c0ad5e0f23c5b09f179cc48cbf1e8af6d581c2c8caef8af03",
+        "source": "engine/libggml-cpu-cooperlake.so",
+        "archivePath": "llama-b12211/libggml-cpu-cooperlake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-haswell.so",
+        "sha256": "da288889750392560dd4b922f3cdaee88567cc1aedb7f525a2e415ed280a47cd",
+        "source": "engine/libggml-cpu-haswell.so",
+        "archivePath": "llama-b12211/libggml-cpu-haswell.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-icelake.so",
+        "sha256": "d1ce43ffcd6d3ecc3581b611297b3fd24a99234a536827de435815309845e110",
+        "source": "engine/libggml-cpu-icelake.so",
+        "archivePath": "llama-b12211/libggml-cpu-icelake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-ivybridge.so",
+        "sha256": "9aae18a31f1ea5a3aa881c3b96e6cbe558d4cde682b6acf0bd2916d928510694",
+        "source": "engine/libggml-cpu-ivybridge.so",
+        "archivePath": "llama-b12211/libggml-cpu-ivybridge.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-piledriver.so",
+        "sha256": "ff6f486b7486eb4a7b661d3c0336138fba2481118a4813be40f790267a80f626",
+        "source": "engine/libggml-cpu-piledriver.so",
+        "archivePath": "llama-b12211/libggml-cpu-piledriver.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-sandybridge.so",
+        "sha256": "4fcbcfe781d6df24b37e06500a164086506afc0542d2690238618261120a59a5",
+        "source": "engine/libggml-cpu-sandybridge.so",
+        "archivePath": "llama-b12211/libggml-cpu-sandybridge.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-sapphirerapids.so",
+        "sha256": "c5c16b23805b8c5fc7817ee277657f59ab882269391ab9f611fd6b75dcb5839a",
+        "source": "engine/libggml-cpu-sapphirerapids.so",
+        "archivePath": "llama-b12211/libggml-cpu-sapphirerapids.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-skylakex.so",
+        "sha256": "55d53dbaa0f19015d27c576c5c57683b21a453ee95490192b9ece7e72c9d8dd8",
+        "source": "engine/libggml-cpu-skylakex.so",
+        "archivePath": "llama-b12211/libggml-cpu-skylakex.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-sse42.so",
+        "sha256": "073800a428bf19ef9c37fc7cbc55451f2ecae6f7beb37d1c0447bd17f6e15ef4",
+        "source": "engine/libggml-cpu-sse42.so",
+        "archivePath": "llama-b12211/libggml-cpu-sse42.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-x64.so",
+        "sha256": "25f93d8f3119d5b656144290bf5d2125a10f6bcbf54a3f9135b312c9900883c7",
+        "source": "engine/libggml-cpu-x64.so",
+        "archivePath": "llama-b12211/libggml-cpu-x64.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-zen4.so",
+        "sha256": "aaa1b6db727c1ecd62a53462674df544e1005fb46b2fd6d1c884f52b300b1b38",
+        "source": "engine/libggml-cpu-zen4.so",
+        "archivePath": "llama-b12211/libggml-cpu-zen4.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-rpc.so",
+        "sha256": "7d0e1cbca812f494de3da87ab17a89899067257d55b3d212d850c9a738ac0f6d",
+        "source": "engine/libggml-rpc.so",
+        "archivePath": "llama-b12211/libggml-rpc.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-vulkan.so",
+        "sha256": "9a6a6fa16ccb3334004c1a31bd69cb1904d88caeacd6218e0fdd3e4c540ec3c8",
+        "source": "engine/libggml-vulkan.so",
+        "archivePath": "llama-b12211/libggml-vulkan.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml.so",
+        "sha256": "8643a58bb37af6fb153e2ea98b48efa227855725ee51c05f4ca76b9867956463",
+        "source": "engine/libggml.so",
+        "archivePath": "llama-b12211/libggml.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml.so.0",
+        "sha256": "8643a58bb37af6fb153e2ea98b48efa227855725ee51c05f4ca76b9867956463",
+        "source": "engine/libggml.so.0",
+        "archivePath": "llama-b12211/libggml.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml.so.0.29.0",
+        "sha256": "8643a58bb37af6fb153e2ea98b48efa227855725ee51c05f4ca76b9867956463",
+        "source": "engine/libggml.so.0.29.0",
+        "archivePath": "llama-b12211/libggml.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-batched-bench-impl.so",
+        "sha256": "d97ce0d9ba48c4018080a21a24b5429044fe8b0fa2ea47a8a9f8bd2ba2608765",
+        "source": "engine/libllama-batched-bench-impl.so",
+        "archivePath": "llama-b12211/libllama-batched-bench-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-bench-impl.so",
+        "sha256": "389bc4f02f645051f8adae70ab961a5d5ca43732ec159cba276152d88f22e6ac",
+        "source": "engine/libllama-bench-impl.so",
+        "archivePath": "llama-b12211/libllama-bench-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-cli-impl.so",
+        "sha256": "bf0ba08ae38c92cf82fe0e353d79c2c20d754a5b82f566473799d386140c7338",
+        "source": "engine/libllama-cli-impl.so",
+        "archivePath": "llama-b12211/libllama-cli-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-common.so",
+        "sha256": "0abc2030d83d393613d735b3eee3a16c1e00c5715bc8b983c643282cdf675b8a",
+        "source": "engine/libllama-common.so",
+        "archivePath": "llama-b12211/libllama-common.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-common.so.0",
+        "sha256": "0abc2030d83d393613d735b3eee3a16c1e00c5715bc8b983c643282cdf675b8a",
+        "source": "engine/libllama-common.so.0",
+        "archivePath": "llama-b12211/libllama-common.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-common.so.0.9.0",
+        "sha256": "0abc2030d83d393613d735b3eee3a16c1e00c5715bc8b983c643282cdf675b8a",
+        "source": "engine/libllama-common.so.0.9.0",
+        "archivePath": "llama-b12211/libllama-common.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-completion-impl.so",
+        "sha256": "7db937c248af4d5c893ae8c05e274c1f1c1186f394e6ba7e487fd0b9618d193c",
+        "source": "engine/libllama-completion-impl.so",
+        "archivePath": "llama-b12211/libllama-completion-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-fit-params-impl.so",
+        "sha256": "e21853f79111c4ed082de1570e3966045feb83d62a1d5361e91a5a8dc102a2b8",
+        "source": "engine/libllama-fit-params-impl.so",
+        "archivePath": "llama-b12211/libllama-fit-params-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-perplexity-impl.so",
+        "sha256": "f298a5e98852c319b9e956da06ee6660f19366d9d67ca2fdeebbc95d7be3d82b",
+        "source": "engine/libllama-perplexity-impl.so",
+        "archivePath": "llama-b12211/libllama-perplexity-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-quantize-impl.so",
+        "sha256": "79d821e4e88ebc408f52a1b3d7d13f44aeb6f71bba13574e7d395608b671775a",
+        "source": "engine/libllama-quantize-impl.so",
+        "archivePath": "llama-b12211/libllama-quantize-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-server-impl.so",
+        "sha256": "d351c1313224cf689aec6b03a94cbad779d40d28bc9b6b59cdd7009b85362dc4",
+        "source": "engine/libllama-server-impl.so",
+        "archivePath": "llama-b12211/libllama-server-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama.so",
+        "sha256": "628b0c43bf91a40547be46bdb338dc13540e6cb2a77bb6ab524312a63e90d14f",
+        "source": "engine/libllama.so",
+        "archivePath": "llama-b12211/libllama.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama.so.0",
+        "sha256": "628b0c43bf91a40547be46bdb338dc13540e6cb2a77bb6ab524312a63e90d14f",
+        "source": "engine/libllama.so.0",
+        "archivePath": "llama-b12211/libllama.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama.so.0.9.0",
+        "sha256": "628b0c43bf91a40547be46bdb338dc13540e6cb2a77bb6ab524312a63e90d14f",
+        "source": "engine/libllama.so.0.9.0",
+        "archivePath": "llama-b12211/libllama.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libmtmd.so",
+        "sha256": "e16863911c56b0295a29f8dfec02b010a426dccdbf599d47bfb9b1beecb58689",
+        "source": "engine/libmtmd.so",
+        "archivePath": "llama-b12211/libmtmd.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libmtmd.so.0",
+        "sha256": "e16863911c56b0295a29f8dfec02b010a426dccdbf599d47bfb9b1beecb58689",
+        "source": "engine/libmtmd.so.0",
+        "archivePath": "llama-b12211/libmtmd.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libmtmd.so.0.9.0",
+        "sha256": "e16863911c56b0295a29f8dfec02b010a426dccdbf599d47bfb9b1beecb58689",
+        "source": "engine/libmtmd.so.0.9.0",
+        "archivePath": "llama-b12211/libmtmd.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-server",
+        "sha256": "8afc02770c629ac70518a73a61cc20eaf425b4f3f5510a5f961a8094471bae0c",
+        "source": "engine/llama-server",
+        "archivePath": "llama-b12211/llama-server",
+        "archive": "engine",
+        "executable": true
+      }
+    ],
+    "archives": [
+      {
+        "id": "engine",
+        "name": "llama-b12211-bin-ubuntu-vulkan-x64.tar.gz",
+        "sha256": "9759acd293d3738f39d3ceed740bd3125d87dfb492ef8c4f00114d3393d37942",
+        "size": 35924677,
+        "unpackedBytes": 99634334,
+        "source": {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12211/llama-b12211-bin-ubuntu-vulkan-x64.tar.gz"
+        }
+      }
+    ],
+    "bytes": 35924677
+  },
+  {
+    "id": "llama-vulkan-windows-x64-b12211",
+    "kind": "engine",
+    "engineId": "llama.cpp",
+    "version": "b12211",
+    "backend": "vulkan",
+    "platforms": [
+      "windows-x64"
+    ],
+    "title": "llama.cpp",
+    "prerelease": true,
+    "requirements": [
+      "Microsoft Visual C++ x64 运行库",
+      "GPU 模式需要提供 vulkan-1.dll 的兼容 Vulkan 驱动"
+    ],
+    "files": [
+      {
+        "path": "LICENSE-LLVM-OpenMP",
+        "sha256": "fdad1758a9e1f9d5a81e18879b3406772115edc92c24bfa36b70c654f325e8e4",
+        "source": "engine/LICENSE-LLVM-OpenMP",
+        "archivePath": "LICENSE-LLVM-OpenMP",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-base.dll",
+        "sha256": "f2dae864981842df3d15032ef3cbebe1c05f9a4fb0887b0345730306d4934fb2",
+        "source": "engine/ggml-base.dll",
+        "archivePath": "ggml-base.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-alderlake.dll",
+        "sha256": "bb3cfd681f0e8a5f706dd1b0e8e685ab674556c7a2bc5a606ca09e14202aaa23",
+        "source": "engine/ggml-cpu-alderlake.dll",
+        "archivePath": "ggml-cpu-alderlake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-cannonlake.dll",
+        "sha256": "7ea02ec0ee2c074f3669b7a198baa9401ec3a316ba0da436d1034351d21d33c8",
+        "source": "engine/ggml-cpu-cannonlake.dll",
+        "archivePath": "ggml-cpu-cannonlake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-cascadelake.dll",
+        "sha256": "25bc16758f8923ffa963954f2fe83c278c29a9546bcac25c075fa1d5856fdbbc",
+        "source": "engine/ggml-cpu-cascadelake.dll",
+        "archivePath": "ggml-cpu-cascadelake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-cooperlake.dll",
+        "sha256": "fc71fd98409f14180f8ffe749ad4de715d1e832174d0bbb3ebd3e5269d723374",
+        "source": "engine/ggml-cpu-cooperlake.dll",
+        "archivePath": "ggml-cpu-cooperlake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-haswell.dll",
+        "sha256": "db85e44b3e7cb3f65c16f21e40417101172f77e80de98257571e066f14c3baa0",
+        "source": "engine/ggml-cpu-haswell.dll",
+        "archivePath": "ggml-cpu-haswell.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-icelake.dll",
+        "sha256": "7e57541cf982ed5c17a029a2ad2d64d7c543913139b36e914d8cdc5ba122f645",
+        "source": "engine/ggml-cpu-icelake.dll",
+        "archivePath": "ggml-cpu-icelake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-ivybridge.dll",
+        "sha256": "a4a7940b979175abad4d3ecc60c82a28628af0644fe9136ba09c2099c7178c00",
+        "source": "engine/ggml-cpu-ivybridge.dll",
+        "archivePath": "ggml-cpu-ivybridge.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-piledriver.dll",
+        "sha256": "89d0c486137fbfd228d27963414e54fda65505c8b3df6108afbf00ac0151d665",
+        "source": "engine/ggml-cpu-piledriver.dll",
+        "archivePath": "ggml-cpu-piledriver.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-sandybridge.dll",
+        "sha256": "8fae2378fa9f5eb73ae3c12b91e2a3ab2f6108697581667d25cd9bbff3bc0ba4",
+        "source": "engine/ggml-cpu-sandybridge.dll",
+        "archivePath": "ggml-cpu-sandybridge.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-sapphirerapids.dll",
+        "sha256": "cca075ea797b51db81e58029997665eef83f797280124150cb352a56cd98529f",
+        "source": "engine/ggml-cpu-sapphirerapids.dll",
+        "archivePath": "ggml-cpu-sapphirerapids.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-skylakex.dll",
+        "sha256": "d9657d4429d37a4bd463441b42a9a2b70473b1e356aeffcdca6886da15d640b2",
+        "source": "engine/ggml-cpu-skylakex.dll",
+        "archivePath": "ggml-cpu-skylakex.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-sse42.dll",
+        "sha256": "4ab5352bb8b37fe2ae69b5ebeb7575937e988424a60ecc9f0c1d141b483574eb",
+        "source": "engine/ggml-cpu-sse42.dll",
+        "archivePath": "ggml-cpu-sse42.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-x64.dll",
+        "sha256": "12e51e926bb931a8cd76985540a31b359de583e8ef6136e269b4607871ffdf20",
+        "source": "engine/ggml-cpu-x64.dll",
+        "archivePath": "ggml-cpu-x64.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-zen4.dll",
+        "sha256": "016d959fde1723b0bd8f45b83aa28a6a891b06de81aa2cb5afbd88bd554a0372",
+        "source": "engine/ggml-cpu-zen4.dll",
+        "archivePath": "ggml-cpu-zen4.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-rpc.dll",
+        "sha256": "c1ea5c27c2c9377bf8ba90591b54c660f1737520c0bfe2bfd86dc774dd51b37f",
+        "source": "engine/ggml-rpc.dll",
+        "archivePath": "ggml-rpc.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-vulkan.dll",
+        "sha256": "9a5cfd2c6b5d5204541fa3a1faa3ccfd4c365700af5ad4499961cf15eeb55fc3",
+        "source": "engine/ggml-vulkan.dll",
+        "archivePath": "ggml-vulkan.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml.dll",
+        "sha256": "510e10f0c398c6a2cc7aa68bd3f6c1b3df23810d22cb7f52d75ef502e95b1bf6",
+        "source": "engine/ggml.dll",
+        "archivePath": "ggml.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "libomp.dll",
+        "sha256": "a12116ba72d1d6820407cf30be23da04ce79d6bb8a71a5ee71759c5a1faa6f1c",
+        "source": "engine/libomp.dll",
+        "archivePath": "libomp.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-batched-bench-impl.dll",
+        "sha256": "4bb1f27bc4d1acbfb95d47e8f1fed976bb25f89fe6965d9fff85b69a8e90fa80",
+        "source": "engine/llama-batched-bench-impl.dll",
+        "archivePath": "llama-batched-bench-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-bench-impl.dll",
+        "sha256": "09762970835b58708e5e07f047cfa92771a6d574e76d43a6287eec9a5681109b",
+        "source": "engine/llama-bench-impl.dll",
+        "archivePath": "llama-bench-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-cli-impl.dll",
+        "sha256": "86c982caf13389861b3d98bef3f8776c355841aecfc975fa7d98043cf7f33cd6",
+        "source": "engine/llama-cli-impl.dll",
+        "archivePath": "llama-cli-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-common.dll",
+        "sha256": "71f734b0b5f591f7e737310d3095331b0b3260d92ca98b75a80e63db3f70027c",
+        "source": "engine/llama-common.dll",
+        "archivePath": "llama-common.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-completion-impl.dll",
+        "sha256": "f358b52fd61a37dac60839b01025b423aec6147f4b3f7c4a69dafce914a5ed63",
+        "source": "engine/llama-completion-impl.dll",
+        "archivePath": "llama-completion-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-fit-params-impl.dll",
+        "sha256": "bce35aa635601f0b182cc94f2b553fc134aa92f731522a06f68a34ce14b3dec0",
+        "source": "engine/llama-fit-params-impl.dll",
+        "archivePath": "llama-fit-params-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-perplexity-impl.dll",
+        "sha256": "60ce9b9613534494a1b4eea22a0184684b191ecc9f90ec7289763da2191689f4",
+        "source": "engine/llama-perplexity-impl.dll",
+        "archivePath": "llama-perplexity-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-quantize-impl.dll",
+        "sha256": "d10bf650cd02cabd4ed08b8393d605aac0fe1f5d0a692ff59c990c772b83cc3e",
+        "source": "engine/llama-quantize-impl.dll",
+        "archivePath": "llama-quantize-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-server-impl.dll",
+        "sha256": "0c1bddd982b8d4da87889a0b314f76550ae3cca064124c3f936e21e716980a25",
+        "source": "engine/llama-server-impl.dll",
+        "archivePath": "llama-server-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-server.exe",
+        "sha256": "75e1099fec4b0e2c0ddd90813653a6a70638b79c6f6d38bf3103c85d7312e89e",
+        "source": "engine/llama-server.exe",
+        "archivePath": "llama-server.exe",
+        "archive": "engine",
+        "executable": true
+      },
+      {
+        "path": "llama.dll",
+        "sha256": "723f1962402bada0970c9b7df53f157d3267d5f09b3a1a56e0d6087af3225ddc",
+        "source": "engine/llama.dll",
+        "archivePath": "llama.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "mtmd.dll",
+        "sha256": "cd5acb7df4e4cfa0260922b8bcfa80f112c8751995ae15fc7b2078457bcdcb01",
+        "source": "engine/mtmd.dll",
+        "archivePath": "mtmd.dll",
+        "archive": "engine"
+      }
+    ],
+    "archives": [
+      {
+        "id": "engine",
+        "name": "llama-b12211-bin-win-vulkan-x64.zip",
+        "sha256": "20954cbad1a4626436c6ebaed5e48477f68427b075934689f360301ac426a2f1",
+        "size": 37845757,
+        "unpackedBytes": 106253597,
+        "source": {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12211/llama-b12211-bin-win-vulkan-x64.zip"
+        }
+      }
+    ],
+    "bytes": 37845757
+  },
+  {
+    "id": "llama-metal-macos-arm64-b12211",
+    "kind": "engine",
+    "engineId": "llama.cpp",
+    "version": "b12211",
+    "backend": "metal",
+    "platforms": [
+      "macos-arm64"
+    ],
+    "title": "llama.cpp",
+    "prerelease": true,
+    "requirements": [
+      "Apple Silicon；遵循宿主 macOS 15+ 基线",
+      "GPU 模式需要系统 Metal 支持"
+    ],
+    "files": [
+      {
+        "path": "LICENSE",
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+        "source": "engine/LICENSE",
+        "archivePath": "llama-b12211/LICENSE",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-base.0.29.0.dylib",
+        "sha256": "a27679374a505439de2220d7c87e52bb371a04568ca7b106c3668e7ba3f92862",
+        "source": "engine/libggml-base.0.29.0.dylib",
+        "archivePath": "llama-b12211/libggml-base.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-base.0.dylib",
+        "sha256": "a27679374a505439de2220d7c87e52bb371a04568ca7b106c3668e7ba3f92862",
+        "source": "engine/libggml-base.0.dylib",
+        "archivePath": "llama-b12211/libggml-base.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-base.dylib",
+        "sha256": "a27679374a505439de2220d7c87e52bb371a04568ca7b106c3668e7ba3f92862",
+        "source": "engine/libggml-base.dylib",
+        "archivePath": "llama-b12211/libggml-base.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-blas.0.29.0.dylib",
+        "sha256": "786754ac19bff80ad4ca76d44d3031f32593772f38d9da819b428dc702f63339",
+        "source": "engine/libggml-blas.0.29.0.dylib",
+        "archivePath": "llama-b12211/libggml-blas.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-blas.0.dylib",
+        "sha256": "786754ac19bff80ad4ca76d44d3031f32593772f38d9da819b428dc702f63339",
+        "source": "engine/libggml-blas.0.dylib",
+        "archivePath": "llama-b12211/libggml-blas.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-blas.dylib",
+        "sha256": "786754ac19bff80ad4ca76d44d3031f32593772f38d9da819b428dc702f63339",
+        "source": "engine/libggml-blas.dylib",
+        "archivePath": "llama-b12211/libggml-blas.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu.0.29.0.dylib",
+        "sha256": "0cae225e9b2f9fcb0c64a1f21f855dcb2ee83c059f503cd37cbff331d509c6a6",
+        "source": "engine/libggml-cpu.0.29.0.dylib",
+        "archivePath": "llama-b12211/libggml-cpu.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu.0.dylib",
+        "sha256": "0cae225e9b2f9fcb0c64a1f21f855dcb2ee83c059f503cd37cbff331d509c6a6",
+        "source": "engine/libggml-cpu.0.dylib",
+        "archivePath": "llama-b12211/libggml-cpu.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu.dylib",
+        "sha256": "0cae225e9b2f9fcb0c64a1f21f855dcb2ee83c059f503cd37cbff331d509c6a6",
+        "source": "engine/libggml-cpu.dylib",
+        "archivePath": "llama-b12211/libggml-cpu.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-metal.0.29.0.dylib",
+        "sha256": "f02a10b8d7d04cc901f24752f8652288e234dd4e4216f0ca291a5bb6bfd510c8",
+        "source": "engine/libggml-metal.0.29.0.dylib",
+        "archivePath": "llama-b12211/libggml-metal.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-metal.0.dylib",
+        "sha256": "f02a10b8d7d04cc901f24752f8652288e234dd4e4216f0ca291a5bb6bfd510c8",
+        "source": "engine/libggml-metal.0.dylib",
+        "archivePath": "llama-b12211/libggml-metal.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-metal.dylib",
+        "sha256": "f02a10b8d7d04cc901f24752f8652288e234dd4e4216f0ca291a5bb6bfd510c8",
+        "source": "engine/libggml-metal.dylib",
+        "archivePath": "llama-b12211/libggml-metal.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-rpc.0.29.0.dylib",
+        "sha256": "1b4d7b2187abe3eda371ce6a72843125b4c6d07a7f14baea5929ede6b5b89d37",
+        "source": "engine/libggml-rpc.0.29.0.dylib",
+        "archivePath": "llama-b12211/libggml-rpc.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-rpc.0.dylib",
+        "sha256": "1b4d7b2187abe3eda371ce6a72843125b4c6d07a7f14baea5929ede6b5b89d37",
+        "source": "engine/libggml-rpc.0.dylib",
+        "archivePath": "llama-b12211/libggml-rpc.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-rpc.dylib",
+        "sha256": "1b4d7b2187abe3eda371ce6a72843125b4c6d07a7f14baea5929ede6b5b89d37",
+        "source": "engine/libggml-rpc.dylib",
+        "archivePath": "llama-b12211/libggml-rpc.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml.0.29.0.dylib",
+        "sha256": "f2b3b1a494448bb17a7bfe6111873326ba2872bdbc52a95c6f1140c6868261b8",
+        "source": "engine/libggml.0.29.0.dylib",
+        "archivePath": "llama-b12211/libggml.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml.0.dylib",
+        "sha256": "f2b3b1a494448bb17a7bfe6111873326ba2872bdbc52a95c6f1140c6868261b8",
+        "source": "engine/libggml.0.dylib",
+        "archivePath": "llama-b12211/libggml.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml.dylib",
+        "sha256": "f2b3b1a494448bb17a7bfe6111873326ba2872bdbc52a95c6f1140c6868261b8",
+        "source": "engine/libggml.dylib",
+        "archivePath": "llama-b12211/libggml.0.29.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-batched-bench-impl.dylib",
+        "sha256": "ea42410725d43ce4dc61f361171e9ce2642c2141cadac34975dee626902074aa",
+        "source": "engine/libllama-batched-bench-impl.dylib",
+        "archivePath": "llama-b12211/libllama-batched-bench-impl.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-bench-impl.dylib",
+        "sha256": "19ac409f52fd0d45174aebdfb3a03d0c49acbc7a6f8b89648f16895d364795ec",
+        "source": "engine/libllama-bench-impl.dylib",
+        "archivePath": "llama-b12211/libllama-bench-impl.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-cli-impl.dylib",
+        "sha256": "cc07c0d4798d33669f65dfa275a755575277eb08dfb3049bcb14d3bf22c534c2",
+        "source": "engine/libllama-cli-impl.dylib",
+        "archivePath": "llama-b12211/libllama-cli-impl.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-common.0.9.0.dylib",
+        "sha256": "c49abb00ca8e1a3ab809fd122a2867f6924d61456878d85df4d5d8129628decc",
+        "source": "engine/libllama-common.0.9.0.dylib",
+        "archivePath": "llama-b12211/libllama-common.0.9.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-common.0.dylib",
+        "sha256": "c49abb00ca8e1a3ab809fd122a2867f6924d61456878d85df4d5d8129628decc",
+        "source": "engine/libllama-common.0.dylib",
+        "archivePath": "llama-b12211/libllama-common.0.9.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-common.dylib",
+        "sha256": "c49abb00ca8e1a3ab809fd122a2867f6924d61456878d85df4d5d8129628decc",
+        "source": "engine/libllama-common.dylib",
+        "archivePath": "llama-b12211/libllama-common.0.9.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-completion-impl.dylib",
+        "sha256": "240ee5168ff18ab6dff29dd2168438f079179ba0f6b51a841d18f16f6f493496",
+        "source": "engine/libllama-completion-impl.dylib",
+        "archivePath": "llama-b12211/libllama-completion-impl.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-fit-params-impl.dylib",
+        "sha256": "8c60cc35f7b3fc018686a293e37eb1a485142ee3bb55512ce66839eea8d98367",
+        "source": "engine/libllama-fit-params-impl.dylib",
+        "archivePath": "llama-b12211/libllama-fit-params-impl.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-perplexity-impl.dylib",
+        "sha256": "ab36bba0f9873b64712660e36b7201572c11d5efd086d1a3c55cb44524895db9",
+        "source": "engine/libllama-perplexity-impl.dylib",
+        "archivePath": "llama-b12211/libllama-perplexity-impl.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-quantize-impl.dylib",
+        "sha256": "f5a8d325802712841b640da755ddce17c6ef4e01bde3c3bcda2144186e9c040b",
+        "source": "engine/libllama-quantize-impl.dylib",
+        "archivePath": "llama-b12211/libllama-quantize-impl.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-server-impl.dylib",
+        "sha256": "83a4a30eb428545bc3d5ec5158e10661de978ebc67fdb86e0cb09c2f8aecdda6",
+        "source": "engine/libllama-server-impl.dylib",
+        "archivePath": "llama-b12211/libllama-server-impl.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama.0.9.0.dylib",
+        "sha256": "74e5225102fef73ebf89a5197775766265004a1874b4df5c2ec1003d82e30a90",
+        "source": "engine/libllama.0.9.0.dylib",
+        "archivePath": "llama-b12211/libllama.0.9.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama.0.dylib",
+        "sha256": "74e5225102fef73ebf89a5197775766265004a1874b4df5c2ec1003d82e30a90",
+        "source": "engine/libllama.0.dylib",
+        "archivePath": "llama-b12211/libllama.0.9.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama.dylib",
+        "sha256": "74e5225102fef73ebf89a5197775766265004a1874b4df5c2ec1003d82e30a90",
+        "source": "engine/libllama.dylib",
+        "archivePath": "llama-b12211/libllama.0.9.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libmtmd.0.9.0.dylib",
+        "sha256": "18f8a5f51ee3c1d76f909db00d72a1e2123ad5bb2d90c055f597aa99faee4318",
+        "source": "engine/libmtmd.0.9.0.dylib",
+        "archivePath": "llama-b12211/libmtmd.0.9.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libmtmd.0.dylib",
+        "sha256": "18f8a5f51ee3c1d76f909db00d72a1e2123ad5bb2d90c055f597aa99faee4318",
+        "source": "engine/libmtmd.0.dylib",
+        "archivePath": "llama-b12211/libmtmd.0.9.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "libmtmd.dylib",
+        "sha256": "18f8a5f51ee3c1d76f909db00d72a1e2123ad5bb2d90c055f597aa99faee4318",
+        "source": "engine/libmtmd.dylib",
+        "archivePath": "llama-b12211/libmtmd.0.9.0.dylib",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-server",
+        "sha256": "e7e3c60a5e612460d095bfd219047040d6bb9d0b56466aae30a480980b676959",
+        "source": "engine/llama-server",
+        "archivePath": "llama-b12211/llama-server",
+        "archive": "engine",
+        "executable": true
+      }
+    ],
+    "archives": [
+      {
+        "id": "engine",
+        "name": "llama-b12211-bin-macos-arm64.tar.gz",
+        "sha256": "4da4edb437358d31d55938ad849d262ca31b0e0ffb35e9caedb727a0cd5a8f0f",
+        "size": 16711245,
+        "unpackedBytes": 42129830,
+        "source": {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12211/llama-b12211-bin-macos-arm64.tar.gz"
+        }
+      }
+    ],
+    "bytes": 16711245
+  },
+  {
+    "id": "llama-cuda-linux-x64-b12211",
+    "kind": "engine",
+    "engineId": "llama.cpp",
+    "version": "b12211",
+    "backend": "cuda",
+    "platforms": [
+      "linux-x64"
+    ],
+    "title": "llama.cpp",
+    "prerelease": true,
+    "requirements": [
+      "glibc >= 2.38；libstdc++ 提供 GLIBCXX_3.4.32",
+      "OpenSSL 3、libgomp.so.1；系统 NVIDIA 驱动提供 libcuda.so.1",
+      "CUDA 13.5：推荐 NVIDIA R620+；R580 仅为次版本兼容下限，不保证 PTX/JIT 或新功能可用",
+      "Turing / RTX 20 及更新架构；不支持更早 GPU；随资源提供 cudart/cuBLAS，无需安装 Toolkit"
+    ],
+    "cudaRuntimeVersion": "13.5",
+    "recommendedDriverBranch": "R620",
+    "minorCompatibilityDriverBranch": "R580",
+    "files": [
+      {
+        "path": "LICENSE",
+        "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d",
+        "source": "engine/LICENSE",
+        "archivePath": "llama-b12211/LICENSE",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-base.so",
+        "sha256": "ca868be7c3100597120be755b16484539bdc51665135cdb46983a601f04c974a",
+        "source": "engine/libggml-base.so",
+        "archivePath": "llama-b12211/libggml-base.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-base.so.0",
+        "sha256": "ca868be7c3100597120be755b16484539bdc51665135cdb46983a601f04c974a",
+        "source": "engine/libggml-base.so.0",
+        "archivePath": "llama-b12211/libggml-base.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-base.so.0.29.0",
+        "sha256": "ca868be7c3100597120be755b16484539bdc51665135cdb46983a601f04c974a",
+        "source": "engine/libggml-base.so.0.29.0",
+        "archivePath": "llama-b12211/libggml-base.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-alderlake.so",
+        "sha256": "e6a638bdfcfc8d75b2272388529afaaf7852c763774a14e3183e1a465f073a09",
+        "source": "engine/libggml-cpu-alderlake.so",
+        "archivePath": "llama-b12211/libggml-cpu-alderlake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-cannonlake.so",
+        "sha256": "1090f277dbe097c9a95d72e36098e37613eef3512a9e106d9c6322783ebda81a",
+        "source": "engine/libggml-cpu-cannonlake.so",
+        "archivePath": "llama-b12211/libggml-cpu-cannonlake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-cascadelake.so",
+        "sha256": "e3aca2df2ab073afe031e65cb1db05fa458b635c4338d30d5a74f078e9788af0",
+        "source": "engine/libggml-cpu-cascadelake.so",
+        "archivePath": "llama-b12211/libggml-cpu-cascadelake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-cooperlake.so",
+        "sha256": "f6235db3030e2c8d6803570fb74d85411515d5a39a4a9f166d3d7d0d0db2f1e8",
+        "source": "engine/libggml-cpu-cooperlake.so",
+        "archivePath": "llama-b12211/libggml-cpu-cooperlake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-haswell.so",
+        "sha256": "84d5952e8be05259c2fd4415771a07db00bc15f13d249ab15875d23049747e25",
+        "source": "engine/libggml-cpu-haswell.so",
+        "archivePath": "llama-b12211/libggml-cpu-haswell.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-icelake.so",
+        "sha256": "9562f19da9682554e293cf92e0b7ccb1f813c616be916e19d86b977f9d69d405",
+        "source": "engine/libggml-cpu-icelake.so",
+        "archivePath": "llama-b12211/libggml-cpu-icelake.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-ivybridge.so",
+        "sha256": "f839a8fbad8f631eee25195f5910aac020451e438f95b922fb52bf19a8818e53",
+        "source": "engine/libggml-cpu-ivybridge.so",
+        "archivePath": "llama-b12211/libggml-cpu-ivybridge.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-piledriver.so",
+        "sha256": "58834b1882eeb4a28443958e12ff2b80222d5c7022fbb7e3a6fdfc0799ee2901",
+        "source": "engine/libggml-cpu-piledriver.so",
+        "archivePath": "llama-b12211/libggml-cpu-piledriver.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-sandybridge.so",
+        "sha256": "39a565a2dfccef845e0ec3caee362acc2b87cf4d7fa1132473276f547e051479",
+        "source": "engine/libggml-cpu-sandybridge.so",
+        "archivePath": "llama-b12211/libggml-cpu-sandybridge.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-sapphirerapids.so",
+        "sha256": "215625413f99a15a25ed98bdd97ade42e94c96fa55be5bbcd0e7ca3b1128ed6e",
+        "source": "engine/libggml-cpu-sapphirerapids.so",
+        "archivePath": "llama-b12211/libggml-cpu-sapphirerapids.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-skylakex.so",
+        "sha256": "8cdca732d20f16c4c839a86c5934d54c1aa1f19a65cc400624d76da265bc1095",
+        "source": "engine/libggml-cpu-skylakex.so",
+        "archivePath": "llama-b12211/libggml-cpu-skylakex.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-sse42.so",
+        "sha256": "c8a5842b48a04ae0b2e98ca41dab334447da4c9eda7723b0f3c176b4921c3990",
+        "source": "engine/libggml-cpu-sse42.so",
+        "archivePath": "llama-b12211/libggml-cpu-sse42.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-x64.so",
+        "sha256": "4ecea4b7e0c70e48ea61824e293b340a64055ecb0a4fe142cc984c3420ae10be",
+        "source": "engine/libggml-cpu-x64.so",
+        "archivePath": "llama-b12211/libggml-cpu-x64.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cpu-zen4.so",
+        "sha256": "753453804cd224f2a072c72ddff0d37e15e096076bd12d321aa2cde525fc608c",
+        "source": "engine/libggml-cpu-zen4.so",
+        "archivePath": "llama-b12211/libggml-cpu-zen4.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-cuda.so",
+        "sha256": "86655b42196a5920e50f8144d2724f9b26650b0b348391a5efc8502796e7a343",
+        "source": "engine/libggml-cuda.so",
+        "archivePath": "llama-b12211/libggml-cuda.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml-rpc.so",
+        "sha256": "3ef6321c847006eaf453eb5479bf7069dc969c451f9b319e17ac2940a2037613",
+        "source": "engine/libggml-rpc.so",
+        "archivePath": "llama-b12211/libggml-rpc.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml.so",
+        "sha256": "207cfc7c4b4b957a0e6f330cd2678290eae05508da23d8ed59b4b7fc0a828390",
+        "source": "engine/libggml.so",
+        "archivePath": "llama-b12211/libggml.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml.so.0",
+        "sha256": "207cfc7c4b4b957a0e6f330cd2678290eae05508da23d8ed59b4b7fc0a828390",
+        "source": "engine/libggml.so.0",
+        "archivePath": "llama-b12211/libggml.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libggml.so.0.29.0",
+        "sha256": "207cfc7c4b4b957a0e6f330cd2678290eae05508da23d8ed59b4b7fc0a828390",
+        "source": "engine/libggml.so.0.29.0",
+        "archivePath": "llama-b12211/libggml.so.0.29.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-batched-bench-impl.so",
+        "sha256": "767527d11bc35097e664ad3813457facc379d6904188158b17014168b34d8983",
+        "source": "engine/libllama-batched-bench-impl.so",
+        "archivePath": "llama-b12211/libllama-batched-bench-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-bench-impl.so",
+        "sha256": "2b6e56723804b5ed777d1207a173e813cb4c9c5d88181511717017cb5629a0bb",
+        "source": "engine/libllama-bench-impl.so",
+        "archivePath": "llama-b12211/libllama-bench-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-cli-impl.so",
+        "sha256": "6d4f81665fbf78959b5117a347ad9a25455d6d4b3a105508c680f6083a292e5a",
+        "source": "engine/libllama-cli-impl.so",
+        "archivePath": "llama-b12211/libllama-cli-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-common.so",
+        "sha256": "c7a79c17fc2eee5d6b71eaccaca7d4d2716de9ebe83531fff1de12bb5f1cf72f",
+        "source": "engine/libllama-common.so",
+        "archivePath": "llama-b12211/libllama-common.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-common.so.0",
+        "sha256": "c7a79c17fc2eee5d6b71eaccaca7d4d2716de9ebe83531fff1de12bb5f1cf72f",
+        "source": "engine/libllama-common.so.0",
+        "archivePath": "llama-b12211/libllama-common.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-common.so.0.9.0",
+        "sha256": "c7a79c17fc2eee5d6b71eaccaca7d4d2716de9ebe83531fff1de12bb5f1cf72f",
+        "source": "engine/libllama-common.so.0.9.0",
+        "archivePath": "llama-b12211/libllama-common.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-completion-impl.so",
+        "sha256": "ec9e84bce52e4af69a342a027c3971f946bbe00dec7c9f936edad2fad64142d2",
+        "source": "engine/libllama-completion-impl.so",
+        "archivePath": "llama-b12211/libllama-completion-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-fit-params-impl.so",
+        "sha256": "42ba19c754f50ee376e7fa521c9ce9300740adc25023e5303a0727c35181b53a",
+        "source": "engine/libllama-fit-params-impl.so",
+        "archivePath": "llama-b12211/libllama-fit-params-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-perplexity-impl.so",
+        "sha256": "cb4440a7597d419766c8c6ea9bfd11493281f48c1beb0a9880980949915b0fa5",
+        "source": "engine/libllama-perplexity-impl.so",
+        "archivePath": "llama-b12211/libllama-perplexity-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-quantize-impl.so",
+        "sha256": "9c53d070543a4b88e917ddafb6b8801c63d36b9713abd0482f819f07db4ec983",
+        "source": "engine/libllama-quantize-impl.so",
+        "archivePath": "llama-b12211/libllama-quantize-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama-server-impl.so",
+        "sha256": "59289b088f0447bbd987fa1b59c50160825b407d7c9f99410ff821001bbaea7f",
+        "source": "engine/libllama-server-impl.so",
+        "archivePath": "llama-b12211/libllama-server-impl.so",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama.so",
+        "sha256": "40138bb55a6bf9a73211bc90370a345918dfaf703c654277d0a1c444fb1556d3",
+        "source": "engine/libllama.so",
+        "archivePath": "llama-b12211/libllama.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama.so.0",
+        "sha256": "40138bb55a6bf9a73211bc90370a345918dfaf703c654277d0a1c444fb1556d3",
+        "source": "engine/libllama.so.0",
+        "archivePath": "llama-b12211/libllama.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libllama.so.0.9.0",
+        "sha256": "40138bb55a6bf9a73211bc90370a345918dfaf703c654277d0a1c444fb1556d3",
+        "source": "engine/libllama.so.0.9.0",
+        "archivePath": "llama-b12211/libllama.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libmtmd.so",
+        "sha256": "8cdd6b8a5aa0d1f134339281c70513d79063e94d7eba3359ac95384531ddce65",
+        "source": "engine/libmtmd.so",
+        "archivePath": "llama-b12211/libmtmd.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libmtmd.so.0",
+        "sha256": "8cdd6b8a5aa0d1f134339281c70513d79063e94d7eba3359ac95384531ddce65",
+        "source": "engine/libmtmd.so.0",
+        "archivePath": "llama-b12211/libmtmd.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "libmtmd.so.0.9.0",
+        "sha256": "8cdd6b8a5aa0d1f134339281c70513d79063e94d7eba3359ac95384531ddce65",
+        "source": "engine/libmtmd.so.0.9.0",
+        "archivePath": "llama-b12211/libmtmd.so.0.9.0",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-server",
+        "sha256": "562d239c31b663340a3ab2be628244267619aabd6ec1723ad61e4d57cd762258",
+        "source": "engine/llama-server",
+        "archivePath": "llama-b12211/llama-server",
+        "archive": "engine",
+        "executable": true
+      },
+      {
+        "path": "libcublas.so.13",
+        "sha256": "b43f57b2185afdc10537b8422177edc7c1436f98cced0d2dc216b5acf9eeb00c",
+        "source": "engine/libcublas.so.13",
+        "archivePath": "cudart-llama-b12211-bin-ubuntu-cuda-13.5-x64/libcublas.so.13",
+        "archive": "cudart"
+      },
+      {
+        "path": "libcublasLt.so.13",
+        "sha256": "34e7a85fe998f33cff4e66968eb32b86ae973e10a66fc62e9ddb58d37763a1ff",
+        "source": "engine/libcublasLt.so.13",
+        "archivePath": "cudart-llama-b12211-bin-ubuntu-cuda-13.5-x64/libcublasLt.so.13",
+        "archive": "cudart"
+      },
+      {
+        "path": "libcudart.so.13",
+        "sha256": "be114eaabb3f3251cf30b6e334be5e8c3cf1b12c0a11c17295a810dd83cc141a",
+        "source": "engine/libcudart.so.13",
+        "archivePath": "cudart-llama-b12211-bin-ubuntu-cuda-13.5-x64/libcudart.so.13",
+        "archive": "cudart"
+      }
+    ],
+    "archives": [
+      {
+        "id": "engine",
+        "name": "llama-b12211-bin-ubuntu-cuda-13.5-x64.tar.gz",
+        "sha256": "90f01a490afd78861b38c056d85717c23380f99eddf94eeae99aa2fcc79bbcb1",
+        "size": 169836305,
+        "unpackedBytes": 235258942,
+        "source": {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12211/llama-b12211-bin-ubuntu-cuda-13.5-x64.tar.gz"
+        }
+      },
+      {
+        "id": "cudart",
+        "name": "cudart-llama-b12211-bin-ubuntu-cuda-13.5-x64.tar.gz",
+        "sha256": "e3c591c707b08a1011b07d1db24b6266b582128d3168966a332bb11b6af1c4c8",
+        "size": 444078793,
+        "unpackedBytes": 609742080,
+        "source": {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12211/cudart-llama-b12211-bin-ubuntu-cuda-13.5-x64.tar.gz"
+        }
+      }
+    ],
+    "bytes": 613915098
+  },
+  {
+    "id": "llama-cuda-windows-x64-b12211",
+    "kind": "engine",
+    "engineId": "llama.cpp",
+    "version": "b12211",
+    "backend": "cuda",
+    "platforms": [
+      "windows-x64"
+    ],
+    "title": "llama.cpp",
+    "prerelease": true,
+    "requirements": [
+      "Microsoft Visual C++ x64 运行库",
+      "CUDA 13.5：推荐 NVIDIA R620+；R580 仅为次版本兼容下限，不保证 PTX/JIT 或新功能可用",
+      "Turing / RTX 20 及更新架构；不支持更早 GPU；随资源提供 cudart/cuBLAS，无需安装 Toolkit"
+    ],
+    "cudaRuntimeVersion": "13.5",
+    "recommendedDriverBranch": "R620",
+    "minorCompatibilityDriverBranch": "R580",
+    "files": [
+      {
+        "path": "LICENSE-LLVM-OpenMP",
+        "sha256": "fdad1758a9e1f9d5a81e18879b3406772115edc92c24bfa36b70c654f325e8e4",
+        "source": "engine/LICENSE-LLVM-OpenMP",
+        "archivePath": "LICENSE-LLVM-OpenMP",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-base.dll",
+        "sha256": "f2dae864981842df3d15032ef3cbebe1c05f9a4fb0887b0345730306d4934fb2",
+        "source": "engine/ggml-base.dll",
+        "archivePath": "ggml-base.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-alderlake.dll",
+        "sha256": "bb3cfd681f0e8a5f706dd1b0e8e685ab674556c7a2bc5a606ca09e14202aaa23",
+        "source": "engine/ggml-cpu-alderlake.dll",
+        "archivePath": "ggml-cpu-alderlake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-cannonlake.dll",
+        "sha256": "7ea02ec0ee2c074f3669b7a198baa9401ec3a316ba0da436d1034351d21d33c8",
+        "source": "engine/ggml-cpu-cannonlake.dll",
+        "archivePath": "ggml-cpu-cannonlake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-cascadelake.dll",
+        "sha256": "25bc16758f8923ffa963954f2fe83c278c29a9546bcac25c075fa1d5856fdbbc",
+        "source": "engine/ggml-cpu-cascadelake.dll",
+        "archivePath": "ggml-cpu-cascadelake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-cooperlake.dll",
+        "sha256": "fc71fd98409f14180f8ffe749ad4de715d1e832174d0bbb3ebd3e5269d723374",
+        "source": "engine/ggml-cpu-cooperlake.dll",
+        "archivePath": "ggml-cpu-cooperlake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-haswell.dll",
+        "sha256": "db85e44b3e7cb3f65c16f21e40417101172f77e80de98257571e066f14c3baa0",
+        "source": "engine/ggml-cpu-haswell.dll",
+        "archivePath": "ggml-cpu-haswell.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-icelake.dll",
+        "sha256": "7e57541cf982ed5c17a029a2ad2d64d7c543913139b36e914d8cdc5ba122f645",
+        "source": "engine/ggml-cpu-icelake.dll",
+        "archivePath": "ggml-cpu-icelake.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-ivybridge.dll",
+        "sha256": "a4a7940b979175abad4d3ecc60c82a28628af0644fe9136ba09c2099c7178c00",
+        "source": "engine/ggml-cpu-ivybridge.dll",
+        "archivePath": "ggml-cpu-ivybridge.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-piledriver.dll",
+        "sha256": "89d0c486137fbfd228d27963414e54fda65505c8b3df6108afbf00ac0151d665",
+        "source": "engine/ggml-cpu-piledriver.dll",
+        "archivePath": "ggml-cpu-piledriver.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-sandybridge.dll",
+        "sha256": "8fae2378fa9f5eb73ae3c12b91e2a3ab2f6108697581667d25cd9bbff3bc0ba4",
+        "source": "engine/ggml-cpu-sandybridge.dll",
+        "archivePath": "ggml-cpu-sandybridge.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-sapphirerapids.dll",
+        "sha256": "cca075ea797b51db81e58029997665eef83f797280124150cb352a56cd98529f",
+        "source": "engine/ggml-cpu-sapphirerapids.dll",
+        "archivePath": "ggml-cpu-sapphirerapids.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-skylakex.dll",
+        "sha256": "d9657d4429d37a4bd463441b42a9a2b70473b1e356aeffcdca6886da15d640b2",
+        "source": "engine/ggml-cpu-skylakex.dll",
+        "archivePath": "ggml-cpu-skylakex.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-sse42.dll",
+        "sha256": "4ab5352bb8b37fe2ae69b5ebeb7575937e988424a60ecc9f0c1d141b483574eb",
+        "source": "engine/ggml-cpu-sse42.dll",
+        "archivePath": "ggml-cpu-sse42.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-x64.dll",
+        "sha256": "12e51e926bb931a8cd76985540a31b359de583e8ef6136e269b4607871ffdf20",
+        "source": "engine/ggml-cpu-x64.dll",
+        "archivePath": "ggml-cpu-x64.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cpu-zen4.dll",
+        "sha256": "016d959fde1723b0bd8f45b83aa28a6a891b06de81aa2cb5afbd88bd554a0372",
+        "source": "engine/ggml-cpu-zen4.dll",
+        "archivePath": "ggml-cpu-zen4.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-cuda.dll",
+        "sha256": "058129961e3a7fbc3ab1b3287fa1cc03c34ff6cb01a77d13fd51a4df86e8b220",
+        "source": "engine/ggml-cuda.dll",
+        "archivePath": "ggml-cuda.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml-rpc.dll",
+        "sha256": "c1ea5c27c2c9377bf8ba90591b54c660f1737520c0bfe2bfd86dc774dd51b37f",
+        "source": "engine/ggml-rpc.dll",
+        "archivePath": "ggml-rpc.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "ggml.dll",
+        "sha256": "510e10f0c398c6a2cc7aa68bd3f6c1b3df23810d22cb7f52d75ef502e95b1bf6",
+        "source": "engine/ggml.dll",
+        "archivePath": "ggml.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "libomp.dll",
+        "sha256": "a12116ba72d1d6820407cf30be23da04ce79d6bb8a71a5ee71759c5a1faa6f1c",
+        "source": "engine/libomp.dll",
+        "archivePath": "libomp.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-batched-bench-impl.dll",
+        "sha256": "4bb1f27bc4d1acbfb95d47e8f1fed976bb25f89fe6965d9fff85b69a8e90fa80",
+        "source": "engine/llama-batched-bench-impl.dll",
+        "archivePath": "llama-batched-bench-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-bench-impl.dll",
+        "sha256": "09762970835b58708e5e07f047cfa92771a6d574e76d43a6287eec9a5681109b",
+        "source": "engine/llama-bench-impl.dll",
+        "archivePath": "llama-bench-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-cli-impl.dll",
+        "sha256": "86c982caf13389861b3d98bef3f8776c355841aecfc975fa7d98043cf7f33cd6",
+        "source": "engine/llama-cli-impl.dll",
+        "archivePath": "llama-cli-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-common.dll",
+        "sha256": "71f734b0b5f591f7e737310d3095331b0b3260d92ca98b75a80e63db3f70027c",
+        "source": "engine/llama-common.dll",
+        "archivePath": "llama-common.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-completion-impl.dll",
+        "sha256": "f358b52fd61a37dac60839b01025b423aec6147f4b3f7c4a69dafce914a5ed63",
+        "source": "engine/llama-completion-impl.dll",
+        "archivePath": "llama-completion-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-fit-params-impl.dll",
+        "sha256": "bce35aa635601f0b182cc94f2b553fc134aa92f731522a06f68a34ce14b3dec0",
+        "source": "engine/llama-fit-params-impl.dll",
+        "archivePath": "llama-fit-params-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-perplexity-impl.dll",
+        "sha256": "60ce9b9613534494a1b4eea22a0184684b191ecc9f90ec7289763da2191689f4",
+        "source": "engine/llama-perplexity-impl.dll",
+        "archivePath": "llama-perplexity-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-quantize-impl.dll",
+        "sha256": "d10bf650cd02cabd4ed08b8393d605aac0fe1f5d0a692ff59c990c772b83cc3e",
+        "source": "engine/llama-quantize-impl.dll",
+        "archivePath": "llama-quantize-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-server-impl.dll",
+        "sha256": "0c1bddd982b8d4da87889a0b314f76550ae3cca064124c3f936e21e716980a25",
+        "source": "engine/llama-server-impl.dll",
+        "archivePath": "llama-server-impl.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "llama-server.exe",
+        "sha256": "75e1099fec4b0e2c0ddd90813653a6a70638b79c6f6d38bf3103c85d7312e89e",
+        "source": "engine/llama-server.exe",
+        "archivePath": "llama-server.exe",
+        "archive": "engine",
+        "executable": true
+      },
+      {
+        "path": "llama.dll",
+        "sha256": "723f1962402bada0970c9b7df53f157d3267d5f09b3a1a56e0d6087af3225ddc",
+        "source": "engine/llama.dll",
+        "archivePath": "llama.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "mtmd.dll",
+        "sha256": "cd5acb7df4e4cfa0260922b8bcfa80f112c8751995ae15fc7b2078457bcdcb01",
+        "source": "engine/mtmd.dll",
+        "archivePath": "mtmd.dll",
+        "archive": "engine"
+      },
+      {
+        "path": "cublas64_13.dll",
+        "sha256": "db5a1d5a0ed0ef126e005fc7449d3584353aaeb8739a18d716fe74be1254a3da",
+        "source": "engine/cublas64_13.dll",
+        "archivePath": "cublas64_13.dll",
+        "archive": "cudart"
+      },
+      {
+        "path": "cublasLt64_13.dll",
+        "sha256": "ca478e1ea932f883ef4fc284f8f33d910079df4e77f9a2ec38d9b4387795f96f",
+        "source": "engine/cublasLt64_13.dll",
+        "archivePath": "cublasLt64_13.dll",
+        "archive": "cudart"
+      },
+      {
+        "path": "cudart64_13.dll",
+        "sha256": "16ab35d8150b6105b7e49da264d360db4ece090157ad48d226c1dc7254136008",
+        "source": "engine/cudart64_13.dll",
+        "archivePath": "cudart64_13.dll",
+        "archive": "cudart"
+      }
+    ],
+    "archives": [
+      {
+        "id": "engine",
+        "name": "llama-b12211-bin-win-cuda-13.5-x64.zip",
+        "sha256": "dc396a25a42729178d991d3913e6fd3619cfb446f6af0937bdec5d03e5375b56",
+        "size": 170948083,
+        "unpackedBytes": 224988445,
+        "source": {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12211/llama-b12211-bin-win-cuda-13.5-x64.zip"
+        }
+      },
+      {
+        "id": "cudart",
+        "name": "cudart-llama-bin-win-cuda-13.5-x64.zip",
+        "sha256": "c2bf4cc202bfbaaa7a0b75f5082457c3811326947bb216059b72839d844e9cba",
+        "size": 426314199,
+        "unpackedBytes": 554866512,
+        "source": {
+          "url": "https://github.com/ggml-org/llama.cpp/releases/download/b12211/cudart-llama-bin-win-cuda-13.5-x64.zip"
+        }
+      }
+    ],
+    "bytes": 597262282
   }
 ]

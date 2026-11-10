@@ -6,7 +6,8 @@ import { jsonBytes, storageMaxBytes } from '../downloadHistory.js'
 
 const originalCatalog = JSON.parse(await fs.readFile(new URL('../catalog.json', import.meta.url)))
 const file = (path, size) => ({ path, sha256: 'a'.repeat(64), url: `https://example.invalid/${path}?secret=private`, ...(size === undefined ? {} : { size }) })
-const defaultSpecs = () => [{ id: 'engine', kind: 'engine', files: [file('engine.bin', 5)] }, { id: 'weights', kind: 'model', files: [file('model.bin', 10)] }]
+const engineIdentity = { engineId: 'llama.cpp', version: 'b12211', backend: 'vulkan', platforms: ['linux-x64'] }
+const defaultSpecs = () => [{ id: 'engine', kind: 'engine', ...engineIdentity, files: [file('engine.bin', 5)] }, { id: 'weights', kind: 'model', files: [file('model.bin', 10)] }]
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done }); return { promise, resolve } }
 const cachePorts = {
   extension: { version: '1.0.0' },
@@ -27,7 +28,7 @@ async function fixture({ specs = defaultSpecs(), stored, onSave = async () => {}
     storage: { get: async () => structuredClone(saved), set: async value => { await onSave(value, execute); saved = structuredClone(value); writes.push(structuredClone(value)) } },
     commands: { register: (id, handler) => { commands.set(id, handler); return () => {} } }, subscriptions: { add() {} },
     inference: {
-      capabilities: { runtimeIsolation: true }, status: async () => [], bind: async () => {}, stop: async () => {}, credentials: { has: async () => false },
+      capabilities: { runtimeIsolation: true }, status: async () => [], bind: async () => {}, unbind: async () => {}, stop: async () => {}, credentials: { has: async () => false },
       resources: {
         list: async () => resources,
         prepare: async (spec, options) => {
@@ -49,14 +50,15 @@ function emit(onProgress, path, bytes, totalBytes, phase = 'download') {
   onProgress({ path, bytes, totalBytes, phase, completedFiles: 0, totalFiles: 1 })
 }
 
-test('manager aggregates every pending input across resources and persists only start/end snapshots', async () => {
+test('manager aggregates pending inputs and persists history boundaries plus the engine selection', async () => {
   const specs = [
-    { id: 'engine', kind: 'engine', archives: [{ id: 'packed', size: 5, unpackedBytes: 100, sha256: 'a'.repeat(64), source: { url: 'https://example.invalid/archive' } }], files: [{ path: 'expanded', archive: 'packed', archivePath: 'expanded' }] },
+    { id: 'engine', kind: 'engine', ...engineIdentity, archives: [{ id: 'packed', size: 5, unpackedBytes: 100, sha256: 'a'.repeat(64), source: { url: 'https://example.invalid/archive' } }], files: [{ path: 'expanded', archive: 'packed', archivePath: 'expanded' }] },
     { id: 'weights', kind: 'model', files: [file('same', 10), file('unknown')] },
     { id: 'more-weights', kind: 'model', files: [{ ...file('same'), bytes: 20 }] },
   ]
   const f = await fixture({ specs, prepare: async (spec, { onProgress }) => {
     if (spec.preparation) {
+      assert.equal(f.saved().engineSelections['linux-x64']['llama.cpp:vulkan'], 'engine', '准备前持久化当前引擎选择')
       emit(onProgress, 'packed', 0, 5, 'connect')
       emit(onProgress, 'packed', 5, 5)
       emit(onProgress, 'expanded', 100, 100, 'extract')
@@ -80,8 +82,12 @@ test('manager aggregates every pending input across resources and persists only 
   assert.equal(state.downloadHistory[0].downloadedBytes, 42)
   assert.equal(state.downloadHistory[0].state, 'completed')
   assert.equal(state.downloadHistory[0].id, state.job.id)
-  assert.equal(f.writes.length, 2)
-  assert.equal(f.writes[0].downloadHistory[0].state, 'preparing')
+  const histories = f.writes.flatMap(write => write.downloadHistory ?? []).filter(record => record.id === state.job.id)
+  assert.equal(histories[0].state, 'preparing')
+  assert.equal(histories.at(-1).state, 'completed')
+  assert.deepEqual([...new Set(histories.map(record => record.state))], ['preparing', 'completed'])
+  assert.ok(histories.slice(0, -1).every(record => JSON.stringify(record) === JSON.stringify(histories[0])), '进度事件不产生中间历史快照')
+  assert.equal(f.saved().engineSelections['linux-x64']['llama.cpp:vulkan'], 'engine')
   assert.deepEqual(f.saved().retainedField, f.initial.retainedField)
   assert.deepEqual(f.saved().models, f.initial.models, '历史写入不得规范化模型配置')
   assert.equal(JSON.stringify(f.saved().downloadHistory).includes('secret'), false)
@@ -214,10 +220,12 @@ test('engine downloads and manual file preparation stay out of model download hi
   await f.execute('prepare', { modelId: f.model.id, resourceId: 'engine' })
   await f.execute('prepare', { modelId: f.model.id, resourceId: 'weights', mode: 'file', files: [{ id: 'model.bin', resourceId: 'external-reference' }] })
   assert.deepEqual((await f.execute('status')).downloadHistory, [])
-  assert.deepEqual(f.writes, [
-    { ...f.initial, resourceRevisions: { engine: 'prepared-1' } },
-    { ...f.initial, resourceRevisions: { engine: 'prepared-1', weights: 'prepared-2' } },
-  ])
+  assert.ok(f.writes.every(write => !(write.downloadHistory?.length)))
+  assert.ok(f.writes.some(write => write.resourceRevisions?.engine === 'prepared-1' && !write.resourceRevisions.weights))
+  assert.deepEqual(f.saved().resourceRevisions, { engine: 'prepared-1', weights: 'prepared-2' })
+  assert.equal(f.saved().engineSelections['linux-x64']['llama.cpp:vulkan'], 'engine')
+  assert.deepEqual(f.saved().models, f.initial.models)
+  assert.deepEqual(f.saved().retainedField, f.initial.retainedField)
   assert.equal(f.prepared[1].files[0].source.reference, true)
   assert.equal(f.prepared[1].files[0].size, undefined)
   assert.deepEqual(f.removed, [])

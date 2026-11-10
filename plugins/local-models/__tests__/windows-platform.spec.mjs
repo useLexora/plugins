@@ -43,8 +43,8 @@ test('Windows selects pinned x64 engines, CPU vision, WASM OCR and no Linux libr
   assert.equal(f.saves(), 0)
   const state = await f.execute('status')
   assert.deepEqual(state.environment, windows)
-  assert.deepEqual(state.engines.map(item => item.id).sort(), ['image-vulkan-windows-x64', 'llama-b11747-windows-x64', 'sherpa-onnx-windows-x64', 'tesseract-wasm'])
-  for (const [runtime, engine] of [['chat', 'llama-b11747-windows-x64'], ['vision', 'llama-b11747-windows-x64'], ['asr', 'sherpa-onnx-windows-x64'], ['tts', 'sherpa-onnx-windows-x64'], ['image', 'image-vulkan-windows-x64'], ['ocr', 'tesseract-wasm']]) {
+  assert.deepEqual(state.engines.map(item => item.id).sort(), ['image-vulkan-windows-x64', 'llama-b11747-windows-x64', 'llama-cuda-windows-x64-b12211', 'llama-vulkan-windows-x64-b12211', 'sherpa-onnx-windows-x64', 'tesseract-wasm'])
+  for (const [runtime, engine] of [['chat', 'llama-vulkan-windows-x64-b12211'], ['vision', 'llama-vulkan-windows-x64-b12211'], ['asr', 'sherpa-onnx-windows-x64'], ['tts', 'sherpa-onnx-windows-x64'], ['image', 'image-vulkan-windows-x64'], ['ocr', 'tesseract-wasm']]) {
     const binding = f.bindings.get(runtime)
     assert.equal(binding.resources[0].id, engine)
     assert.equal(binding.libraryPaths, undefined)
@@ -55,14 +55,18 @@ test('Windows selects pinned x64 engines, CPU vision, WASM OCR and no Linux libr
   assert.equal(f.bindings.get('image').configuration.backend, 'Vulkan0')
   assert.equal(f.bindings.get('ocr').configuration.ocrEngine, 'wasm')
   assert.ok((await f.execute('prepare', { resourceId: 'llama-b11747', mode: 'download' })).error)
-  assert.equal((await f.execute('prepare', { resourceId: 'llama-b11747-windows-x64', mode: 'download' })).ok, true)
-  assert.match(f.prepared[0].preparation.inputs[0].source.url, /win-vulkan-x64\.zip$/)
+  assert.ok((await f.execute('prepare', { resourceId: 'llama-b11747-windows-x64', mode: 'download' })).error)
+  assert.equal((await f.execute('prepare', { resourceId: 'llama-vulkan-windows-x64-b12211', mode: 'download' })).ok, true)
+  assert.match(f.prepared[0].preparation.inputs[0].source.url, /b12211-bin-win-vulkan-x64\.zip$/)
+  assert.equal((await f.execute('use-engine', { resourceId: 'llama-b11747-windows-x64' })).ok, true)
+  assert.equal(f.bindings.get('chat').resources[0].id, 'llama-b11747-windows-x64')
 })
 
 test('existing models, IDs, history and configuration survive Windows platform projection without storage migration', async () => {
   const model = { ...catalog.models[0], id: 'existing', custom: true }
   const stored = { custom: [{ model, specification: specifications.find(item => item.id === model.resources[1]) }], active: { chat: model.id }, models: { [model.id]: { ...model.defaults, threads: 7, contextWindow: 65536 } }, services: { 'speech-api': { enabled: true, configuration: catalog.services[0].defaults } } }
-  const f = await open({ stored })
+  const resources = specifications.filter(spec => spec.version !== 'b12211').map(spec => registered(spec.id))
+  const f = await open({ stored, resources })
   assert.deepEqual(f.saved(), stored)
   assert.equal(f.saves(), 0)
   assert.equal(f.bindings.get('chat').resources[0].id, 'llama-b11747-windows-x64')
@@ -72,9 +76,12 @@ test('existing models, IDs, history and configuration survive Windows platform p
   assert.equal((await f.execute('configure', { modelId: model.id, configuration: { ...stored.models[model.id], threads: 5 } })).ok, true)
   assert.deepEqual(f.saved().custom[0].model.resources, model.resources)
   assert.equal(f.saved().active.chat, 'existing')
+  const upgradedInstallation = await open({ stored: f.saved() })
+  assert.equal(upgradedInstallation.bindings.get('chat').resources[0].id, 'llama-b11747-windows-x64')
+  assert.equal(upgradedInstallation.bindings.get('chat').configuration.threads, 5)
 })
 
-test('Windows nondefault vision GPU choice survives Linux saves without changing Linux fields or runtime defaults', async () => {
+test('Windows vision GPU choice survives Linux acceleration controls and unrelated saves', async () => {
   const acceleration = 'gpu'
   const first = await open()
   const vision = (await first.execute('status')).models.find(model => model.id === 'qwen3-vl')
@@ -85,9 +92,9 @@ test('Windows nondefault vision GPU choice survives Linux saves without changing
   const models = (await linux.execute('status')).models
   const linuxVision = models.find(model => model.id === vision.id)
   const chat = models.find(model => model.id === 'qwen3-4b')
-  assert.equal(linuxVision.fields.some(field => field.key === 'acceleration'), false)
-  assert.equal(linuxVision.configuration.acceleration, undefined)
-  assert.equal(linux.bindings.get('vision').configuration.acceleration, undefined)
+  assert.deepEqual(linuxVision.fields.find(field => field.key === 'acceleration').choices.map(choice => choice.value), ['cpu', 'gpu', 'cuda'])
+  assert.equal(linuxVision.configuration.acceleration, acceleration)
+  assert.equal(linux.bindings.get('vision').configuration.acceleration, acceleration)
   assert.equal((await linux.execute('configure', { modelId: chat.id, configuration: { ...chat.configuration, threads: 7 } })).ok, true)
   assert.equal(linux.saved().models[vision.id].acceleration, acceleration)
 
@@ -98,17 +105,18 @@ test('Windows nondefault vision GPU choice survives Linux saves without changing
 
   assert.equal((await linux.execute('configure', { modelId: vision.id, configuration: { ...linuxVision.configuration, threads: 6 } })).ok, true)
   assert.equal(linux.saved().models[vision.id].acceleration, acceleration)
-  assert.equal(linux.bindings.get('vision').configuration.acceleration, undefined)
+  assert.equal(linux.bindings.get('vision').configuration.acceleration, acceleration)
   const returnedAgain = await open({ stored: linux.saved() })
   assert.equal(returnedAgain.bindings.get('vision').configuration.acceleration, acceleration)
   assert.equal(returnedAgain.bindings.get('vision').configuration.threads, 6)
 })
 
-test('Linux retains original engines and Windows-only registrations never satisfy its bindings', async () => {
+test('Linux retains installed legacy engines and Windows-only registrations never satisfy its bindings', async () => {
   const environment = { platform: 'linux-x64', executionMode: 'isolated' }
-  const f = await open({ environment })
+  const legacyResources = specifications.filter(spec => spec.version !== 'b12211').map(spec => registered(spec.id))
+  const f = await open({ environment, resources: legacyResources })
   for (const model of catalog.models) {
-    const selected = await open({ environment, stored: { active: { [model.runtime]: model.id } } })
+    const selected = await open({ environment, resources: legacyResources, stored: { active: { [model.runtime]: model.id } } })
     assert.deepEqual(selected.bindings.get(model.runtime).resources.map(item => item.id), model.resources)
   }
   assert.deepEqual(f.bindings.get('asr').libraryPaths, [{ mount: 'engine', path: 'node_modules/sherpa-onnx-linux-x64' }])
@@ -116,6 +124,27 @@ test('Linux retains original engines and Windows-only registrations never satisf
   const resources = specifications.filter(spec => spec.kind === 'model' || spec.platforms?.includes('windows-x64')).map(spec => registered(spec.id))
   const unavailable = await open({ environment, resources })
   assert.equal(unavailable.bindings.size, 0)
+})
+
+test('CUDA selects only the current platform CUDA engine while macOS rejects that device choice', async () => {
+  for (const environment of [windows, { platform: 'linux-x64', executionMode: 'isolated' }]) {
+    const f = await open({ environment })
+    for (const runtime of ['chat', 'vision']) {
+      const model = (await f.execute('status')).models.find(model => model.runtime === runtime)
+      const before = f.bindings.get(runtime)
+      assert.deepEqual(model.fields.find(field => field.key === 'acceleration').choices.map(choice => choice.value), ['cpu', 'gpu', 'cuda'])
+      assert.equal((await f.execute('configure', { modelId: model.id, configuration: { ...model.configuration, acceleration: 'cuda' } })).ok, true)
+      const binding = f.bindings.get(runtime)
+      assert.equal(binding.resources[0].id, `llama-cuda-${environment.platform}-b12211`)
+      assert.deepEqual(binding.resources.slice(1), before.resources.slice(1))
+      assert.equal(binding.models[0].id, before.models[0].id)
+      assert.equal(binding.configuration.acceleration, 'cuda')
+    }
+  }
+  const mac = await open({ environment: { platform: 'macos-arm64', executionMode: 'supervised' } })
+  const model = (await mac.execute('status')).models.find(model => model.runtime === 'chat')
+  assert.ok((await mac.execute('configure', { modelId: model.id, configuration: { ...model.configuration, acceleration: 'cuda' } })).error)
+  assert.equal(mac.bindings.get('chat').resources[0].id, 'llama-metal-macos-arm64-b12211')
 })
 
 test('unknown legacy engine stays visible but cannot run on Windows; API connections remain available', async () => {

@@ -20,7 +20,8 @@ export function createTransport(socketPath, platform = process.platform) {
       return new Promise((resolve, reject) => {
         const req = httpRequest({ ...(loopback ? { host: '127.0.0.1', port } : { socketPath }), path, method: body ? 'POST' : 'GET', signal, headers: { ...(body ? { 'content-type': 'application/json', 'content-length': body.length } : {}), ...(key ? { authorization: `Bearer ${key}` } : {}) } }, response => resolve({ ok: response.statusCode === 200, status: response.statusCode, body: response }))
         req.once('error', reject)
-        req.setTimeout(30000, () => req.destroy(Error('EXTENSION_INFERENCE_REQUEST_TIMEOUT')))
+        if (path === '/health') req.setTimeout(2000, () => req.destroy(Error('EXTENSION_INFERENCE_REQUEST_TIMEOUT')))
+        else req.setTimeout(0)
         req.end(body)
       })
     },

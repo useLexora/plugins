@@ -8,13 +8,14 @@ const u32 = n => { const b = Buffer.alloc(4); b.writeUInt32LE(n); return b }
 const u64 = n => { const b = Buffer.alloc(8); b.writeBigInt64LE(BigInt(n)); return b }
 const string = text => Buffer.concat([u64(Buffer.byteLength(text)), Buffer.from(text)])
 const hash = data => createHash('sha256').update(data).digest('hex')
-function gguf({ architecture = 'qwen3', split = false, projector = false, type = 'model' } = {}) {
+function gguf({ architecture = 'qwen3', split = false, projector = false, type = 'model', metadata: overrides = {} } = {}) {
   const metadata = {
     'general.architecture': projector ? 'clip' : architecture,
     'general.type': type,
     'general.name': 'Tiny structured model',
     ...(projector ? { 'clip.projector_type': architecture, 'clip.has_vision_encoder': true } : { [`${architecture}.block_count`]: 1, [`${architecture}.embedding_length`]: 4, 'tokenizer.ggml.model': 'gpt2', 'tokenizer.ggml.tokens': ['a', 'b'] }),
     ...(split ? { 'split.count': 2 } : {}),
+    ...overrides,
   }
   const pairs = Object.entries(metadata).map(([key, val]) => Buffer.concat([string(key), typeof val === 'string' ? Buffer.concat([u32(8), string(val)]) : typeof val === 'boolean' ? Buffer.concat([u32(7), Buffer.from([Number(val)])]) : Array.isArray(val) ? Buffer.concat([u32(9), u32(8), u64(val.length), ...val.map(string)]) : Buffer.concat([u32(4), u32(val)])]))
   const tensors = projector ? [['v.patch_embd.weight', [4, 4]], ['mm.0.weight', [4, 4]]] : [
@@ -183,7 +184,11 @@ test('GGUF offline definition has content-stable identity, authorized resource I
   const resolved = await f.importer.resolve({ ...input, title: 'Local title' }, { onProgress: value => progress.push(value) })
   assert.deepEqual(resolved.files, { model: 'renamed.gguf' })
   assert.deepEqual(resolved.origin, { source: 'local' })
-  assert.deepEqual(resolved.metadata, { source: 'local', tags: ['gguf'] })
+  const { inference, ...metadata } = resolved.metadata
+  assert.deepEqual(metadata, { source: 'local', tags: ['gguf'], architecture: 'qwen3' })
+  assert.equal(inference.weightBytes, 560)
+  assert.equal(inference.kvBytesPerToken, undefined)
+  assert.match(inference.limitations.join(' '), /KV 未知/)
   assert.deepEqual(resolved.specification.files, [{ path: 'renamed.gguf', source: 'renamed.gguf', resourceId: f.ids[0], sha256: hash(gguf()) }])
   assert.equal(resolved.specification.bytes, gguf().length)
   assert.equal(progress.at(-1).completedBytes, gguf().length)
@@ -192,6 +197,30 @@ test('GGUF offline definition has content-stable identity, authorized resource I
   const changed = gguf(); changed[changed.length - 1] = 1
   const different = fixture([['renamed.gguf', changed]])
   assert.notEqual((await different.importer.resolve(await select(different, 'chat'))).id, resolved.id)
+})
+
+test('GGUF persists bounded tensor weights and explicit head dimensions without guessing KV from file size', async () => {
+  for (const architecture of ['llama', 'qwen2', 'qwen3']) {
+    const metadata = {
+      [`${architecture}.context_length`]: 65536,
+      [`${architecture}.attention.head_count`]: 2,
+      [`${architecture}.attention.head_count_kv`]: 1,
+      [`${architecture}.attention.head_length`]: 4,
+      [`${architecture}.attention.value_length`]: 2,
+    }
+    const f = fixture([['model.gguf', gguf({ architecture, metadata })]])
+    const result = await f.importer.resolve(await select(f, 'chat'))
+    assert.equal(result.metadata.inference.contextWindow, 65536)
+    assert.equal(result.metadata.inference.weightBytes, 560)
+    assert.equal(result.metadata.inference.kvBytesPerToken, 12)
+    assert.equal(result.metadata.inference.kvEstimate, 'full-context-f16')
+    assert.ok(result.specification.bytes > result.metadata.inference.weightBytes)
+    const sliding = fixture([['model.gguf', gguf({ architecture, metadata: { ...metadata, [`${architecture}.attention.sliding_window`]: 4096 } })]])
+    const unknown = (await sliding.importer.resolve(await select(sliding, 'chat'))).metadata.inference
+    assert.equal(unknown.kvBytesPerToken, undefined)
+    assert.equal(unknown.kvEstimate, undefined)
+    assert.match(unknown.limitations.join(' '), /KV 未知.*滑窗/)
+  }
 })
 
 test('GGUF metadata selects the default without restricting text and vision loading choices', async () => {
@@ -203,6 +232,7 @@ test('GGUF metadata selects the default without restricting text and vision load
   const text = await f.importer.resolve(await select(f, 'chat'))
   assert.deepEqual(text.files, { model: 'weights.gguf' })
   assert.equal(text.recipe, 'chat')
+  assert.equal(text.metadata.architecture, 'qwen3vl')
   for (const options of [{ split: true }, { type: 'adapter' }]) {
     const bad = fixture([['normal.gguf', gguf(options)]])
     await assert.rejects(bad.importer.inspect({ resourceIds: bad.ids }), /分片|架构|适配器/)

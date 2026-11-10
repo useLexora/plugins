@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import { ActionIcon, Button as MantineButton, MantineProvider, createTheme, defaultVariantColorsResolver, type ButtonProps as MantineButtonProps, type CSSVariablesResolver } from '@mantine/core'
-import { AlertCircle, ArrowLeft, Box, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CloudOff, Download, ExternalLink, File, FileUp, HardDrive, Image, Info, MessageSquare, Mic, Plug, ScanEye, Search, Settings, Square, Star, Trash2, Volume2, X, type LucideIcon } from 'lucide-react'
+import { AlertCircle, ArrowLeft, Box, Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, CloudOff, Download, ExternalLink, File, FileUp, HardDrive, Image, Info, MessageSquare, Mic, MoreHorizontal, Plug, ScanEye, Search, Settings, Square, Star, Trash2, Volume2, X, type LucideIcon } from 'lucide-react'
 import '@mantine/core/styles.css'
 
 const icons: Record<string, LucideIcon> = {
   alert: AlertCircle, 'arrow-left': ArrowLeft, box: Box, check: Check, 'chevron-down': ChevronDown, 'chevron-left': ChevronLeft,
   'chevron-right': ChevronRight, 'chevron-up': ChevronUp, 'cloud-off': CloudOff, download: Download,
   'external-link': ExternalLink, file: File, 'file-up': FileUp, 'hard-drive': HardDrive, image: Image,
-  info: Info, chat: MessageSquare, vision: ScanEye, mic: Mic, plug: Plug, 'scan-eye': ScanEye,
+  info: Info, chat: MessageSquare, vision: ScanEye, mic: Mic, 'more-horizontal': MoreHorizontal, plug: Plug, 'scan-eye': ScanEye,
   search: Search, settings: Settings, star: Star, stop: Square, trash: Trash2, tts: Volume2, x: X,
 }
 
@@ -16,7 +16,7 @@ export function Icon({ name, size = 16, className }: { name: string, size?: numb
   return <Component size={size} strokeWidth={1.6} aria-hidden="true" className={className} />
 }
 
-export type ButtonProps = React.ComponentPropsWithoutRef<'button'> & {
+export type ButtonProps = React.ComponentPropsWithRef<'button'> & {
   variant?: MantineButtonProps['variant']
   leftSection?: React.ReactNode
   rightSection?: React.ReactNode
