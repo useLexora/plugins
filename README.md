@@ -13,6 +13,7 @@ Lexora 插件源码与插件市场目录，汇集官方插件和社区作品，�
 | 插件 | 作者 | 功能 |
 | --- | --- | --- |
 | [标题自动生成](plugins/auto-title) | Lexora | 自动生成任务标题，可随任务目标更新，并保留手动命名。 |
+| [任务残留清理](plugins/legacy-task-cleanup) | Lexora | 清理旧版已移除任务的本地残留，不影响现有任务和外部文件。 |
 | [Lexora Office](plugins/office) | Lexora | 编辑本地 Word、Excel、PowerPoint 和 PDF 文件，支持选区引用、任务协作与文档库。 |
 | [Lexora Local Models](plugins/local-models) | Lexora | 发现、下载和运行本地模型，支持对话、图像理解、语音转写、朗读、图像生成与文字识别。 |
 | [多 Shell · 命令执行](plugins/multi-shell) | Lexora | 检测本机命令解释器，配置启用状态、路径与优先级；命令仍由 Lexora 核心受控执行。 |

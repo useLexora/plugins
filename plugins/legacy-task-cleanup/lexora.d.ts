@@ -1,0 +1,803 @@
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json }
+export type ReadonlyJson = string | number | boolean | null | ReadonlyJsonArray | ReadonlyJsonObject
+export interface ReadonlyJsonArray extends ReadonlyArray<ReadonlyJson> {}
+export interface ReadonlyJsonObject { readonly [key: string]: ReadonlyJson }
+export interface Disposable { dispose: () => void | Promise<void> }
+export interface EventSubscription { dispose: () => void }
+export interface EventSubscriptionOptions { signal?: AbortSignal, once?: boolean }
+export type EventName<Events> = Extract<keyof Events, string>
+type NamespacePattern<Name extends string> = Name extends `${infer Head}:${infer Tail}` ? `${Head}:*` | `${Head}:**` | `${Head}:${NamespacePattern<Tail>}` : never
+export type EventPattern<Events> = EventName<Events> | '*' | '**' | NamespacePattern<EventName<Events>>
+type EventMatches<Name extends string, Pattern extends string> = Pattern extends '**' ? true
+  : Pattern extends `${infer Prefix}:**` ? Name extends Prefix | `${Prefix}:${string}` ? true : false
+    : Pattern extends `${infer Prefix}:*` ? Name extends `${Prefix}:${infer Tail}` ? Tail extends `${string}:${string}` ? false : true : false
+      : Pattern extends '*' ? Name extends `${string}:${string}` ? false : true : Name extends Pattern ? true : false
+export type EventMessage<Events, Pattern extends string = '**'> = Pattern extends unknown ? {
+  [Name in EventName<Events>]: EventMatches<Name, Pattern> extends true ? Readonly<{ type: Name, data: Events[Name] }> : never
+}[EventName<Events>] : never
+export interface EventSubscriber<Events> {
+  on: <const Pattern extends EventPattern<Events>>(patterns: Pattern | readonly Pattern[], listener: (event: EventMessage<Events, Pattern>) => unknown, options?: EventSubscriptionOptions) => EventSubscription
+}
+export type EventSnapshot<Value> = Value extends object ? { readonly [Key in keyof Value]: EventSnapshot<Value[Key]> } : Value
+export type FileOpeningLocation = 'inline' | 'standalone'
+export type FileViewResource = 'selected-file' | 'optional-file' | 'none'
+export interface FileHandlerView {
+  view: string
+  /** Preselect this mode in the installation dialog. Defaults to true. */
+  requestDefault?: boolean
+}
+export interface FileHandlerContribution {
+  id: string
+  title: string
+  extensions: string[]
+  preview?: FileHandlerView
+  open?: FileHandlerView
+}
+/** Legacy declaration. New plugins should use FileHandlerContribution. */
+export interface FileOpenerContribution {
+  id: string
+  title: string
+  view: string
+  extensions: string[]
+  locations: FileOpeningLocation[]
+  requestDefault?: boolean
+}
+export interface LauncherContribution { id: string, title: string, view: string }
+export interface NavigationContribution {
+  title: string
+  view: string
+  /** Show the host title bar on this navigation page. Defaults to true; does not affect resource tabs or the app frame. */
+  showHeader?: boolean
+  when?: WorkbenchCondition
+}
+/** API 4: contributes.skills; id is plugin-prefixed and package-wide unique; path points to a packaged Skill directory's SKILL.md. */
+export interface SkillContribution { id: string, path: string }
+/**
+ * API 4 increment: contributes.mcpConnectors; see mcp-connectors.md and set engines.lexora to verified supporting hosts.
+ * Independent declarations need no other contributions, entry or plugin permissions.
+ * Connection definitions follow the plugin; credentials, enablement and authorization remain host-managed.
+ */
+export interface McpConnectorContribution {
+  /** Unprefixed package-local ID matching /^[a-z0-9][a-z0-9_-]{0,63}$/, unique among MCP connectors; not a user connection ID. */
+  id: string
+  name: string
+  transport: 'streamable-http'
+  /** HTTPS address without userinfo or secrets. */
+  url: string
+  /** Required authentication requirement, not credentials or a guarantee of host OAuth support. */
+  authentication: 'none' | 'bearer' | 'oauth'
+}
+export type SubagentToolReference = {
+  source: 'mcp'
+  /** Local ID declared in this package's contributes.mcpConnectors. */
+  connector: string
+  /** Exact remote tool name, not a host-generated or JSON-encoded identity. */
+  name: string
+} | {
+  source: 'builtin'
+  name: 'read' | 'find' | 'grep' | 'ls'
+}
+/**
+ * API 4 increment: contributes.subagents (NPC); see buddies.md and set engines.lexora to verified supporting hosts.
+ * Independent declarations need no MCP connectors, Skills, entry or plugin permissions and do not bind themselves to a companion.
+ * Enablement, model selection and companion bindings are user configuration, not manifest fields.
+ * Customize a copy; explicitly referenced plugin Skills and connectors remain dependencies of that copy.
+ */
+export interface SubagentContribution {
+  /** Unprefixed package-local ID matching /^[a-z0-9][a-z0-9_-]{0,63}$/, unique among NPCs; built-in NPC IDs are reserved. */
+  id: string
+  name: string
+  /** Defaults to ''. */
+  description?: string
+  instructions: string
+  /** Unique full plugin-prefixed contributes.skills IDs from this package. Defaults to []. */
+  skills?: string[]
+  /** Unique subset of skills that must be available. Defaults to []. */
+  requiredSkills?: string[]
+  /** Unique explicit references; no all-tools selection. Defaults to []. */
+  tools?: SubagentToolReference[]
+  /** Required. Inherits the task's limits or restricts file access; read_only forbids MCP references. */
+  fileAccess: 'inherit' | 'read_only'
+}
+export interface Resource { readonly id: string, readonly name: string, readonly sourceId?: string }
+export interface ResourceTransferOptions { name?: string, signal?: AbortSignal }
+export interface ResourceApi {
+  readText: (resource: Resource) => Promise<string>
+  listFiles: () => Promise<LocalFile[]>
+  getUrl: (resource: Pick<LocalFile, 'id'> | { packagePath: string }) => Promise<string>
+  readBytes: (resource: Pick<LocalFile, 'id'>, options?: { offset?: number, length?: number }) => Promise<{ data: Uint8Array, size: number, eof: boolean }>
+  hash: (resource: Pick<LocalFile, 'id'>, options?: { signal?: AbortSignal }) => Promise<{ sha256: string, size: number }>
+  importFile: (resource: Resource, options?: ResourceTransferOptions) => Promise<LocalFile>
+  createFile: (options: { name: string, data: Blob | ArrayBuffer | Uint8Array, mimeType?: string, signal?: AbortSignal }) => Promise<LocalFile>
+  release: (resource: Pick<LocalFile, 'id'>) => Promise<void>
+}
+export interface LocalFile extends Resource { readonly mimeType: string, readonly size: number, readonly relativePath?: string }
+export interface LocalDirectory extends Resource {}
+export interface LocalResourceApi extends ResourceApi {
+  pickFiles: (options?: { filters?: { name: string, extensions: string[] }[], multiple?: boolean }) => Promise<LocalFile[]>
+  revokeFile: (resource: Pick<LocalFile, 'id'>) => Promise<void>
+  pickDirectory: () => Promise<LocalDirectory | null>
+  listDirectories: () => Promise<LocalDirectory[]>
+  scanDirectory: (directory: Pick<LocalDirectory, 'id'>, options?: { extensions?: string[], recursive?: boolean }) => Promise<LocalFile[]>
+  revokeDirectory: (directory: Pick<LocalDirectory, 'id'>) => Promise<void>
+  saveFile: (options: { name: string, data: Blob | ArrayBuffer | Uint8Array }) => Promise<boolean>
+}
+export interface NetworkResponse {
+  status: number
+  text: string
+  headers: { link?: string }
+}
+export interface NetworkApi {
+  get: (url: string) => Promise<NetworkResponse>
+  download: (url: string, options?: ResourceTransferOptions) => Promise<LocalFile>
+}
+export interface ScheduleInput { id: string, command: string, enabled: boolean, intervalMinutes: number }
+export interface Schedule extends ScheduleInput { nextRunAt: number | null }
+export interface ScheduleApi {
+  get: (id: string) => Promise<Schedule | null>
+  set: (schedule: ScheduleInput) => Promise<Schedule>
+  remove: (id: string) => Promise<void>
+}
+export interface CommandInvocation {
+  readonly target: 'extension.actions' | 'composer.actions' | 'task.actions' | 'resource.actions' | 'message.actions' | 'view' | 'slash'
+  readonly instanceId: string | null
+  readonly content?: string
+}
+export interface Rect { readonly x: number, readonly y: number, readonly width: number, readonly height: number }
+export interface PaneSnapshot { readonly id: string, readonly active: boolean, readonly visible: boolean, readonly rect: Rect }
+export interface Interaction { readonly id: string, readonly signal: AbortSignal, end: () => Promise<void> }
+export interface PlacementOptions { instanceId?: string, interactionId?: string }
+export interface HitRegion { id: string, label: string, rect: Rect }
+export interface ModelSelection { providerId: string, modelId: string }
+export type SettingValue = boolean | string | number | ModelSelection | null
+export interface ConfigurationEvents {
+  'configuration:changed': { readonly configuration: EventSnapshot<Record<string, SettingValue>>, readonly changedKeys: readonly string[] }
+}
+export interface WorkbenchPaneEvents {
+  'workbench:panes:changed': { readonly panes: readonly PaneSnapshot[] }
+}
+export interface ExtensionEvents extends ConfigurationEvents, WorkbenchPaneEvents, InferenceResourceEvents {}
+export interface TaskTitle {
+  id: string
+  title: string | null
+  titleSource: 'legacy' | 'manual' | 'fallback' | 'generated'
+}
+export interface AgentReferenceSummary { referenceId: string, sourceMessageId: string, title: string, excerpt: string }
+export interface AgentReference {
+  referenceId: string
+  sourceMessageId: string
+  title: string
+  text: string
+  textLength: number
+  textDigest: string
+  offset: number
+  nextOffset: number | null
+  locator: ReferenceLocator | null
+  scope: { taskId: string, branchId: string }
+}
+export interface AgentPublishedArtifact { id: string, name: string, mimeType: string, size: number }
+export interface AgentToolContext {
+  readonly scope: Readonly<{ taskId: string, branchId: string, runId: string }>
+  readonly artifacts: {
+    /** Publish a private file to this task. Requires a write tool. Creates an independent workspace copy and a task output card. */
+    publish: (input: { resource: Pick<LocalFile, 'id'>, name?: string }) => Promise<AgentPublishedArtifact>
+  }
+  readonly results: {
+    /** Add a private PNG/JPEG/WebP to this tool's native model image result. Await before returning the JSON result. */
+    addImage: (input: { resource: Pick<LocalFile, 'id'> }) => Promise<void>
+  }
+  readonly references: {
+    list: () => Promise<{ items: AgentReferenceSummary[], truncated: boolean }>
+    resolve: (referenceId: string, options?: { sourceMessageId?: string, offset?: number, limit?: number }) => Promise<AgentReference>
+  }
+  readonly signal: AbortSignal
+  readonly task: {
+    get: () => Promise<TaskTitle>
+    messages: () => Promise<{ role: 'user' | 'assistant', text: string }[]>
+    rename: (input: { title: string }) => Promise<{ applied: boolean }>
+  }
+  readonly models: {
+    generateText: (input: { prompt: string, system?: string, model?: ModelSelection | null, maxTokens?: number }) => Promise<{ text: string, model: ModelSelection }>
+  }
+}
+export interface TaskActionEvents {
+  'task:created': { readonly conversationId: string, readonly branchId: string, readonly runId: string, readonly messageId: string, readonly commitId: string }
+  'task:run:before': { readonly conversationId: string, readonly branchId: string, readonly runId: string, readonly messageId: string }
+  'task:reply:started': { readonly conversationId: string, readonly branchId: string, readonly runId: string, readonly messageId: string }
+  'task:input:committed': { readonly conversationId: string, readonly branchId: string, readonly runId: string, readonly messageId: string, readonly commitId: string }
+  'task:turn:completed': { readonly conversationId: string, readonly branchId: string, readonly runId: string, readonly triggeringMessageId: string, readonly completedAt: string }
+}
+export interface AgentActionContext extends Omit<AgentToolContext, 'references' | 'scope' | 'artifacts' | 'results'> {
+  readonly cause: EventMessage<TaskActionEvents> | Readonly<{ type: 'user' }>
+}
+export interface AgentActionResult { status: 'completed' | 'skipped', message?: string }
+export type ConditionInput = 'configuration' | 'runtime.models' | 'runtime.task' | 'workbench' | 'form'
+export interface ConditionReference { condition: string, params?: ReadonlyJsonObject }
+export interface ConditionResult { value: boolean, reason?: string }
+export type ConfigurationScope = { kind: 'global' } | { kind: 'space', spaceId: string } | { kind: 'task', taskId: string }
+export type ConditionInvocationScope = { kind: 'settings', moduleId: string, groupId: string } | { kind: 'task', taskId: string, runId: string | null }
+export type ConditionData<T> = EventSnapshot<{ status: 'available', revision: string } & T> | Readonly<{ status: 'not_requested' | 'no_context' | 'denied' | 'unsupported' | 'loading' | 'invalid' }>
+export interface ConditionContext {
+  readonly version: 1
+  readonly signal: AbortSignal
+  readonly scope: EventSnapshot<{ key: string, configuration: ConfigurationScope, invocation: ConditionInvocationScope }>
+  readonly target: Readonly<{ kind: 'setting' | 'agent' | 'action', id: string }>
+  readonly configuration: ConditionData<{ values: Record<string, SettingValue>, sources: Record<string, ConfigurationScope> }>
+  readonly runtime: Readonly<{
+    models: ConditionData<{ selection: ModelSelection | null, models: { providerId: string, modelId: string, name: string, available: boolean, capabilities: string[] }[] }>
+    task: ConditionData<{ id: string, spaceId: string | null, branchId: string, title: string | null, titleSource: 'fallback' | 'generated' | 'manual' | 'legacy', activity: 'idle' | 'running' | 'awaiting_approval', modelSelection: ModelSelection | null }>
+  }>
+  readonly workbench: ConditionData<{ panes: { id: string, active: boolean, visible: boolean }[] }>
+  readonly form: ConditionData<{ values: Record<string, SettingValue>, dirtyKeys: string[] }>
+}
+export interface ConditionApi {
+  register: (id: string, evaluate: (context: ConditionContext, params: ReadonlyJsonObject) => boolean | ConditionResult | Promise<boolean | ConditionResult>) => Disposable
+  invalidate: (input?: { condition?: string, scopeKey?: string }) => Promise<void>
+}
+export type ShellCandidateId = 'bash' | 'git-bash' | 'zsh' | 'sh' | 'powershell7' | 'powershell51' | 'cmd'
+export interface ShellCandidate {
+  id: ShellCandidateId
+  label: string
+  dialect: 'bash' | 'zsh' | 'sh' | 'powershell' | 'cmd'
+  executable: string
+  version: string
+  available: boolean
+  reason?: string
+}
+
+export interface WorkerOptions {
+  type?: 'classic' | 'module'
+  name?: string
+  signal?: AbortSignal
+}
+export interface WorkerApi {
+  create: (entry: string | URL, options?: WorkerOptions) => Promise<Worker>
+}
+
+export interface ExtensionContext {
+  readonly signal: AbortSignal
+  readonly workers: WorkerApi
+  readonly themes: ThemeApi
+  readonly extension: { readonly id: string, readonly version: string, readonly apiVersion: 1 | 2 | 3 | 4 }
+  readonly events: EventSubscriber<ExtensionEvents>
+  readonly configuration: {
+    get: () => Promise<Record<string, SettingValue>>
+    onChange: (listener: (configuration: Readonly<Record<string, SettingValue>>) => void | Promise<void>) => Disposable
+  }
+  readonly conditions: ConditionApi
+  readonly shells: { detect: () => Promise<ShellCandidate[]> }
+  readonly inference: InferenceApi
+  readonly agent: {
+    registerTool: (id: string, execute: (input: Record<string, Json>, context: AgentToolContext) => Json | void | Promise<Json | void>) => Disposable
+    registerAction: (id: string, execute: (context: AgentActionContext) => AgentActionResult | Promise<AgentActionResult>) => Disposable
+  }
+  readonly subscriptions: { add: <T extends Disposable>(disposable: T) => T }
+  readonly commands: { register: (id: string, execute: (context: { resource: Resource | null, arguments: Json, invocation: CommandInvocation | null, taskCleanup?: LegacyTaskCleanupCommandApi }) => Json | void | Promise<Json | void>) => Disposable }
+  readonly placements: { show: (id: string, options?: string | PlacementOptions) => Promise<string>, hide: (id: string, options?: string | PlacementOptions) => Promise<string | null> }
+  readonly window: { readonly styles: { set: (id: string, css: string) => Promise<void>, remove: (id: string) => Promise<void> } }
+  readonly workbench: { readonly panes: readonly PaneSnapshot[], onPanesChange: (listener: (panes: readonly PaneSnapshot[]) => void) => Disposable }
+  readonly interactions: { start: (title: string) => Promise<Interaction> }
+  readonly views: { broadcast: (message: Json) => Promise<void>, open: (type: string, options?: { resource?: Resource | null, state?: Json }) => Promise<string> }
+  readonly resources: ResourceApi
+  readonly network: NetworkApi
+  readonly storage: { get: () => Promise<Json>, set: (value: Json) => Promise<void> }
+  readonly notifications: { show: (notification: { title: string, body: string }) => Promise<boolean> }
+  readonly schedules: ScheduleApi
+}
+export type WorkbenchRegion
+  = | 'window'
+    | 'app.sidebar'
+    | 'workbench.sidebar'
+    | 'workbench.workspace'
+    | 'workbench.pane'
+    | 'task.history'
+    | 'composer.input'
+export interface AnchorGeometry {
+  readonly kind: WorkbenchRegion
+  readonly visible: boolean
+  readonly width: number
+  readonly height: number
+}
+export interface ControlSnapshot {
+  readonly revision: string
+  readonly value: string | null
+  readonly options: readonly { readonly value: string, readonly label: string }[]
+  readonly disabled: boolean
+}
+export type MountTarget = 'workbench' | 'app.sidebar' | 'workbench.sidebar' | 'workbench.pane'
+export type MountLength = number | `${number}%` | null
+export interface ViewPresentation {
+  target?: MountTarget
+  position?: 'static' | 'absolute'
+  order?: number
+  zIndex?: number
+  width?: MountLength
+  height?: MountLength
+  top?: MountLength
+  right?: MountLength
+  bottom?: MountLength
+  left?: MountLength
+}
+export interface MountGeometry {
+  readonly instanceId?: string
+  readonly target: MountTarget
+  readonly visible: boolean
+  readonly width: number
+  readonly height: number
+  readonly rect: { readonly x: number, readonly y: number, readonly width: number, readonly height: number }
+}
+export type WorkbenchContextValues = Readonly<Record<string, string | number | boolean>>
+export type WorkbenchCondition = Record<string, string | number | boolean | (string | number | boolean)[]>
+export interface WorkbenchContextSnapshot {
+  readonly values: WorkbenchContextValues
+  readonly pages: readonly { readonly id: string, readonly title: string }[]
+}
+export interface ReferenceLocator {
+  readonly version: number
+  readonly data: ReadonlyJson
+}
+export type ReferenceChoice = { kind: 'view', id: string } | { kind: 'new-task' | 'clipboard' }
+export interface ReferenceCapture {
+  readonly id: string
+  readonly targets: readonly { readonly id: string, readonly label: string }[]
+  readonly defaultId: string | null
+  readonly clipboard: boolean
+}
+export interface ReferenceReveal {
+  readonly referenceId: string
+  readonly text: string
+  readonly locator: ReferenceLocator | null
+}
+export type ReferenceInput
+  = | { kind: 'content', title: string, text: string, locator?: ReferenceLocator, source?: 'view' }
+    | { kind: 'resource', resource: { id: string } }
+/** Format-independent editable content; it may exist before a file is saved. */
+export interface EditableDocument {
+  readonly id: string
+  readonly name: string
+  readonly location: string
+  readonly version: string | null
+  readonly revision: string
+  readonly size: number
+  readonly writable: boolean
+  readonly kind: 'file' | 'draft'
+  readonly recovery: boolean
+  readonly openedAt: number
+}
+export interface DocumentBytes { data: Blob | ArrayBuffer | Uint8Array, signal?: AbortSignal }
+export interface DocumentApi {
+  pick: (options?: { filters?: { name: string, extensions: string[] }[] }) => Promise<EditableDocument | null>
+  open: (resource: Resource) => Promise<EditableDocument | null>
+  resume: (document: Pick<EditableDocument, 'id'>) => Promise<EditableDocument>
+  list: () => Promise<EditableDocument[]>
+  read: (document: Pick<EditableDocument, 'id'>, options?: { recovery?: boolean, signal?: AbortSignal }) => Promise<Uint8Array>
+  create: (options: DocumentBytes & { name: string }) => Promise<EditableDocument>
+  save: (document: EditableDocument, options: DocumentBytes) => Promise<EditableDocument>
+  saveAs: (options: DocumentBytes & { name: string }) => Promise<EditableDocument | null>
+  backup: (document: EditableDocument, options: DocumentBytes) => Promise<EditableDocument>
+  status: (document: Pick<EditableDocument, 'id'>) => Promise<{ changed: boolean }>
+  discardRecovery: (document: Pick<EditableDocument, 'id'>) => Promise<void>
+  close: (document: Pick<EditableDocument, 'id'>) => Promise<void>
+  forget: (document: Pick<EditableDocument, 'id'>) => Promise<void>
+  reveal: (document: Pick<EditableDocument, 'id'>) => Promise<void>
+}
+
+export type ExtensionDataSource = 'task.metrics' | 'context.usage'
+export interface ExtensionDataQuery<Source extends ExtensionDataSource = ExtensionDataSource> {
+  readonly source: Source
+  readonly scope: 'bound'
+}
+export interface ExtensionDataValues {
+  'task.metrics': {
+    taskId: string
+    branchId: string
+    turns: number
+    steps: number
+    tokens: { inputTokens: number, outputTokens: number, cacheReadTokens: number, cacheWriteTokens: number }
+    throughput: { samples: number, tokensPerSecond: number | null }
+  }
+  'context.usage': {
+    taskId: string
+    branchId: string
+    actorId: string
+    runId: string | null
+    tokens: number
+    window: number
+    percent: number
+  }
+}
+export type ExtensionDataSnapshot<Source extends ExtensionDataSource = ExtensionDataSource> = {
+  [Key in Source]: {
+    readonly source: Key
+    readonly status: 'ready'
+    readonly value: EventSnapshot<ExtensionDataValues[Key]>
+  } | {
+    readonly source: Key
+    readonly status: 'denied' | 'no_target' | 'unavailable'
+    readonly value: null
+  }
+}[Source]
+export interface ExtensionDataApi {
+  read: <Source extends ExtensionDataSource>(query: ExtensionDataQuery<Source>) => Promise<ExtensionDataSnapshot<Source>>
+  observe: <Source extends ExtensionDataSource>(query: ExtensionDataQuery<Source>, listener: (snapshot: ExtensionDataSnapshot<Source>) => unknown) => Disposable
+}
+
+export interface SettingsHeaderAction {
+  readonly id: string
+  readonly title: string
+  readonly icon?: 'settings' | 'download' | 'refresh' | 'add' | 'back' | 'more'
+  readonly disabled?: boolean
+  readonly progress?: number | null
+}
+export interface LegacyTaskCleanupProgress {
+  readonly phase: 'scanning' | 'confirming' | 'running' | 'completed' | 'cancelled' | 'failed'
+  /** @description 完整扫描前为 null；不包含 skipped。 */
+  readonly total: number | null
+  readonly processed: number
+  readonly deleted: number
+  /** @description 已受理但尚未完成，不代表已删除。 */
+  readonly pending: number
+  readonly failed: number
+  readonly skipped: number
+  readonly errorCode: string | null
+}
+export interface LegacyTaskCleanupCommandApi {
+  run: (options: {
+    confirm: (preview: { total: number, skipped: number }, signal: AbortSignal) => boolean | Promise<boolean>
+    onProgress?: (progress: LegacyTaskCleanupProgress) => void
+  }) => Promise<{
+    /** @description completed 表示调用结束；成功与否以 summary.phase 为准。进入批次前的授权或不可用错误仍 reject。 */
+    status: 'cancelled' | 'completed'
+    results: { conversationId: string, expectedRevision: number, status: 'deleted' | 'pending' | 'failed', errorCode?: string }[]
+    /** @description 最终快照，包含失败或中断前的真实部分计数；应覆盖进度回调的状态。 */
+    summary: LegacyTaskCleanupProgress
+  }>
+}
+export interface ViewContext {
+  readonly documents: DocumentApi
+  readonly clipboard: {
+    read: () => Promise<{ text?: string, html?: string }>
+    write: (data: { text?: string, html?: string }) => Promise<void>
+  }
+  setDocumentInfo: (info: { title: string, dirty: boolean }) => Promise<void>
+  setSettingsHeaderActions: (actions: readonly SettingsHeaderAction[]) => Promise<void>
+  onSettingsHeaderAction: (listener: (id: string) => void) => Disposable
+  onBeforeClose: (handler: (signal: AbortSignal) => boolean | Promise<boolean>) => Disposable
+  readonly workers: WorkerApi
+  readonly themes: ThemeApi
+  readonly events: EventSubscriber<ViewEvents>
+  readonly interaction: {
+    readonly id: string
+    setRegions: (regions: readonly HitRegion[]) => Promise<void>
+    onActivate: (listener: (event: { readonly id: string, readonly x: number, readonly y: number }) => void) => Disposable
+  } | null
+  onMessage: (listener: (message: Json) => void) => Disposable
+  readonly instanceId: string | null
+  readonly data: ExtensionDataApi
+  readonly workbench: WorkbenchContextSnapshot
+  onWorkbenchChange: (listener: (snapshot: WorkbenchContextSnapshot) => void) => Disposable
+  readonly visible: boolean
+  onVisibilityChange: (listener: (visible: boolean) => void) => Disposable
+  readonly mount: MountGeometry | null
+  onMountChange: (listener: (mount: MountGeometry) => void) => Disposable
+  readonly anchor: AnchorGeometry | null
+  onAnchorChange: (listener: (anchor: AnchorGeometry) => void) => Disposable
+  readonly control: {
+    readonly snapshot: ControlSnapshot
+    onChange: (listener: (snapshot: ControlSnapshot) => void) => Disposable
+    propose: (value: string, revision?: string) => Promise<void>
+  } | null
+  readonly environment: ViewEnvironment
+  onEnvironmentChange: (listener: (environment: ViewContext['environment']) => void) => Disposable
+  readonly apiVersion: 1 | 2 | 3 | 4
+  readonly resource: Resource | null
+  readonly state: Json
+  readonly stateVersion: number
+  readonly expectedStateVersion: number
+  readonly signal: AbortSignal
+  onActivity: (listener: (event: { readonly type: 'composer-input', readonly caret?: { readonly x: number, readonly y: number, readonly width: number, readonly height: number } | null }) => void) => Disposable
+  openExternal: (url: string) => Promise<void>
+  readonly references: {
+    add: (input: ReferenceInput) => Promise<boolean>
+    capture: (input: ReferenceInput) => Promise<ReferenceCapture | null>
+    commit: (id: string, choice: ReferenceChoice) => Promise<boolean>
+    release: (id: string) => Promise<boolean>
+    onReveal: (handler: (input: ReferenceReveal, signal: AbortSignal) => boolean | Promise<boolean>) => Disposable
+  }
+  readonly resources: LocalResourceApi
+  readonly network: NetworkApi
+  readonly commands: { execute: (command: string, args?: Json) => Promise<Json> }
+  setPresentation: (presentation: ViewPresentation) => Promise<void>
+  setState: (state: Json) => Promise<void>
+  setActive: (active: boolean) => Promise<void>
+}
+export interface ViewEnvironment {
+  readonly language: string
+  readonly colorScheme: 'light' | 'dark'
+  readonly themeRevision?: number
+  readonly colors: Readonly<Record<string, string>>
+}
+export interface ExtensionDataEvents {
+  'data:changed': { readonly id: string, readonly snapshot: ExtensionDataSnapshot | null }
+}
+export interface ViewStateEvents {
+  'view:settings-header-action:activated': { readonly id: string }
+  'view:visibility:changed': { readonly visible: boolean }
+  'view:environment:changed': { readonly environment: ViewEnvironment }
+}
+export interface ViewGeometryEvents {
+  'view:mount:changed': { readonly mount: MountGeometry }
+  'view:anchor:changed': { readonly anchor: AnchorGeometry }
+}
+export interface ViewMessageEvents {
+  'view:message:received': { readonly message: ReadonlyJson }
+}
+export interface WorkbenchContextEvents {
+  'workbench:context:changed': { readonly context: WorkbenchContextSnapshot }
+}
+export interface ControlEvents {
+  'control:changed': { readonly control: ControlSnapshot }
+}
+export interface InteractionEvents {
+  'interaction:activated': { readonly regionId: string, readonly x: number, readonly y: number }
+}
+export interface ComposerEvents {
+  'composer:input:received': { readonly caret?: Rect | null }
+}
+export interface ViewEvents extends ExtensionDataEvents, ViewStateEvents, ViewGeometryEvents, ViewMessageEvents, WorkbenchContextEvents, ControlEvents, InteractionEvents, ComposerEvents {}
+export interface ExtensionModule {
+  activate: (context: ExtensionContext) => void | Promise<void>
+  deactivate?: () => void | Promise<void>
+  migrate?: (previous: Json, from: number, to: number) => Json | Promise<Json>
+}
+export interface ViewModule { render: (context: ViewContext, container: HTMLElement) => void | Promise<void> }
+
+export type ThemeColor = 'app-sidebar-fg' | 'workspace-sidebar-fg' | 'reading' | 'reading-fg' | 'composer' | 'composer-fg' | 'hover-fg' | 'selected-fg' | 'pressed-fg' | 'link' | 'quote' | 'quote-border' | 'inline-code' | 'inline-code-fg' | 'code' | 'code-fg' | 'code-header' | 'code-border' | 'code-line-number' | 'table-header' | 'table-border' | 'table-stripe' | 'table-hover' | 'canvas-grid' | 'diff-added' | 'diff-removed' | 'editor' | 'editor-fg' | 'editor-line' | 'editor-gutter' | 'editor-cursor' | 'syntax-comment' | 'syntax-keyword' | 'syntax-string' | 'syntax-number' | 'syntax-function' | 'syntax-type' | 'syntax-variable' | 'syntax-operator' | 'terminal-background' | 'terminal-foreground' | 'terminal-muted' | 'terminal-scrollbar' | 'terminal-mauve' | 'terminal-blue' | 'terminal-green' | 'terminal-yellow' | 'terminal-peach' | 'terminal-maroon' | 'terminal-sky' | 'terminal-rosewater' | 'canvas' | 'app-sidebar' | 'workspace-sidebar' | 'surface' | 'raised' | 'subtle' | 'user-message' | 'hover' | 'pressed' | 'selected' | 'selected-hover' | 'nav-hover' | 'nav-selected' | 'nav-selected-hover' | 'nav-pressed' | 'nav-foreground' | 'border' | 'border-strong' | 'strong' | 'fg' | 'muted' | 'disabled' | 'on-accent' | 'accent' | 'accent-hover' | 'accent-pressed' | 'accent-text' | 'focus' | 'text-selection' | 'text-selection-inactive' | 'text-selection-match' | 'accent-subtle' | 'accent-surface' | 'accent-surface-hover' | 'accent-surface-pressed' | 'accent-border' | 'accent-border-hover' | 'accent-on-surface' | 'success' | 'success-solid' | 'success-surface' | 'success-surface-hover' | 'success-border' | 'warning' | 'warning-solid' | 'warning-surface' | 'warning-surface-hover' | 'warning-border' | 'danger' | 'danger-solid' | 'danger-surface' | 'danger-surface-hover' | 'danger-border' | 'gold' | 'gold-surface' | 'avatar' | 'avatar-foreground' | 'data-violet' | 'data-cyan' | 'data-blue'
+export type ThemeAppearance = 'light' | 'dark'
+export interface FileIconAssociations {
+  file?: string
+  folder?: string
+  folderExpanded?: string
+  rootFolder?: string
+  rootFolderExpanded?: string
+  fileNames?: Record<string, string>
+  fileExtensions?: Record<string, string>
+  languageIds?: Record<string, string>
+  folderNames?: Record<string, string>
+  folderNamesExpanded?: Record<string, string>
+  rootFolderNames?: Record<string, string>
+  rootFolderNamesExpanded?: Record<string, string>
+}
+export interface FileIconThemeDocument extends FileIconAssociations {
+  $schema?: string
+  iconDefinitions: Record<string, { iconPath: string }>
+  light?: FileIconAssociations
+  highContrast?: FileIconAssociations
+  hidesExplorerArrows?: boolean
+}
+export interface FileIconThemeContribution { id: string, label: string, path: string }
+export interface ThemePreference { id: string }
+export interface ThemeDescriptor { id: string, label: string, appearance: ThemeAppearance, source: 'plugin' | 'user' | 'fallback', extensionId: string | null, packageName: string, swatch: string }
+export interface ThemeMaterial {
+  anchor: WorkbenchRegion
+  image?: string
+  color?: string
+  gradient?: { angle: number, stops: { color: string, at: number }[] }
+  opacity?: number
+  imageOpacity?: number
+  scale?: number
+  blur?: number
+  position?: [number, number]
+  size?: 'cover' | 'contain'
+}
+export interface ThemeDocument {
+  schemaVersion: 1
+  colors?: Partial<Record<ThemeColor, string>>
+  shadows?: Partial<Record<'soft' | 'raised' | 'overlay' | 'window' | 'illustration', { x: number, y: number, blur: number, spread?: number, color: string }[]>>
+  /** Optional semantic radii in px, each 0–24. Omitted fields retain host defaults. */
+  shape?: { radius?: Partial<Record<'micro' | 'icon' | 'control' | 'menu' | 'menu-item', number>> }
+  /** State transitions only, in ms (0–400); system reduced-motion takes precedence. */
+  motion?: { 'state-duration'?: number }
+  materials?: ThemeMaterial[]
+  welcome?: { text?: { 'zh-CN': string, 'en-US': string } | null, image?: string | null }
+}
+export interface ThemeArchive { schemaVersion: 1, label: string, appearance: ThemeAppearance, document: ThemeDocument, assets?: Record<string, string | { resourceId: string } | { packagePath: string }> }
+export interface ResolvedTheme { descriptor: ThemeDescriptor, colors: Record<ThemeColor, string>, variables: Record<string, string>, document: ThemeDocument, assets: Record<string, string> }
+export interface ThemeSnapshot { revision: number, preference: ThemePreference, active: ResolvedTheme, themes: ThemeDescriptor[], unavailable: string | null, preview: boolean }
+export interface ThemePreview { token: string, revision: number }
+export interface ThemeApi {
+  list: () => Promise<ThemeDescriptor[]>
+  get: (id: string) => Promise<{ descriptor: ThemeDescriptor, document: ThemeDocument }>
+  getActive: () => Promise<ThemeSnapshot>
+  describe: () => Promise<{ schema: Json, colors: ThemeColor[], anchors: ThemeMaterial['anchor'][], precedence: string[] }>
+  validate: (document: unknown) => Promise<{ valid: boolean, diagnostics: { path: string, message: string }[] }>
+  resolve: (appearance: ThemeAppearance, document: ThemeDocument, overrides?: Partial<Record<ThemeColor, string>>) => Promise<ResolvedTheme>
+  save: (archive: ThemeArchive, id?: string) => Promise<ThemeDescriptor>
+  remove: (id: string) => Promise<void>
+  setPreference: (preference: ThemePreference) => Promise<ThemeSnapshot>
+  beginPreview: (archive: ThemeArchive) => Promise<ThemePreview>
+  updatePreview: (preview: ThemePreview, archive: ThemeArchive) => Promise<ThemePreview>
+  commitPreview: (preview: ThemePreview) => Promise<ThemeDescriptor>
+  cancelPreview: (token: string) => Promise<void>
+  import: (content: string) => Promise<ThemeDescriptor>
+  export: (id: string) => Promise<string>
+  onDidChange: (listener: (snapshot: ThemeSnapshot) => void) => Disposable
+}
+
+/** contributes.inference; model service naming is independent of the plugin name and navigation title. */
+export type InferencePlatform = 'linux-x64' | 'windows-x64' | 'macos-arm64'
+export interface InferenceEnvironment {
+  platform: InferencePlatform | null
+  executionMode: 'isolated' | 'supervised' | 'unsupported'
+  hardware?: InferenceHardware
+}
+export interface InferenceHardware {
+  sampledAt: number
+  logicalCores: number
+  totalMemoryBytes: number
+  availableMemoryBytes?: number
+  gpus: { name: string, vendor: 'nvidia' | 'amd' | 'intel' | 'apple' | 'unknown', totalMemoryBytes?: number, availableMemoryBytes?: number }[]
+}
+export interface InferenceTiming { tokens: number, ms: number, tokensPerSecond?: number }
+export interface InferenceObservation {
+  observedAt: number
+  engine?: { name: 'llama.cpp', version?: string }
+  backend?: { requested: 'cpu' | 'vulkan' | 'cuda' | 'metal' | 'unknown', observed: ('cpu' | 'vulkan' | 'cuda' | 'metal')[] }
+  device?: { backend: 'cpu' | 'vulkan' | 'cuda' | 'metal', index: number }[]
+  architecture?: string
+  context?: { requested?: number, actual?: number, train?: number }
+  offload?: { layers: number, total: number }
+  degraded?: boolean
+  loadMs?: number
+  timings?: { prompt?: InferenceTiming, decode?: InferenceTiming }
+  prompt?: InferenceTiming
+  decode?: InferenceTiming
+  error?: string
+}
+export interface InferenceContribution {
+  /** Trimmed, nonblank, 1–100 characters. Defaults to manifest.name; does not change provider or model IDs. */
+  providerName?: string
+  preparation?: { entry: string, platforms: InferencePlatform[] }
+  runtimes: { id: string, entry: string, platforms: InferencePlatform[], gpu?: boolean, capacity?: number, idleTimeoutMs?: number }[]
+  capabilities: { id: string, title: string, kind: 'speech.transcribe' | 'speech.synthesize' | 'chat.completion' | 'image.generate' | 'image.read', runtime: string, streamingInput?: boolean, streamingOutput?: boolean }[]
+}
+
+export interface InferenceResourceSet { readonly id: string, readonly revision: string, readonly kind: 'engine' | 'model', readonly files: number, readonly bytes: number }
+export interface InferenceResourceStatus extends InferenceResourceSet { readonly authorized: boolean }
+export interface InferenceResourceFile { path: string, sha256: string, size?: number, executable?: boolean, source: { url: string } | { resourceId: string, reference?: boolean } | { directoryId: string, path: string, reference: true } }
+export interface InferencePreparation {
+  inputs: { id: string, sha256: string, size: number, source: { url: string } | { resourceId: string } }[]
+  options: Json
+  maxBytes: number
+  maxFiles: number
+}
+export interface InferencePrepare {
+  id: string
+  kind: 'engine' | 'model'
+  files: InferenceResourceFile[]
+  preparation?: InferencePreparation
+}
+export interface InferenceResourceProgress {
+  readonly resource: string
+  readonly path: string
+  readonly phase: 'connect' | 'download' | 'verify' | 'extract' | 'ready'
+  readonly completedFiles: number
+  readonly totalFiles: number
+  readonly bytes: number
+  readonly totalBytes: number | null
+  /** 本次文件请求复用的本地字节；计算网络速度时从 bytes 中扣除。 */
+  readonly resumedBytes?: number
+}
+export interface InferenceResourceEvents {
+  'inference:resources:progress': { readonly id: string, readonly progress: InferenceResourceProgress }
+}
+export interface InferenceModel { id: string, title: string, capability: string, contextWindow: number, maxTokens: number, tools: boolean | 'auto', reasoning?: boolean | 'auto', catalogModels?: { providerId: string, modelId: string }[], input?: ('text' | 'image')[] }
+export interface InferenceImageModel {
+  id: string
+  title: string
+  capability: string
+  support: { operations: ('generate' | 'edit')[], maxReferenceImages: number, sizes: string[], qualities: ('auto' | 'low' | 'medium' | 'high')[], backgrounds: ('auto' | 'opaque' | 'transparent')[] }
+}
+export interface InferenceImageReader {
+  id: string
+  title: string
+  capability: string
+  support: { operations: ('understand' | 'extract' | 'document')[] }
+}
+export interface InferenceBinding {
+  imageReaders?: InferenceImageReader[]
+  imageModels?: InferenceImageModel[]
+  models?: InferenceModel[]
+  endpoints?: { id: string, url: string, contentType: 'application/json' | 'application/octet-stream' | 'audio/wav' | 'multipart/form-data', credential?: string }[]
+  runtime: string
+  resources: { mount: string, id: string, revision: string }[]
+  libraryPaths?: { mount: string, path: string }[]
+  configuration?: Record<string, Json>
+}
+export interface InferenceApi {
+  readonly capabilities: { readonly nativeRuntime: true, readonly runtimeIsolation: true, readonly chatImageInput: true, readonly chatToolMatching: true, readonly chatReasoning: true, readonly resumableDownloads: true }
+  environment: () => Promise<InferenceEnvironment>
+  status: () => Promise<{ runtime: string, configured: boolean, platforms: string[], instances: { id: string | null, state: 'loading' | 'ready' | 'stopping' | 'stopped', active: number, pending: number, cancelling: number, observation?: InferenceObservation }[] }[]>
+  stop: (input?: { runtime: string }) => Promise<void>
+  unbind: (input: { runtime: string }) => Promise<void>
+  bind: (binding: InferenceBinding) => Promise<void>
+  credentials: {
+    has: (reference: { id: string, origin: string }) => Promise<boolean>
+    set: (credential: { id: string, origin: string, token: string }) => Promise<void>
+    remove: (id: string) => Promise<void>
+  }
+  resources: {
+    list: () => Promise<InferenceResourceStatus[]>
+    prepare: (resource: InferencePrepare, options?: { signal?: AbortSignal, onProgress?: (progress: InferenceResourceProgress) => void }) => Promise<InferenceResourceSet>
+    remove: (resource: Pick<InferenceResourceSet, 'id' | 'revision'>) => Promise<void>
+  }
+}
+export interface InferenceCall {
+  readonly network: { post: (endpoint: string, body: Uint8Array, options?: { contentType?: string }) => Promise<Response> }
+  readonly signal: AbortSignal
+  emit: (data: Json, bytes?: Uint8Array) => boolean
+  emitAsync: (data: Json, bytes?: Uint8Array) => Promise<void>
+}
+export interface InferenceInput {
+  write?: (bytes: Uint8Array) => void | Promise<void>
+  finish: () => void | Promise<void>
+}
+export interface InferenceBackend {
+  start: (capability: string, input: Json, call: InferenceCall) => InferenceInput | Promise<InferenceInput>
+  dispose?: () => void | Promise<void>
+}
+export interface InferenceModule {
+  initialize: (input: { configuration: Record<string, Json>, resources: Record<string, string>, resourceFiles?: Record<string, Record<string, string>> }) => InferenceBackend | Promise<InferenceBackend>
+}
+
+export type InferenceChatContent
+  = | { type: 'text', text: string }
+    | { type: 'image', mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif', data: string }
+export interface InferenceChatRequest {
+  model: string
+  messages: (
+    | { role: 'system' | 'user', text: string }
+    | { role: 'user', content: InferenceChatContent[] }
+    | { role: 'assistant', text: string, toolCalls: InferenceToolCall[] }
+    | { role: 'tool', text: string, toolCallId: string, name: string, isError: boolean }
+    | { role: 'tool', content: InferenceChatContent[], toolCallId: string, name: string, isError: boolean }
+  )[]
+  tools: { name: string, description: string, parameters: Record<string, Json> }[]
+  maxTokens: number
+  temperature?: number
+  reasoning?: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+}
+export interface InferenceToolCall { id: string, name: string, arguments: Record<string, Json> }
+export type InferenceChatEvent
+  = | { type: 'thinking', text: string }
+    | { type: 'text', text: string }
+    | { type: 'tool', call: InferenceToolCall }
+    | { type: 'done', reason: 'stop' | 'length' | 'toolUse', usage: { input: number, output: number, cacheRead?: number, cacheWrite?: number } }
+
+export interface InferenceImageRequest {
+  requestId: string
+  model: string
+  operation: 'generate' | 'edit'
+  prompt: string
+  images: { mimeType: 'image/png' | 'image/jpeg' | 'image/webp', data: string }[]
+  output: { size: string, quality: 'auto' | 'low' | 'medium' | 'high', background: 'auto' | 'opaque' | 'transparent' }
+}
+export type InferenceImageEvent
+  = { type: 'submitted', requestId: string }
+    | { type: 'image', index: number, sequence: number, final: boolean, mimeType: 'image/png' }
+    | { type: 'done', responseId: string | null }
+    | { type: 'failed', code: 'UNAVAILABLE' | 'BUSY' | 'RESOURCE_EXHAUSTED' | 'UNSUPPORTED' | 'FAILED', retryable: boolean }
+
+export type InferenceImageReadingRequest = {
+  requestId: string
+  model: string
+  question: string
+  image: { mimeType: 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif', data: string }
+} & (
+  | { operation: 'understand' | 'document', currentUserRequest?: string }
+  | { operation: 'extract', currentUserRequest?: never }
+)
+export type InferenceImageReadingEvent
+  = | { type: 'text', sequence: number, text: string }
+    | { type: 'done' }
+    | { type: 'failed', code: 'UNAVAILABLE' | 'BUSY' | 'UNSUPPORTED' | 'FAILED', retryable: boolean }

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup",
+  "name": "任务残留清理",
+  "author": "Lexora",
+  "description": "清理旧版已移除任务的本地残留，不影响现有任务和外部文件。",
+  "version": "1.0.0",
+  "apiVersion": 4,
+  "engines": { "lexora": ">=0.22.0 <1.0.0" },
+  "format": "source",
+  "entry": "main.ts",
+  "permissions": { "legacyTaskCleanup": true },
+  "contributes": {
+    "commands": [{
+      "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.cleanup",
+      "title": "清理任务残留…",
+      "hidden": true
+    }, {
+      "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.show-progress",
+      "title": "查看进度与结果",
+      "hidden": true
+    }, {
+      "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.get-status",
+      "title": "读取清理状态",
+      "hidden": true
+    }, {
+      "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.respond-confirmation",
+      "title": "回应本次清理确认",
+      "hidden": true
+    }, {
+      "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.hide-progress",
+      "title": "隐藏清理面板",
+      "hidden": true
+    }],
+    "menus": [{
+      "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.action",
+      "command": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.cleanup",
+      "target": "extension.actions",
+      "order": 0
+    }, {
+      "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.result-action",
+      "command": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.show-progress",
+      "target": "extension.actions",
+      "order": 1
+    }],
+    "views": [{
+      "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.progress",
+      "title": "任务残留清理 · 确认与结果",
+      "entry": "view.ts",
+      "resource": "none"
+    }],
+    "placements": [{
+      "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.progress-panel",
+      "view": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.progress",
+      "kind": "view",
+      "target": "workbench",
+      "presentation": { "position": "absolute", "width": 460, "height": 420, "right": 16, "bottom": 16 }
+    }]
+  }
+}
