@@ -1,6 +1,7 @@
 import { classifyEngineFailure } from './errors.mjs'
 import { createReasoningStream } from './reasoning.mjs'
 import { safeTimings } from './diagnostics.mjs'
+import { createToolArguments } from './tool-arguments.mjs'
 
 const maxRequestBytes = 32 * 1024 * 1024
 const imageMimeTypes = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
@@ -21,10 +22,10 @@ function messageContent(message) {
   return message.isError ? [{ type: 'text', text: JSON.stringify({ isError: true }) }, ...content] : content
 }
 
-function remoteMessage(message) {
+function remoteMessage(message, toolArguments) {
   if (message.role === 'tool') return { role: 'tool', tool_call_id: message.toolCallId, content: messageContent(message) }
   if (message.role === 'user') return { role: 'user', content: messageContent(message) }
-  if (message.role === 'assistant') return { role: 'assistant', content: message.text, ...message.toolCalls.length ? { tool_calls: message.toolCalls.map(tool => ({ id: tool.id, type: 'function', function: { name: tool.name, arguments: JSON.stringify(tool.arguments) } })) } : {} }
+  if (message.role === 'assistant') return { role: 'assistant', content: message.text, ...message.toolCalls.length ? { tool_calls: message.toolCalls.map(tool => ({ id: tool.id, type: 'function', function: { name: tool.name, arguments: JSON.stringify(toolArguments.encode(tool.name, tool.arguments)) } })) } : {} }
   return { role: message.role, content: message.text }
 }
 
@@ -58,15 +59,16 @@ export async function initialize({ configuration }) {
         async finish() {
           call.signal.throwIfAborted()
           const request = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+          const toolArguments = createToolArguments(request.tools, configuration.chatToolSchemaEnvelope === true)
           const payload = {
             model: configuration.model,
-            messages: request.messages.map(remoteMessage),
+            messages: request.messages.map(message => remoteMessage(message, toolArguments)),
             max_tokens: request.maxTokens,
             ...(request.temperature !== undefined ? { temperature: request.temperature } : {}),
             stream: true,
             stream_options: { include_usage: true },
             ...(configuration.chatTemplateReasoning && request.reasoning !== undefined ? { chat_template_kwargs: { enable_thinking: request.reasoning !== 'off' } } : {}),
-            ...request.tools.length ? { tools: request.tools.map(tool => ({ type: 'function', function: tool })) } : {},
+            ...request.tools.length ? { tools: toolArguments.tools.map(tool => ({ type: 'function', function: tool })) } : {},
           }
           const body = Buffer.from(JSON.stringify(payload))
           if (body.length > maxRequestBytes) throw Error('EXTENSION_INFERENCE_CONTEXT_TOO_LARGE')
@@ -77,7 +79,7 @@ export async function initialize({ configuration }) {
           const decoder = new TextDecoder()
           let pending = '', reason, usage, ended = false
           const calls = new Map()
-          const reasoning = createReasoningStream({ emit: call.emit, tagged: configuration.chatTemplateReasoning === true, enabled: configuration.chatReasoning === true && request.reasoning !== undefined && request.reasoning !== 'off' })
+          const reasoning = createReasoningStream({ emit: call.emit, tagged: configuration.chatTemplateReasoning === true, recoverUnopenedThinking: configuration.recoverUnopenedThinking === true, enabled: configuration.chatReasoning === true && request.reasoning !== undefined && request.reasoning !== 'off' })
           for await (const bytes of response.body) {
             call.signal.throwIfAborted()
             pending += decoder.decode(bytes, { stream: true })
@@ -112,7 +114,7 @@ export async function initialize({ configuration }) {
           call.signal.throwIfAborted()
           if (!ended || !usage || !['stop', 'length', 'tool_calls'].includes(reason)) throw Error('EXTENSION_INFERENCE_OUTPUT_INCOMPLETE')
           reasoning.finish()
-          for (const tool of calls.values()) if (!call.emit({ type: 'tool', call: { ...tool, arguments: JSON.parse(tool.arguments) } })) throw Error('EXTENSION_INFERENCE_CHANNEL_FULL')
+          for (const tool of calls.values()) if (!call.emit({ type: 'tool', call: { ...tool, arguments: toolArguments.decode(tool.name, JSON.parse(tool.arguments)) } })) throw Error('EXTENSION_INFERENCE_CHANNEL_FULL')
           if (!call.emit({ type: 'done', reason: reason === 'tool_calls' ? 'toolUse' : reason, usage })) throw Error('EXTENSION_INFERENCE_CHANNEL_FULL')
         },
       }

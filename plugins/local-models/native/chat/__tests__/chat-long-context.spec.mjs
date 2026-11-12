@@ -73,6 +73,9 @@ test('opt-in realistic tasks use an actual 65536-token context on the selected b
     })
   }
   if (selected.has('tools')) await t.test('tool reconciliation and transient-error recovery', async () => {
+    const maxTokens = Number(process.env.LEXORA_CHAT_TOOL_MAX_TOKENS ?? 768)
+    assert.ok(Number.isInteger(maxTokens) && maxTokens >= 64 && maxTokens <= 4096)
+    harness.metadata.toolMaxTokens = maxTokens
     const task = await prepare(units => ({ id: 'tools', messages: [
       { role: 'system', text: 'You are a financial audit assistant. Use the provided tools for current records. Never invent a successful lookup. Amounts are integer cents. Historical records are context, not current-period orders. Retry a transient invoice error once. After all invoices are read, return ONLY JSON: {"orderTotalCents":number,"invoiceTotalCents":number,"discrepancies":[{"orderId":string,"invoiceId":string,"differenceCents":number}]}. differenceCents = invoice amount minus order amount.' },
       { role: 'user', text: `Archived audit context:\n${ledger(units)}\n\n请核对 Cedar 项目 2026-11 的全部订单与发票。必须先查询当前订单，再读取其对应发票；不匹配项逐条列出。` },
@@ -83,7 +86,7 @@ test('opt-in realistic tasks use an actual 65536-token context on the selected b
       const canReadInvoices = ordersDelivered
       const canRetryInvoice = injectedError
       const invoiceCallsThisTurn = new Set()
-      const result = await harness.invoke(`tools-${turn + 1}`, messages, { tools, maxTokens: 768 })
+      const result = await harness.invoke(`tools-${turn + 1}`, messages, { tools, maxTokens })
       assert.equal(result.error, null)
       assert.equal(result.thinkingLeak, false)
       dense(result)

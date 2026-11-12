@@ -185,7 +185,7 @@ test('GGUF offline definition has content-stable identity, authorized resource I
   assert.deepEqual(resolved.files, { model: 'renamed.gguf' })
   assert.deepEqual(resolved.origin, { source: 'local' })
   const { inference, ...metadata } = resolved.metadata
-  assert.deepEqual(metadata, { source: 'local', tags: ['gguf'], architecture: 'qwen3' })
+  assert.deepEqual(metadata, { source: 'local', tags: ['gguf'], architecture: 'qwen3', capabilities: {} })
   assert.equal(inference.weightBytes, 560)
   assert.equal(inference.kvBytesPerToken, undefined)
   assert.match(inference.limitations.join(' '), /KV 未知/)
@@ -197,6 +197,18 @@ test('GGUF offline definition has content-stable identity, authorized resource I
   const changed = gguf(); changed[changed.length - 1] = 1
   const different = fixture([['renamed.gguf', changed]])
   assert.notEqual((await different.importer.resolve(await select(different, 'chat'))).id, resolved.id)
+})
+
+test('GGUF import preserves artifact capabilities without inventing a repository or changing content identity', async () => {
+  const metadata = { 'qwen3.context_length': 262144, 'tokenizer.chat_template': `{% if tools %}{{ tools }}{{ message.tool_calls }}{% endif %}{% if enable_thinking %}{{ '<think>' }}{% endif %}` }
+  const bytes = gguf({ metadata })
+  const f = fixture([['offline.gguf', bytes]])
+  const resolved = await f.importer.resolve(await select(f, 'chat'))
+  assert.deepEqual(resolved.metadata.capabilities, { contextWindow: 262144, toolCall: true, reasoningOptions: ['off', 'medium'] })
+  assert.deepEqual(resolved.origin, { source: 'local' })
+  assert.equal(resolved.specification.files[0].sha256, hash(bytes))
+  const renamed = fixture([['renamed.gguf', bytes]])
+  assert.equal((await renamed.importer.resolve(await select(renamed, 'chat'))).id, resolved.id)
 })
 
 test('GGUF persists bounded tensor weights and explicit head dimensions without guessing KV from file size', async () => {

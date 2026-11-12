@@ -10,7 +10,7 @@ const vision = catalog.models.find(model => model.runtime === 'vision')
 const resource = id => ({ id, authorized: true, revision: 'existing-revision' })
 const linuxConfiguration = values => ({ acceleration: 'gpu', ...values })
 
-async function open({ stored = null, resources = vision.resources.map(resource), chatImageInput = true, chatToolMatching = true, chatReasoning = 'absent' } = {}) {
+async function open({ stored = null, resources = vision.resources.map(resource), chatImageInput = true, chatToolMatching = true, chatReasoning = 'absent', chatModelMetadata = false } = {}) {
   let saved = structuredClone(stored)
   const original = structuredClone(stored)
   let saves = 0
@@ -22,7 +22,7 @@ async function open({ stored = null, resources = vision.resources.map(resource),
     commands: { register: (id, handler) => { commands.set(id, handler); return () => {} } },
     subscriptions: { add() {} },
     inference: {
-      capabilities: { runtimeIsolation: true, chatToolMatching, ...(chatImageInput === 'absent' ? {} : { chatImageInput }), ...(chatReasoning === 'absent' ? {} : { chatReasoning }) },
+      capabilities: { runtimeIsolation: true, chatToolMatching, chatModelMetadata, ...(chatImageInput === 'absent' ? {} : { chatImageInput }), ...(chatReasoning === 'absent' ? {} : { chatReasoning }) },
       resources: { list: async () => resources },
       status: async () => [...bindings.keys()].map(runtime => ({ runtime, configured: true, instances: [] })),
       credentials: { has: async () => false },
@@ -42,7 +42,7 @@ test('vision registers chat image input and the original image reader on one run
   assert.deepEqual(binding.models, [{ id: vision.id, title: vision.title, capability: 'vision-chat', input: ['text', 'image'], contextWindow: 4096, maxTokens: 512, tools: 'auto', catalogModels: [] }])
   assert.deepEqual(binding.imageReaders, [{ id: vision.id, title: vision.title, capability: 'vision', support: { operations: ['understand', 'extract', 'document'] } }])
   assert.deepEqual(binding.resources, vision.resources.map((id, index) => ({ mount: index === 0 ? 'engine' : 'model', id, revision: 'existing-revision' })))
-  assert.deepEqual(binding.configuration, { threads: 7, contextWindow: 4096, maxTokens: 512, acceleration: 'gpu', chatReasoning: false, backend: 'vision', engineVersion: 'b11747', engineBackend: 'vulkan' })
+  assert.deepEqual(binding.configuration, { threads: 7, contextWindow: 4096, maxTokens: 512, acceleration: 'gpu', chatReasoning: false, modelId: vision.id, backend: 'vision', engineVersion: 'b11747', engineBackend: 'vulkan' })
   assert.equal(f.bindings.size, 1)
   assert.equal((await f.execute('status')).models[0].bindingWarning, '')
 })
@@ -56,9 +56,23 @@ for (const [runtime, chatReasoning] of [['chat', 'absent'], ['chat', true], ['vi
   const f = await open({ stored, resources: model.resources.map(resource), chatReasoning })
   const binding = f.bindings.get(runtime)
   assert.deepEqual(binding.models, [{ id: model.id, title: model.title, capability: runtime === 'vision' ? 'vision-chat' : 'chat', ...(runtime === 'vision' ? { input: ['text', 'image'] } : {}), contextWindow: 65536, maxTokens: 4096, tools: 'auto', ...(chatReasoning === true ? { reasoning: 'auto' } : {}), catalogModels: [{ providerId: 'huggingface', modelId: 'Qwen/Qwen3.5-9B' }] }])
-  assert.deepEqual(binding.configuration, { ...linuxConfiguration(configuration), chatReasoning: chatReasoning === true, ...(runtime === 'vision' ? { backend: 'vision' } : {}), engineVersion: 'b11747', engineBackend: 'vulkan' })
+  assert.deepEqual(binding.configuration, { ...linuxConfiguration(configuration), chatReasoning: chatReasoning === true, modelId: model.id, ...(runtime === 'vision' ? { backend: 'vision' } : {}), engineVersion: 'b11747', engineBackend: 'vulkan' })
   assert.deepEqual((await f.execute('status')).models.find(item => item.id === model.id).configuration, linuxConfiguration(configuration))
   assert.deepEqual(binding.resources, model.resources.map((id, index) => ({ mount: index === 0 ? 'engine' : 'model', id, revision: 'existing-revision' })))
+  assert.deepEqual(f.saved(), stored)
+})
+
+for (const chatModelMetadata of [false, true]) test(`local model declarations preserve identity, user configuration and old-host compatibility (${chatModelMetadata})`, async () => {
+  const template = catalog.models.find(model => model.runtime === 'chat')
+  const capabilities = { toolCall: true, reasoningOptions: ['off', 'medium'], contextWindow: 262144 }
+  const model = { ...structuredClone(template), id: 'local-existing', origin: { source: 'local' }, metadata: { capabilities } }
+  const configuration = { ...model.defaults, contextWindow: 65536, maxTokens: 2048 }
+  const stored = { custom: [{ model, specification: { id: 'unchanged', kind: 'model', files: [] } }], active: { chat: model.id }, models: { [model.id]: configuration } }
+  const f = await open({ stored, resources: model.resources.map(resource), chatReasoning: true, chatModelMetadata })
+  const binding = f.bindings.get('chat')
+  assert.equal(binding.configuration.modelId, model.id)
+  assert.equal(binding.configuration.contextWindow, 65536)
+  assert.deepEqual(binding.models[0], { id: model.id, title: model.title, capability: 'chat', contextWindow: 65536, maxTokens: 2048, tools: true, reasoning: true, catalogModels: [], ...(chatModelMetadata ? { metadata: capabilities } : {}) })
   assert.deepEqual(f.saved(), stored)
 })
 
