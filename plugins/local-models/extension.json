@@ -5,7 +5,7 @@
   "name": "Lexora Local Models",
   "author": "Lexora",
   "description": "下载并运行本地模型，在当前设备完成对话、语音与图像任务。",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "apiVersion": 3,
   "engines": {
     "lexora": ">=0.22.0"

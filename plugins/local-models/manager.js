@@ -56,7 +56,7 @@ function runtimeState(runtime, available) {
   return available ? 'available' : 'missing'
 }
 
-function modelBinding(model, configuration, resources, chatImageInput, chatToolMatching, chatReasoning, platform, revisions = {}) {
+function modelBinding(model, configuration, resources, chatImageInput, chatToolMatching, chatReasoning, platform, revisions = {}, chatModelMetadata = false) {
   configuration = configurationFor(model, configuration)
   const selected = modelResources(model, resources, revisions).map(id => authorized(resources, id, revisions[id]))
   if (selected.some(resource => !resource)) return null
@@ -65,8 +65,8 @@ function modelBinding(model, configuration, resources, chatImageInput, chatToolM
     resources: selected.map((resource, index) => ({ mount: index === 0 ? 'engine' : 'model', id: resource.id, revision: resource.revision })),
     configuration: { ...configuration, ...(model.bundle ? { bundle: true } : {}), ...(model.files ? { files: model.files, ...(model.phonemes ? { phonemes: model.phonemes } : {}), ...(model.languages ? { languages: model.languages } : {}), ...(model.imageArchitecture ? { imageArchitecture: model.imageArchitecture } : {}), ...(model.imageValidation ? { imageValidation: model.imageValidation } : {}) } : {}) },
   }
-  if (model.runtime === 'chat' || model.runtime === 'vision') binding.configuration.chatReasoning = chatReasoning
-  if (model.runtime === 'chat' || (model.runtime === 'vision' && chatImageInput)) binding.models = [{ id: model.id, title: model.title, capability: model.runtime === 'vision' ? 'vision-chat' : 'chat', ...(model.runtime === 'vision' ? { input: ['text', 'image'] } : {}), contextWindow: configuration.contextWindow, maxTokens: configuration.maxTokens, ...modelToolBinding(model, chatToolMatching, chatReasoning) }]
+  if (model.runtime === 'chat' || model.runtime === 'vision') Object.assign(binding.configuration, { chatReasoning, modelId: model.id })
+  if (model.runtime === 'chat' || (model.runtime === 'vision' && chatImageInput)) binding.models = [{ id: model.id, title: model.title, capability: model.runtime === 'vision' ? 'vision-chat' : 'chat', ...(model.runtime === 'vision' ? { input: ['text', 'image'] } : {}), contextWindow: configuration.contextWindow, maxTokens: configuration.maxTokens, ...modelToolBinding(model, chatToolMatching, chatReasoning, chatModelMetadata) }]
   if (model.runtime === 'asr' || model.runtime === 'tts') {
     binding.configuration = { ...binding.configuration, kind: model.runtime }
     if (platform === 'linux-x64') binding.libraryPaths = [{ mount: 'engine', path: 'node_modules/sherpa-onnx-linux-x64' }]
@@ -104,6 +104,7 @@ export async function activateManager(context, { manifest, catalog, specificatio
   const resumableDownloads = context.inference?.capabilities?.resumableDownloads === true
   const chatToolMatching = context.inference?.capabilities?.chatToolMatching === true
   const chatReasoning = context.inference?.capabilities?.chatReasoning === true
+  const chatModelMetadata = context.inference?.capabilities?.chatModelMetadata === true
   const toolWarning = model => !chatToolMatching && (model.runtime === 'chat' || (model.runtime === 'vision' && chatImageInput)) ? '当前宿主不支持工具能力匹配与手动修正，请升级 Lexora。' : ''
   const visionWarning = model => model.runtime === 'vision' && !chatImageInput ? '当前 Lexora 版本仅支持此模型的独立识图；请升级 Lexora 后使用对话与图片输入。' : ''
   const compatibilityMessage = supported ? '' : '当前版本不支持本地推理，请更新 Lexora 后使用。'
@@ -165,7 +166,7 @@ export async function activateManager(context, { manifest, catalog, specificatio
   const bindingFor = (model, configuration, resources) => {
     model = currentModel(model, configuration)
     if (compatibility(model)) return null
-    const binding = modelBinding(model, configuration, resources, chatImageInput, chatToolMatching, chatReasoning, platform, settings.resourceRevisions)
+    const binding = modelBinding(model, configuration, resources, chatImageInput, chatToolMatching, chatReasoning, platform, settings.resourceRevisions, chatModelMetadata)
     const engine = specifications.find(spec => spec.id === model.resources[0])
     if (binding && engine?.engineId === 'llama.cpp') Object.assign(binding.configuration, {
       ...(engine.version ? { engineVersion: engine.version } : {}),

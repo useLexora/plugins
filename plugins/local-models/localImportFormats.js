@@ -1,5 +1,6 @@
 import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex } from '@noble/hashes/utils'
+import { ggufModelMetadata } from './modelToolSupport.js'
 
 const MiB = 1024 ** 2
 const decoder = new TextDecoder('utf-8', { fatal: true })
@@ -249,7 +250,7 @@ async function gguf(r) {
     const layers = new Set([...tensors.keys()].map(name => /^blk\.(\d+)\./.exec(name)?.[1]))
     for (let i = 0; i < blocks; i++) if (!layers.has(String(i))) fail('GGUF 缺少模型层，可能是组件或分片')
   }
-  return { format: 'gguf', role: 'model', architecture, inference: ggufInference(metadata, tensors, spans), vision: ['qwen2vl', 'qwen3vl'].includes(architecture), title: typeof metadata['general.name'] === 'string' ? metadata['general.name'].slice(0, 160) : undefined }
+  return { format: 'gguf', role: 'model', architecture, capabilities: ggufModelMetadata(metadata), inference: ggufInference(metadata, tensors, spans), vision: ['qwen2vl', 'qwen3vl'].includes(architecture), title: typeof metadata['general.name'] === 'string' ? metadata['general.name'].slice(0, 160) : undefined }
 }
 
 async function protobuf(r, end, visitor) {

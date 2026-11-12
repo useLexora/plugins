@@ -2,7 +2,7 @@ import { sha256 } from '@noble/hashes/sha256'
 import { bytesToHex } from '@noble/hashes/utils'
 import { huggingFaceCatalog } from './catalogSources.js'
 import { createAvailabilityCache } from './discoveryCache.js'
-import { huggingFaceBaseModels } from './modelToolSupport.js'
+import { declaredModelMetadata, huggingFaceBaseModels } from './modelToolSupport.js'
 import { expandModelFiles, groupGgufFiles } from './modelFileGroups.js'
 import { zImageTurbo, zImageTurboFiles } from './native/image/recipes.mjs'
 
@@ -29,6 +29,8 @@ function hfMetadata(data) {
   return {
     tags,
     baseModels: huggingFaceBaseModels(data),
+    ...(data.cardData?.base_model_relation === 'quantized' ? { baseModelRelation: 'quantized' } : {}),
+    capabilities: declaredModelMetadata(data.cardData?.capabilities),
     pipelineTag: textValue(data.pipeline_tag),
     libraryName: textValue(data.library_name),
     likes: countValue(data.likes),

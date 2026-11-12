@@ -195,12 +195,22 @@ test('inspect and resolve preserve metadata, fixed revision, safe choices and up
   assert.equal(url.pathname, `/api/models/${repository}/revision/${revision}`)
   assert.equal(url.searchParams.get('blobs'), 'true')
   const resolved = await discovery.resolve({ key: inspected.key, selection: { model: filename }, title: 'My model' })
-  assert.deepEqual(resolved.metadata, metadata)
+  assert.deepEqual(resolved.metadata, { ...metadata, capabilities: {} })
   assert.deepEqual(resolved.origin, { source: 'huggingface', repository, revision })
   assert.equal(resolved.recipe, 'chat')
   assert.equal(resolved.title, 'My model')
   assert.deepEqual(resolved.specification.files, [{ path: filename, source: filename, url: inspected.roles[0].choices[0].url, sha256: hash, size: 2048 }])
   await assert.rejects(discovery.resolve({ key: inspected.key, selection: { model: '../unsafe.gguf' } }), /请选择模型权重/)
+})
+
+test('pinned Hub structured capabilities are preserved as declarations, not inferred from tags or a base model', async () => {
+  const capabilities = { toolCall: false, reasoningOptions: ['off', 'medium'], contextWindow: 65536, input: ['text'] }
+  const { discovery } = fixture(() => ({ body: model({ cardData: { base_model: 'example/base', base_model_relation: 'finetune', capabilities }, tags: ['tools', 'reasoning'], siblings: [{ rfilename: 'model.gguf', size: 2048, lfs: { sha256: hash, size: 2048 } }] }) }))
+  const inspected = await discovery.inspect({ recipe: 'chat', repository, revision })
+  const resolved = await discovery.resolve({ key: inspected.key, selection: { model: 'model.gguf' } })
+  assert.deepEqual(resolved.metadata.capabilities, capabilities)
+  assert.equal(resolved.metadata.baseModelRelation, undefined)
+  assert.deepEqual(resolved.origin, { source: 'huggingface', repository, revision })
 })
 
 test('restricted models retain inspectable metadata but cannot be resolved', async () => {

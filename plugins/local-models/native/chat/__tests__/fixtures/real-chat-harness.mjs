@@ -171,7 +171,7 @@ export async function createRealChatHarness({ engine, model, profile, output, ba
   try {
     const start = performance.now()
     await sampleGpu()
-    runtime = await initialize({ resources: { engine, model: engine }, resourceFiles: { model: { 'model.gguf': model } }, configuration: { engineBackend: backend, acceleration, engineVersion: process.env.LEXORA_CHAT_TEST_ENGINE_VERSION, contextWindow, threads, files: { model: 'model.gguf' }, chatReasoning: true } })
+    runtime = await initialize({ resources: { engine, model: engine }, resourceFiles: { model: { 'model.gguf': model } }, configuration: { engineBackend: backend, acceleration, engineVersion: process.env.LEXORA_CHAT_TEST_ENGINE_VERSION, ...(profile === 'lfm3' ? { architecture: 'lfm3' } : {}), contextWindow, threads, files: { model: 'model.gguf' }, chatReasoning: true } })
     metadata.initializeMs = performance.now() - start
     const props = await http('/props')
     await writeFile(join(output, 'engine-props.json'), JSON.stringify(props, null, 2) + '\n')

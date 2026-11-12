@@ -7,6 +7,7 @@ import { initialize as initializeProtocol } from './remote.mjs'
 import { createTransport } from './transport.mjs'
 import { checkEngineVersion } from './errors.mjs'
 import { createEngineDiagnostics } from './diagnostics.mjs'
+import { serverModelMetadata } from './model-metadata.mjs'
 import { engineEnvironment, resourceDirectory, resourceFile } from '../resources.mjs'
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
@@ -90,11 +91,27 @@ export async function initialize(input) {
         if (Date.now() >= deadline) throw Error('EXTENSION_INFERENCE_LOAD_TIMEOUT')
         await pause(50)
       }
-      record({ event: 'chat.gpu.ready', pid: child.pid, loadMs: Date.now() - started, ...diagnostics.snapshot() })
+      let modelMetadata
+      try {
+        const metadataSignal = AbortSignal.any([AbortSignal.timeout(3000), ...(signal ? [signal] : [])])
+        const response = await transport.request('/props', undefined, metadataSignal)
+        if (response.ok) {
+          const chunks = []
+          let size = 0
+          for await (const chunk of response.body) {
+            size += chunk.length
+            if (size > 1024 * 1024) throw Error('Metadata exceeds limit')
+            chunks.push(chunk)
+          }
+          const metadata = serverModelMetadata(JSON.parse(Buffer.concat(chunks).toString('utf8')), configuration)
+          if (Object.keys(metadata).length) modelMetadata = metadata
+        } else response.body.destroy()
+      } catch { signal?.throwIfAborted() }
+      record({ event: 'chat.gpu.ready', pid: child.pid, loadMs: Date.now() - started, ...diagnostics.snapshot(), ...(modelMetadata ? { modelMetadata, ...(configuration.modelId ? { modelId: configuration.modelId } : {}) } : {}) })
     } catch (error) { await stop(true); throw error }
   }
   try { await ready() } catch (error) { await rm(directory, { recursive: true, force: true }); throw error }
-  const protocol = await initializeProtocol({ configuration: { model: 'local', chatTemplateReasoning: true, chatReasoning: configuration.chatReasoning === true } })
+  const protocol = await initializeProtocol({ configuration: { model: 'local', chatToolSchemaEnvelope: true, chatTemplateReasoning: true, chatReasoning: configuration.chatReasoning === true, recoverUnopenedThinking: configuration.architecture === 'lfm3' } })
   return {
     async dispose() { disposed = true; await stop(); await rm(directory, { recursive: true, force: true }) },
     start(capability, input, call) {

@@ -1,4 +1,4 @@
-import { modelCatalogReferences } from './modelToolSupport.js'
+import { modelIdentityReferences } from './modelToolSupport.js'
 import { imageModelWarning } from './native/image/recipes.mjs'
 
 const zImageTurboModels = new Set([
@@ -18,5 +18,5 @@ export function compatibleImageModel(source, models, specifications, resources, 
 export function compatibleImageRecipe(model) {
   if (model?.runtime !== 'image' || model.imageArchitecture !== 'checkpoint') return undefined
   if (model.origin?.source === 'huggingface' && model.origin.repository === 'unsloth/Z-Image-Turbo-FP8') return 'z-image-turbo'
-  return modelCatalogReferences(model).some(reference => reference.providerId === 'huggingface' && zImageTurboModels.has(reference.modelId)) ? 'z-image-turbo' : undefined
+  return modelIdentityReferences(model).some(reference => reference.providerId === 'huggingface' && zImageTurboModels.has(reference.modelId)) ? 'z-image-turbo' : undefined
 }
