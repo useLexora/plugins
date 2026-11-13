@@ -224,6 +224,116 @@
     {
       "manifest": {
         "schemaVersion": 1,
+        "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup",
+        "name": "任务残留清理",
+        "author": "Lexora",
+        "description": "清理旧版已移除任务的本地残留，不影响现有任务和外部文件。",
+        "categories": [],
+        "tags": [],
+        "version": "1.0.0",
+        "apiVersion": 4,
+        "engines": {
+          "lexora": ">=0.22.0 <1.0.0"
+        },
+        "format": "compiled",
+        "entry": "main.js",
+        "dataVersion": 1,
+        "dependencies": {},
+        "permissions": {
+          "legacyTaskCleanup": true
+        },
+        "contributes": {
+          "skills": [],
+          "mcpConnectors": [],
+          "subagents": [],
+          "iconThemes": [],
+          "themes": [],
+          "conditions": [],
+          "settings": {
+            "modules": [],
+            "groups": [],
+            "items": []
+          },
+          "commands": [
+            {
+              "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.cleanup",
+              "title": "清理任务残留…",
+              "hidden": true
+            },
+            {
+              "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.show-progress",
+              "title": "查看进度与结果",
+              "hidden": true
+            },
+            {
+              "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.get-status",
+              "title": "读取清理状态",
+              "hidden": true
+            },
+            {
+              "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.respond-confirmation",
+              "title": "回应本次清理确认",
+              "hidden": true
+            },
+            {
+              "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.hide-progress",
+              "title": "隐藏清理面板",
+              "hidden": true
+            }
+          ],
+          "menus": [
+            {
+              "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.action",
+              "command": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.cleanup",
+              "target": "extension.actions",
+              "order": 0
+            },
+            {
+              "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.result-action",
+              "command": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.show-progress",
+              "target": "extension.actions",
+              "order": 1
+            }
+          ],
+          "views": [
+            {
+              "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.progress",
+              "title": "任务残留清理 · 确认与结果",
+              "entry": "view.js",
+              "stateVersion": 1,
+              "resource": "none",
+              "location": "context"
+            }
+          ],
+          "fileHandlers": [],
+          "launchers": [],
+          "placements": [
+            {
+              "id": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.progress-panel",
+              "view": "p95e8d9a8d120433d9ba2058e1c844ed0.legacy-task-cleanup.progress",
+              "kind": "view",
+              "target": "workbench",
+              "presentation": {
+                "position": "absolute",
+                "width": 460,
+                "height": 420,
+                "right": 16,
+                "bottom": 16
+              }
+            }
+          ]
+        }
+      },
+      "repository": "https://github.com/useLexora/plugins",
+      "artifact": {
+        "url": "https://github.com/useLexora/plugins/releases/download/legacy-task-cleanup-v1.0.0/legacy-task-cleanup-1.0.0.lexora-extension",
+        "sha256": "48ddfb4e0d9a7b5127ca3b189088ada5407dfd52123387ea99143df56c7ba9ad",
+        "size": 12261
+      }
+    },
+    {
+      "manifest": {
+        "schemaVersion": 1,
         "format": "compiled",
         "id": "lexora.themes",
         "name": "Lexora 主题",
@@ -750,7 +860,7 @@
           "演示文稿",
           "PDF"
         ],
-        "version": "1.1.0",
+        "version": "1.1.1",
         "apiVersion": 4,
         "engines": {
           "lexora": ">=0.17.0"
@@ -1149,13 +1259,13 @@
           }
         }
       },
-      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJsdWUiIHgxPSIxMCIgeTE9IjYiIHgyPSIzMiIgeTI9IjMyIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiM2QjhBRkYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNDI2M0U4Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJncmVlbiIgeDE9IjM4IiB5MT0iNiIgeDI9IjU0IiB5Mj0iMzgiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzRERDVCRiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMxQ0E5OEQiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9Im9yYW5nZSIgeDE9IjQ4IiB5MT0iMzIiIHgyPSIzMiIgeTI9IjU4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiNGRkM4NkEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRjM5QTM4Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJjb3JhbCIgeDE9IjI0IiB5MT0iMjYiIHgyPSIxNCIgeTI9IjU4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiNGRjhFOTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRUU1QTc1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cGF0aCBkPSJNNiAzMlYyMEExNCAxNCAwIDAgMSAyMCA2SDMyTDM4IDIySDI2QTQgNCAwIDAgMCAyMiAyNloiIGZpbGw9InVybCgjYmx1ZSkiLz4KICA8cGF0aCBkPSJNMzIgNkg0NEExNCAxNCAwIDAgMSA1OCAyMFYzMkw0MiAzOFYyNkE0IDQgMCAwIDAgMzggMjJaIiBmaWxsPSJ1cmwoI2dyZWVuKSIvPgogIDxwYXRoIGQ9Ik01OCAzMlY0NEExNCAxNCAwIDAgMSA0NCA1OEgzMkwyNiA0MkgzOEE0IDQgMCAwIDAgNDIgMzhaIiBmaWxsPSJ1cmwoI29yYW5nZSkiLz4KICA8cGF0aCBkPSJNMzIgNThIMjBBMTQgMTQgMCAwIDEgNiA0NFYzMkwyMiAyNlYzOEE0IDQgMCAwIDAgMjYgNDJaIiBmaWxsPSJ1cmwoI2NvcmFsKSIvPgo8L3N2Zz4K",
       "repository": "https://github.com/useLexora/plugins",
       "artifact": {
-        "url": "https://github.com/useLexora/plugins/releases/download/office-v1.1.0/office-1.1.0.lexora-extension",
-        "sha256": "c4d0a40b16d74c86bb37fb23633d05d0a981ab77dee44360f1e926db0aaf3289",
-        "size": 32417265
-      }
+        "url": "https://github.com/useLexora/plugins/releases/download/office-v1.1.1/office-1.1.1.lexora-extension",
+        "sha256": "1e09690a7121a395599d0cb9ca613736454c77c4398832a17db4c7152876e541",
+        "size": 34236020
+      },
+      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCIgZmlsbD0ibm9uZSI+CiAgPGRlZnM+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJsdWUiIHgxPSIxMCIgeTE9IjYiIHgyPSIzMiIgeTI9IjMyIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiM2QjhBRkYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjNDI2M0U4Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJncmVlbiIgeDE9IjM4IiB5MT0iNiIgeDI9IjU0IiB5Mj0iMzgiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agc3RvcC1jb2xvcj0iIzRERDVCRiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMxQ0E5OEQiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9Im9yYW5nZSIgeDE9IjQ4IiB5MT0iMzIiIHgyPSIzMiIgeTI9IjU4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiNGRkM4NkEiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRjM5QTM4Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJjb3JhbCIgeDE9IjI0IiB5MT0iMjYiIHgyPSIxNCIgeTI9IjU4IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIHN0b3AtY29sb3I9IiNGRjhFOTMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjRUU1QTc1Ii8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogIDwvZGVmcz4KICA8cGF0aCBkPSJNNiAzMlYyMEExNCAxNCAwIDAgMSAyMCA2SDMyTDM4IDIySDI2QTQgNCAwIDAgMCAyMiAyNloiIGZpbGw9InVybCgjYmx1ZSkiLz4KICA8cGF0aCBkPSJNMzIgNkg0NEExNCAxNCAwIDAgMSA1OCAyMFYzMkw0MiAzOFYyNkE0IDQgMCAwIDAgMzggMjJaIiBmaWxsPSJ1cmwoI2dyZWVuKSIvPgogIDxwYXRoIGQ9Ik01OCAzMlY0NEExNCAxNCAwIDAgMSA0NCA1OEgzMkwyNiA0MkgzOEE0IDQgMCAwIDAgNDIgMzhaIiBmaWxsPSJ1cmwoI29yYW5nZSkiLz4KICA8cGF0aCBkPSJNMzIgNThIMjBBMTQgMTQgMCAwIDEgNiA0NFYzMkwyMiAyNlYzOEE0IDQgMCAwIDAgMjYgNDJaIiBmaWxsPSJ1cmwoI2NvcmFsKSIvPgo8L3N2Zz4K"
     },
     {
       "manifest": {
@@ -1246,10 +1356,10 @@
           "本地模型",
           "离线推理"
         ],
-        "version": "1.1.0",
+        "version": "1.2.1",
         "apiVersion": 3,
         "engines": {
-          "lexora": ">=0.21.0"
+          "lexora": ">=0.22.0"
         },
         "format": "compiled",
         "entry": "entry.js",
@@ -1508,6 +1618,21 @@
               "hidden": false
             },
             {
+              "id": "lexora.local-models.use-engine",
+              "title": "切换引擎版本",
+              "hidden": false
+            },
+            {
+              "id": "lexora.local-models.import-engine",
+              "title": "使用已有引擎",
+              "hidden": false
+            },
+            {
+              "id": "lexora.local-models.check-engine-updates",
+              "title": "检查引擎更新",
+              "hidden": false
+            },
+            {
               "id": "lexora.local-models.stop",
               "title": "停止模型",
               "hidden": false
@@ -1589,13 +1714,13 @@
           "placements": []
         }
       },
-      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNWI3ZGE1IiBzdHJva2Utd2lkdGg9IjEuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj4KICA8cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iMTQiIGhlaWdodD0iMTQiIHJ4PSI0Ii8+CiAgPHBhdGggZD0iTTkgMi41VjVtNi0yLjVWNU05IDE5djIuNW02LTIuNVYxOU0yLjUgOUg1bS0yLjUgNkg1bTE0LTZoMi41TTE5IDE1aDIuNSIvPgogIDxwYXRoIGQ9Ik05IDE0LjV2LTVsNiA1di01IiBzdHJva2U9IiMzOThiODQiIHN0cm9rZS13aWR0aD0iMS44Ii8+Cjwvc3ZnPgo=",
       "repository": "https://github.com/useLexora/plugins",
       "artifact": {
-        "url": "https://github.com/useLexora/plugins/releases/download/local-models-v1.1.0/local-models-1.1.0.lexora-extension",
-        "sha256": "0eb5f41b0da67ea1fdd04297f0f26c8b21cadc6709cccb47ada5c8aac0e205f6",
-        "size": 387914
-      }
+        "url": "https://github.com/useLexora/plugins/releases/download/local-models-v1.2.1/local-models-1.2.1.lexora-extension",
+        "sha256": "8a02f72995b47ce94f695b3c7d1152b3eeca8b27d35e1c5c79719366e56c36b8",
+        "size": 438772
+      },
+      "iconUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNWI3ZGE1IiBzdHJva2Utd2lkdGg9IjEuNiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj4KICA8cmVjdCB4PSI1IiB5PSI1IiB3aWR0aD0iMTQiIGhlaWdodD0iMTQiIHJ4PSI0Ii8+CiAgPHBhdGggZD0iTTkgMi41VjVtNi0yLjVWNU05IDE5djIuNW02LTIuNVYxOU0yLjUgOUg1bS0yLjUgNkg1bTE0LTZoMi41TTE5IDE1aDIuNSIvPgogIDxwYXRoIGQ9Ik05IDE0LjV2LTVsNiA1di01IiBzdHJva2U9IiMzOThiODQiIHN0cm9rZS13aWR0aD0iMS44Ii8+Cjwvc3ZnPgo="
     }
   ]
 }
